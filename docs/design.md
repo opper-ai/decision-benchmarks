@@ -119,3 +119,38 @@ Cookies HttpOnly, `Path=/decision-benchmarks/<slug>/`: players sign in per game.
 jevman's code is AGPL-3.0-or-later (authors: Johnny Chadda, Felix Wunderlich, Jose Sabater). The root LICENSE and the
 kit stay AGPL until all three agree to MIT; then the kit is relicensed in one commit. `games/fighter` keeps its MIT
 LICENSE; `games/snake` is MIT.
+
+## Implementation notes (phase 1, the kit and Pac-Man on it)
+
+Where building the kit changed or filled in the design above, and why:
+
+- **GameDefinition.** `Rec` has no `{ format }` constraint: Pac-Man's recordings (submitted ones included) carry
+  `version`, and the kit never reads a recording itself. `play` also gets `model`, the id the recording names. A
+  game's `rules.maxRecordingBytes` caps the gzipped file; unpacked it may be eight times that.
+- **decideRequest.** The game's check runs for every key (player, pool, dev), not only the pool's: the service never
+  forwards anything its games would not send. The kit also caps every request at five questions. A verdict may carry
+  `as`, the game's own name for the model: the response names the model that way and answers are signed as it, so a
+  game can keep the ids its recordings use (Pac-Man keeps jevman's `opper/clef` while the request carries
+  `sference/clef`).
+- **Seeds.** A submission's games must be `game-01` to `game-N`, each once; game n is replayed on `seedFor(n - 1)`,
+  which the game's `verify` checks against the recording. Pac-Man has no randomness, so its `seedFor` is constant.
+- **Settings.** One redirect URI per game comes from `PUBLIC_BASE_URL` + `APP_BASE_PATH` + slug, so jevman's
+  `OPPER_REDIRECT_URI` and `OPPER_OAUTH_REDIRECT_URI` are gone, as is `JEV_MODEL` (a request without a model plays
+  Jev). High scores: `HIGHSCORES_BUCKET` (each game at `[HIGHSCORES_PREFIX/]<slug>/highscores.json`) or
+  `HIGHSCORES_DIR`. `ALLOW_HTTP=1` replaces `JEVMAN_ALLOW_HTTP`. `GAMES=<slug>,...` makes the service serve those
+  games instead of the registry, fixtures included (`GAMES=pacman` locally). Cookies are `db_session` (path
+  `<base>/<slug>/`) and `db_oauth_state` (path `<base>/<slug>/auth`).
+- **Routes.** `/revision` answers below the base path and lists the games served. `POST /api/highscores` answers with
+  `order` too. A production image refuses to start without an https `PUBLIC_BASE_URL` even with no games mounted.
+- **Pac-Man.** Its `leaderboard.json` and the `community.json` the kit builds are in the contract shape (Opper ids;
+  its numbers in `extra`); `shared/leaderboard.ts` turns them back into jevman's shape for its page. It has a
+  `game.json` but no poster (not live), and `check-contract` checks it without one. Its bench-only flags (ghosts
+  played by models, `--pacman greedy`) are gone with the old bench script; `--record` remains, for demos.
+- **Build and tooling.** `vitest.config.ts` is separate from `vite.config.ts` (which needs `GAME`). `community.json`
+  is not committed: `npm run submissions` writes it, and `npm run build` runs it for each game. Scripts run under
+  plain Node (no tsx). A game's page takes the shared opper.ai chrome with
+  `@import "../../../packages/kit/client/opper-chrome.css"` at the top of its stylesheet.
+- **CI.** `.github/workflows/ci.yml`: typecheck, tests, every game's submissions replayed, the contract checked, the
+  image built and smoke-tested. The deploy job comes with the infrastructure (step 0).
+- **games/fighter** stays outside the root typecheck and tests until it is ported (its video export needs
+  mediabunny, which is not a root dependency).
