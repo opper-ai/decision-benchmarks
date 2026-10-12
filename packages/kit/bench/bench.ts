@@ -42,9 +42,16 @@ interface Contender {
   name: string;
   via: Entry['via'];
   transport: Transport;
-  /** A game's own scripted player: nothing to warm up. */
+  /** One of the game's baselines: nothing to warm up. */
   baseline?: boolean;
 }
+
+/** The transport of a baseline the game plays itself: never called, since `play` plays it without a model. */
+const ownPlayer =
+  (id: string): Transport =>
+  async () => {
+    throw new Error(`${id} is played by the game itself, not through a model`);
+  };
 
 export interface BenchPaths {
   /** games/<slug>/public: where --leaderboard writes leaderboard.json. */
@@ -133,7 +140,8 @@ export async function runBench(game: GameDefinition<unknown, GameResult>, argv: 
       if (id.startsWith(BASELINE_PREFIX)) {
         const b = game.baselines?.[id.slice(BASELINE_PREFIX.length)];
         if (!b) fail(`${game.slug} has no baseline ${id}; ${Object.keys(game.baselines ?? {}).length ? `one of: ${Object.keys(game.baselines!).map((n) => BASELINE_PREFIX + n).join(', ')}` : 'it has none'}`);
-        contenders.push({ model: id, name: b!.name, via: 'systemone', transport: b!.transport(), baseline: true });
+        // A baseline without a transport is played by the game itself: `play` gets its id as `model`.
+        contenders.push({ model: id, name: b!.name, via: 'systemone', transport: b!.transport ? b!.transport() : ownPlayer(id), baseline: true });
         continue;
       }
       if (!isModelId(id)) fail(`Unknown model ${id}; one of: ${DECISION_MODELS.map((m) => m.id).join(', ')}`);
@@ -153,7 +161,7 @@ export async function runBench(game: GameDefinition<unknown, GameResult>, argv: 
 
   for (const c of contenders) {
     log(`\n${c.name} (${c.model})`);
-    // Warm first: a cold model's first answers would come too late and count as fallbacks.
+    // Warm first: a cold model's first answers would come too late and count as fallbacks. A baseline is no model.
     const problem = c.baseline ? null : await warmUp(c.transport, { fastMs: timeoutMs * 0.9, log });
     if (problem) {
       if (!leaderboard) fail(`${c.name}: ${problem}`);

@@ -1,32 +1,66 @@
-import { getMe, getReplay, type Me } from './api.ts';
-import { subscribe, summary } from './connections.ts';
-import { openConnect } from './views/connect.ts';
+import { POOL_EMPTY_NOTICE, poolAmount, signIn, signOut, takeAuthError, walletNotice } from '../../../packages/kit/client/auth.ts';
+import type { TransportHooks } from '../../../packages/kit/client/transport.ts';
+import type { Replay } from '../shared/replay.ts';
+import { getDemo, getMe, type Me } from './api.ts';
 import { audio } from './audio.ts';
 import { h } from './dom.ts';
 import './style.css';
 import { fightView } from './views/fight.ts';
-import { leaderboardView, replaysView } from './views/lists.ts';
+import { leaderboardView } from './views/leaderboard.ts';
 import { posesView } from './views/poses.ts';
 import { replayView } from './views/replay.ts';
+import { stillView } from './views/still.ts';
+import { watchView } from './views/watch.ts';
 
+// One page, routed by the address's hash (#/watch, #/leaderboard, ...), so it works below any base path.
 const app = document.getElementById('app')!;
-let me: Me = { mode: 'none', user: null, loginAvailable: false, models: [] };
+let me: Me = { mode: 'none', walletUrl: 'https://platform.opper.ai/wallet', loginAvailable: false };
+let notice: { text: string; link?: string } | null = null;
 let cleanup: () => void = () => {};
+/** The match just played on this page: Watch can replay it, nothing else keeps it. */
+let lastMatch: Replay | null = null;
 
-let connectBtn: HTMLElement | null = null;
-function paintConnect(): void {
-  if (!connectBtn) return;
-  const what = summary(me);
-  connectBtn.replaceChildren(h('span.connect-dot', { 'data-on': what ? '1' : '0' }), what || 'Connect');
-  connectBtn.title = what ? `Connected: ${what}` : 'Sign in with Opper, add an API key or an endpoint';
+const account = h('div.account', { 'aria-live': 'polite' });
+
+/** Who plays the models: the free credits, your Opper account or the local key; and sign in or out. */
+function paintAccount(): void {
+  const parts: (Node | string)[] = [];
+  if (me.mode === 'player') {
+    parts.push(h('span', null, me.user?.email ?? me.user?.name ?? 'Signed in'), h('button.btn.small', { type: 'button', onclick: () => void signOut() }, 'Sign out'));
+  } else {
+    if (me.mode === 'pool') {
+      const amount = me.pool?.open === false ? null : poolAmount(me.pool?.remainingUsd ?? null);
+      parts.push(h('span.credits', { title: 'Free credits: a shared pool for everyone to try the models' }, me.pool?.open === false ? 'Free credits used up' : `Free credits${amount ? ` ${amount}` : ''}`));
+    } else if (me.mode === 'dev') parts.push(h('span.badge', { title: 'Models play on the key in .env' }, 'Local key'));
+    if (me.loginAvailable) parts.push(h('button.btn.small.primary', { type: 'button', onclick: signIn }, 'Login with Opper'));
+  }
+  if (notice) parts.push(notice.link ? h('a.notice', { href: notice.link, target: '_blank', rel: 'noopener' }, notice.text) : h('span.notice', null, notice.text));
+  account.replaceChildren(...parts);
 }
-subscribe(paintConnect);
 
-function header(): HTMLElement {
-  const link = (href: string, text: string) => h(`a.nav${location.pathname === href ? '.active' : ''}`, { href }, text);
-  // Everything about keys, sign-in and endpoints lives behind one button, labelled with what is connected.
-  connectBtn = h('button.btn.small.connect-btn', { type: 'button', onclick: () => openConnect(me) });
-  paintConnect();
+const setNotice = (text: string, link?: string) => {
+  notice = { text, ...(link ? { link } : {}) };
+  paintAccount();
+};
+
+/** What the transport tells the page when a model call cannot be paid for. */
+const hooks: TransportHooks = {
+  onSignedOut: () => {
+    me = { ...me, mode: me.pool ? 'pool' : 'none', user: undefined };
+    setNotice('Your Opper sign-in has expired. Sign in again to keep playing.');
+  },
+  onPoolEmpty: () => {
+    if (me.pool) me = { ...me, pool: { ...me.pool, open: false } };
+    setNotice(POOL_EMPTY_NOTICE);
+  },
+  onWalletEmpty: (url) => {
+    const w = walletNotice(url);
+    setNotice(w.notice, w.noticeLink);
+  },
+};
+
+function header(path: string): HTMLElement {
+  const link = (href: string, text: string, active: boolean) => h(`a.nav${active ? '.active' : ''}`, { href }, text);
   const toggle = (key: 'sound' | 'music', label: string, icon: string) => {
     const b = h('button.btn.small.toggle', { type: 'button', 'aria-pressed': String(audio.settings[key]), title: `${label} on/off`, html: `${icon}<span>${label}</span>` });
     b.addEventListener('click', () => audio.set({ [key]: !audio.settings[key] }));
@@ -38,10 +72,10 @@ function header(): HTMLElement {
   return h(
     'header.top',
     null,
-    h('a.logo', { href: '/' }, 'Jev Fighter'),
-    h('nav', null, link('/', 'Fight'), link('/replays', 'Replays'), link('/leaderboard', 'Leaderboard')),
+    h('a.logo', { href: '#/' }, 'Jev Fighter'),
+    h('nav', null, link('#/', 'Play', path === '/' || path === ''), link('#/watch', 'Watch', path.startsWith('/watch') || path === '/replay'), link('#/leaderboard', 'Leaderboard', path === '/leaderboard')),
     h('div.audio-toggles', null, toggle('sound', 'Sound', SPEAKER), toggle('music', 'Music', NOTE)),
-    connectBtn,
+    account,
   );
 }
 
@@ -49,45 +83,58 @@ async function route(): Promise<void> {
   cleanup();
   cleanup = () => {};
   audio.scene(false);
+  const path = location.hash.replace(/^#/, '').split('?')[0] || '/';
+  // A recorded match's frame on its own, filling the window (#/still/<file>?t=<tick>): for posters and embeds.
+  const still = /^\/still\/([a-z0-9][a-z0-9-]*\.fight\.json\.gz)$/.exec(path);
+  if (still) {
+    const r = await getDemo(still[1]!).catch(() => null);
+    if (r) cleanup = stillView(app, r, Number(new URLSearchParams(location.hash.split('?')[1] ?? '').get('t')) || 0);
+    return;
+  }
   const main = h('main');
-  app.replaceChildren(header(), main);
-  const path = location.pathname;
-  const m = /^\/replay\/([a-z0-9-]+)$/.exec(path);
+  app.replaceChildren(header(path), main);
+  paintAccount();
+  const demo = /^\/watch\/([a-z0-9][a-z0-9-]*\.fight\.json\.gz)$/.exec(path);
   try {
-    if (m) {
-      main.append(h('p.note.page', null, 'Loading replay...'));
-      const { replay, source } = await getReplay(m[1]);
-      cleanup = replayView(main, replay, m[1], { source, admin: Boolean(me.admin), onDeleted: () => navigate('/replays') });
-    } else if (path === '/replays') {
-      await replaysView(main, me);
-    } else if (path === '/poses') {
-      posesView(main);
+    if (demo) {
+      main.append(h('p.note.page', null, 'Loading the match...'));
+      const r = await getDemo(demo[1]!);
+      cleanup = replayView(main, r, { link: `#/watch/${demo[1]}` });
+    } else if (path === '/replay' && lastMatch) {
+      cleanup = replayView(main, lastMatch, { note: 'The match you just played. It is not saved anywhere: download it to keep it.' });
+    } else if (path.startsWith('/watch')) {
+      await watchView(main);
     } else if (path === '/leaderboard') {
       await leaderboardView(main);
+    } else if (path === '/poses') {
+      posesView(main);
     } else {
-      cleanup = fightView(main, me, navigate);
+      cleanup = fightView(main, {
+        me,
+        hooks,
+        signIn,
+        watch: (r) => {
+          lastMatch = r;
+          navigate('#/replay');
+        },
+        navigate,
+      });
     }
   } catch (e) {
     main.replaceChildren(h('div.page', null, h('h1', null, 'Something went wrong'), h('p', null, (e as Error).message)));
   }
 }
 
-export function navigate(path: string): void {
-  history.pushState(null, '', path);
-  void route();
+/** Goes to `hash`; going to the page already shown starts it afresh (a new fight). */
+export function navigate(hash: string): void {
+  if (location.hash === hash || (hash === '#/' && !location.hash)) void route();
+  else location.hash = hash;
 }
 
-document.addEventListener('click', (e) => {
-  const a = (e.target as HTMLElement).closest('a');
-  // Leave downloads, new tabs and external links to the browser.
-  if (!a || a.target || a.hasAttribute('download') || a.dataset.external || e.metaKey || e.ctrlKey || e.shiftKey) return;
-  const url = new URL(a.href, location.href);
-  // blob: and data: URLs report this page's origin, so check the protocol too.
-  if (url.origin !== location.origin || (url.protocol !== 'http:' && url.protocol !== 'https:')) return;
-  e.preventDefault();
-  navigate(url.pathname);
-});
-window.addEventListener('popstate', () => void route());
+window.addEventListener('hashchange', () => void route());
 
-me = await getMe().catch(() => me);
+const authError = takeAuthError();
+if (authError) notice = { text: authError };
+me = await getMe();
+if (me.unavailable && !notice) notice = { text: "Couldn't reach the server" };
 void route();

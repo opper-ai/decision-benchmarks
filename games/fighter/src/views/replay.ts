@@ -1,5 +1,4 @@
-import type { Source } from '../../shared/stats.ts';
-import { deleteButton, sourceBadge } from './lists.ts';
+import { downloadReplay } from '../api.ts';
 import { TICK_MS } from '../../shared/match.ts';
 import { ReplayPlayer, type Decision, type Replay } from '../../shared/replay.ts';
 import { clockTime, h, money } from '../dom.ts';
@@ -12,7 +11,8 @@ import { audio } from '../audio.ts';
 import { clipName, exportClip, exportSupported } from '../export.ts';
 import { OUTCOME_COLORS, SIDES } from '../theme.ts';
 
-export function replayView(host: HTMLElement, r: Replay, id: string | null, opts: { source?: Source; admin?: boolean; onDeleted?: () => void } = {}): () => void {
+/** A match played back: the stage, the decisions, stats and clip export. `link` is its address, for a recorded one. */
+export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; note?: string } = {}): () => void {
   const player = new ReplayPlayer(r);
   const bySide = decisionsBySide(r);
   const stageHost = h('div.stage-wrap');
@@ -268,9 +268,8 @@ export function replayView(host: HTMLElement, r: Replay, id: string | null, opts
             h('span', { style: { color: SIDES[0].deep } }, a.label),
             ' vs ',
             h('span', { style: { color: SIDES[1].deep } }, b.label),
-            opts.source ? sourceBadge(opts.source) : null,
-            id && opts.admin ? deleteButton(id, () => opts.onDeleted?.()) : null,
           ),
+          opts.note ? h('p.note', null, opts.note) : null,
           h('div.sub', null, `${winner}. ${r.mode === 'paused' ? 'Paused' : 'Real-time'} mode, ${r.track ?? 'assisted'} track, ${r.deadlineMs} ms deadline, ${r.decisions.length} decisions, ${money(r.costUsd)}.`, player.diverged !== null ? h('strong.warn', null, ` Replay diverged at ${clockTime(player.diverged)}.`) : ''),
         ),
         stageHost,
@@ -293,14 +292,14 @@ export function replayView(host: HTMLElement, r: Replay, id: string | null, opts
           null,
           ...['hit', 'traded', 'punished', 'blocked', 'whiffed', 'defended'].map((o) => h('span', null, h('span.sq', { style: { background: OUTCOME_COLORS[o] } }), o === 'punished' ? 'got hit' : o)),
           h('span', null, h('span.sq.ko'), 'KO'),
-          id ? h('span.share', null, h('a', { href: `/replay/${id}` }, 'Link to this replay')) : '',
+          h('span.share', null, opts.link ? h('a', { href: opts.link }, 'Link to this match') : null, ' ', h('button.btn.small', { type: 'button', onclick: () => void downloadReplay(r) }, 'Download')),
         ),
       ),
       h('aside.panel', null, h('div.tabs', null, tabDecisions, tabStats), panelBody),
     ),
   );
   showDecisions();
-  const at = Number(new URLSearchParams(location.search).get('t'));
+  const at = Number(new URLSearchParams(location.hash.split('?')[1] ?? '').get('t'));
   if (at > 0) {
     seek(Math.min(r.ticks, at));
     setPlaying(false);

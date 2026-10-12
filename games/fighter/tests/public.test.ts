@@ -1,0 +1,34 @@
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
+import { describe, expect, it } from 'vitest';
+import { validateLeaderboard } from '../../../packages/kit/shared/contract.ts';
+import game from '../game.ts';
+import { BASELINES } from '../shared/baselines.ts';
+import { verifyGauntlet, type GauntletRecording } from '../shared/gauntlet.ts';
+import { ReplayPlayer } from '../shared/replay.ts';
+
+const file = (name: string) => new URL(`../public/${name}`, import.meta.url);
+const json = (name: string) => JSON.parse(readFileSync(file(name), 'utf8')) as Record<string, any>;
+
+describe('the files the page serves', () => {
+  it("lists recordings for Watch that replay exactly and check out as the benchmark's matches", () => {
+    const { demos } = json('demo/index.json') as { demos: { file: string; title: string }[] };
+    expect(demos.length).toBeGreaterThanOrEqual(3);
+    for (const d of demos) {
+      const rec = JSON.parse(gunzipSync(readFileSync(file(`demo/${d.file}`))).toString('utf8')) as GauntletRecording;
+      expect(new ReplayPlayer(rec).diverged, d.file).toBeNull();
+      const v = verifyGauntlet(rec, rec.bench.seed);
+      expect(v.ok ? 'ok' : v.error, d.file).toBe('ok');
+      expect(d.title).toBe(`${rec.fighters[0].label} vs ${rec.fighters[1].label}`);
+    }
+  });
+
+  it("has every baseline's own results on the benchmark, in the leaderboard's shape", () => {
+    const b = json('baselines.json');
+    expect(validateLeaderboard(b, 'fighter')).toEqual([]);
+    expect(b.benchVersion).toBe(game.benchVersion);
+    expect(b.metric).toEqual(game.metric);
+    expect(b.entries.map((e: { model: string }) => e.model).sort()).toEqual([...BASELINES].sort());
+    for (const e of b.entries) expect(e.games).toBeGreaterThanOrEqual(game.rules.officialGames);
+  });
+});

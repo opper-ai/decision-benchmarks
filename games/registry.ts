@@ -17,6 +17,11 @@ export const REGISTRY: readonly RegisteredGame[] = [
     server: () => import('./snake/game.server.ts').then((m) => m.default),
     definition: () => import('./snake/game.ts').then((m) => m.default as unknown as GameDefinition<unknown, GameResult>),
   },
+  {
+    slug: 'fighter',
+    server: () => import('./fighter/game.server.ts').then((m) => m.default),
+    definition: () => import('./fighter/game.ts').then((m) => m.default as unknown as GameDefinition<unknown, GameResult>),
+  },
 ];
 
 /**

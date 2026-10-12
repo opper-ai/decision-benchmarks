@@ -1,0 +1,17 @@
+{
+  "slug": "fighter",
+  "name": "Jev Fighter",
+  "tagline": "Stick figures fight, decision models pick every move: ranked by the rounds they win against three fixed-rule baselines.",
+  "category": "Fighting",
+  "author": {
+    "github": "Jose-Sabater",
+    "originalRepo": "https://github.com/Jose-Sabater/jev-fighter"
+  },
+  "license": "MIT",
+  "metric": {
+    "name": "Round-win share vs baselines",
+    "unit": "%",
+    "higherIsBetter": true
+  },
+  "updatedAt": "2026-10-12T00:00:00.000Z"
+}

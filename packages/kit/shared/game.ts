@@ -57,16 +57,20 @@ export interface GameDefinition<Rec = unknown, R extends GameResult = GameResult
   /** Game-specific numbers for a model's results, shown as the leaderboard entry's `extra`. */
   summarize?(results: R[]): Record<string, number | string>;
   /**
-   * Free players for reference, by name: the bench plays one with `--model baseline/<name>`, without a key or a network
-   * call. Their results go to a file of their own (a game's baselines.json), never to the official leaderboard.
+   * Free players for reference, by name: the bench plays one with `--model baseline/<name>`, without a key, a warm-up or
+   * a network call. Their results go to a file of their own (a game's baselines.json), never to the official leaderboard.
    */
   baselines?: Record<string, Baseline>;
 }
 
-/** A scripted player that answers the game's questions itself, through the same transport a model would. */
+/**
+ * A scripted player for reference. With `transport` it answers the game's questions itself, through the same transport
+ * a model would. Without one the game plays it: `play` gets `model: 'baseline/<name>'` and a transport that throws if
+ * ever called (for baselines that read the full game state rather than the questions).
+ */
 export interface Baseline {
   name: string;
-  transport(): Transport;
+  transport?(): Transport;
 }
 
 /** The model id a baseline plays under: `baseline/<name>`. */

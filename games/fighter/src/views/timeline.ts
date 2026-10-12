@@ -13,11 +13,14 @@ export class Timeline {
   private dragging = false;
   head = 0;
 
-  constructor(
-    private r: Replay,
-    private events: GameEvent[],
-    private onSeek: (tick: number) => void,
-  ) {
+  private r: Replay;
+  private events: GameEvent[];
+  private onSeek: (tick: number) => void;
+
+  constructor(r: Replay, events: GameEvent[], onSeek: (tick: number) => void) {
+    this.r = r;
+    this.events = events;
+    this.onSeek = onSeek;
     this.el = document.createElement('canvas');
     this.el.className = 'timeline';
     this.el.setAttribute('aria-label', 'Match timeline: drag to seek');

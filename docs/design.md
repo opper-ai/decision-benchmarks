@@ -157,17 +157,28 @@ Where building the kit changed or filled in the design above, and why:
   `@import "../../../packages/kit/client/opper-chrome.css"` at the top of its stylesheet.
 - **CI.** `.github/workflows/ci.yml`: typecheck, tests, every game's submissions replayed, the contract checked, the
   image built and smoke-tested. The deploy job comes with the infrastructure (step 0).
-- **games/fighter** stays outside the root typecheck and tests until it is ported (its video export needs
-  mediabunny, which is not a root dependency).
 
 ## Implementation notes (snake, the first game on the kit)
 
-- **Baselines.** `GameDefinition.baselines` lists a game's free scripted players, each a transport that answers the
-  game's questions itself. The bench plays them with `--model baseline/<name>` (no key, no warm-up) and writes them
-  only with `--leaderboard --out <file>` (snake's `public/baselines.json`): never into `leaderboard.json` or a
-  submission, so the hub never shows a baseline as a model. A game's page reads its baselines file itself.
+- **Baselines.** `GameDefinition.baselines` lists a game's free scripted players by name. A baseline with a
+  `transport` answers the game's questions itself, like a model (snake's). One without is played by the game itself,
+  for baselines that read the full game state (the fighter's): the bench calls `play` with `model: 'baseline/<name>'`
+  and a transport that throws if ever called. The bench plays either with `--model baseline/<name>` (no key, no
+  warm-up) and writes them only with `--leaderboard --out <file>` (a game's `public/baselines.json`): never into
+  `leaderboard.json` or a submission, and submissions may not take a baseline's name or id, so the hub never shows a
+  baseline as a model. A game's page reads its baselines file itself.
 - **Issued seeds.** A game whose high scores need a dealt board sets `highScores.seeded`; the service then answers
   `GET <game>/api/seed` with a random 31-bit seed and a stateless token signed with a per-game key
   (`HMAC(SESSION_SECRET, "decision-benchmarks:seeds:" + slug)`, one hour). `highScores.check` gets a `SeedVerifier`
   as its third argument, returning the seed and the token's age. The client side is `packages/kit/client/seeds.ts`.
 - **Snake** follows `games/snake/SPEC.md`; its last section lists where the build differs from the spec.
+
+## Implementation notes (phase 2, the fighter on the kit)
+
+- **games/fighter** is in the registry, the root typecheck and the root tests. Its port is recorded, with the choices
+  the code forced, in `games/fighter/docs/specs/2026-10-12-port-to-kit.md`.
+- **Baselines.** The fighter's five baselines (`baseline/random`, `guard`, `greedy`, `payoff`, `maximin`) are
+  `baselines` without a transport (see above); `public/baselines.json` holds their results.
+- **Shared settings.** The root `tsconfig.json` takes the fighter's ES2023 target and `verbatimModuleSyntax`, which the
+  whole repository passes. mediabunny (clip export in the browser) is the first runtime dependency, pinned exactly; it
+  ships in the fighter's page bundle only, never in the service.
