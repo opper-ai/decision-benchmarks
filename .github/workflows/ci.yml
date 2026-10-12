@@ -1,14 +1,13 @@
 name: CI
 
-# Every push and pull request: typecheck, unit tests, every game's submissions replayed with our code, the hub contract
-# checked, then the image as deployed (below /decision-benchmarks) gets a container smoke test. Deploying (image to
-# ECR, the ECS service) is added with the infrastructure: see docs/design.md, "Service".
+# Every pull request (and, through deploy.yml, every push to main): typecheck, unit tests, every game's submissions
+# replayed with our code, the hub contract checked, then the image as deployed (below /decision-benchmarks) gets a
+# container smoke test. deploy.yml calls this workflow and deploys only when it passes.
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
 
 permissions:
   contents: read

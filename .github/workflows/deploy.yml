@@ -1,0 +1,207 @@
+name: Deploy
+
+# A push to main of opper-ai/decision-benchmarks: the whole CI (ci.yml) first, then the image goes to ECR and the
+# decision-benchmarks ECS service rolls to it, as opper-ai/jevman-benchmark does. Auth is OIDC into the deploy role
+# (Terraform: opper-ai/terraform environments/eu-north/decision-benchmarks.tf), so there are no long-lived AWS keys.
+# Its ARN is the AWS_DEPLOY_ROLE_ARN repository secret.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false # never interrupt an in-flight deploy
+
+env:
+  AWS_REGION: eu-north-1
+  ECR_REPOSITORY: opper/decision-benchmarks
+  ECS_CLUSTER: opper-eu-north
+  ECS_SERVICE: opper-eu-north-service-decision-benchmarks
+  ECS_TASK_FAMILY: opper-eu-north-decision-benchmarks
+  CONTAINER_NAME: decision-benchmarks
+  LOG_GROUP: /opper/eu-north-decision-benchmarks
+  # Baked into the clients at build time; the image also sets APP_BASE_PATH for the server.
+  APP_BASE_PATH: /decision-benchmarks
+  VITE_PUBLIC_URL: https://opper.ai
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      packages: read
+
+  deploy:
+    name: Build image & deploy to ECS
+    needs: test
+    # Only a green push to main of the Opper repository deploys; never pull requests or forks.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'opper-ai/decision-benchmarks'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      id-token: write # request the OIDC token to assume the AWS role
+      contents: read
+      packages: read # pull ghcr.io/opper-ai/opper-secrets (the loadsecrets layer)
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      - name: Login to GHCR (for the loadsecrets layer)
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      # Only the commit tag: the ECR repository has immutable tags, so re-pushing `latest` would fail.
+      - name: Build and push image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          push: true
+          provenance: false
+          build-args: |
+            APP_BASE_PATH=${{ env.APP_BASE_PATH }}
+            VITE_PUBLIC_URL=${{ env.VITE_PUBLIC_URL }}
+            SOURCE_COMMIT=${{ github.sha }}
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.ECS_TASK_FAMILY }} \
+            --query taskDefinition \
+            | jq 'del(.compatibilities, .taskDefinitionArn, .requiresAttributes, .revision, .status, .registeredAt, .registeredBy)' \
+            > task-definition.json
+
+      - name: Render new image into task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@8d79160660ad39c402a16e5fc7cd2a32e8f7d6b7 # v1.9.1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+      # The action only registers the task definition and updates the service. Its built-in stability waiter is
+      # off (media-studio saw it spin silently for 30 minutes on an already-stable service); the next step polls
+      # rolloutState instead, bounded and with progress.
+      - name: Deploy to ECS
+        id: deploy
+        uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de # v2.6.3
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: false
+
+      # COMPLETED -> done; FAILED -> the circuit breaker gave up (tasks crash or fail health checks) and is rolling
+      # back, so fail the run (the diagnose job then prints why). 40 x 15 s = 10 min, far above a normal rollout.
+      - name: Wait for rollout
+        env:
+          # Our deployment by its task definition: a circuit-breaker rollback becomes PRIMARY and would read COMPLETED.
+          TASK_DEF: ${{ steps.deploy.outputs.task-definition-arn }}
+        run: |
+          for i in $(seq 1 40); do
+            read -r STATE RUNNING DESIRED <<< "$(aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+              --query "services[0].deployments[?taskDefinition=='$TASK_DEF'] | [0].[rolloutState, runningCount, desiredCount]" \
+              --output text)"
+            echo "[$((i*15))s] rollout=$STATE running=$RUNNING/$DESIRED"
+            case "$STATE" in
+              COMPLETED) echo "rollout completed"; exit 0 ;;
+              FAILED|None) echo "::error::rollout failed - circuit breaker rolled back (or the deployment is gone)"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error::rollout still IN_PROGRESS after 10 minutes"
+          exit 1
+
+      # /revision is no-store, so this reads the tasks behind CloudFront: done once they serve this commit.
+      - name: Verify the deployed commit
+        run: |
+          for i in $(seq 1 30); do
+            commit=$(curl -fsS --max-time 5 "${VITE_PUBLIC_URL}${APP_BASE_PATH}/revision" | jq -r .commit || true)
+            echo "[$((i*10))s] serving ${commit:-nothing}"
+            if [ "$commit" = "$GITHUB_SHA" ]; then
+              echo "Deployed \`$GITHUB_SHA\` to ${VITE_PUBLIC_URL}${APP_BASE_PATH}/" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::${VITE_PUBLIC_URL}${APP_BASE_PATH}/revision never reported $GITHUB_SHA"
+          exit 1
+
+  # If the deploy fails, surface why in the run: the service's rollout state and recent events, why the newest
+  # stopped container exited, and the last app log lines. Never fails the run itself (the deploy job already does).
+  # The stopped-task and log sections need ecs:ListTasks, ecs:DescribeTasks, logs:DescribeLogStreams and
+  # logs:GetLogEvents on the deploy role; without them they print the AWS denial.
+  diagnose:
+    name: Diagnose failed deploy
+    needs: deploy
+    if: failure() && needs.deploy.result == 'failure'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Dump ECS rollout, task exit reason and app logs
+        run: |
+          set +e
+          echo "::group::Service rollout state + recent events"
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].{rollout:deployments[0].rolloutState,reason:deployments[0].rolloutStateReason,running:runningCount,desired:desiredCount}' \
+            --output table
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'reverse(services[0].events[:15]).[createdAt,message]' --output text
+          echo "::endgroup::"
+
+          echo "::group::Why the container exited (newest stopped task)"
+          TASK=$(aws ecs list-tasks --cluster "$ECS_CLUSTER" --service-name "$ECS_SERVICE" \
+            --desired-status STOPPED --query 'taskArns[0]' --output text 2>&1)
+          if [ -n "$TASK" ] && [ "$TASK" != "None" ] && [[ "$TASK" == arn:* ]]; then
+            aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$TASK" \
+              --query 'tasks[0].{stopped:stoppedReason,container:containers[0].name,exit:containers[0].exitCode,reason:containers[0].reason}' \
+              --output table
+          else
+            echo "no stopped task (or missing ecs:ListTasks): $TASK"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Recent app logs"
+          STREAM=$(aws logs describe-log-streams --log-group-name "$LOG_GROUP" \
+            --order-by LastEventTime --descending --max-items 1 \
+            --query 'logStreams[0].logStreamName' --output text 2>&1)
+          if [ -n "$STREAM" ] && [ "$STREAM" != "None" ] && [[ "$STREAM" != *"error"* ]]; then
+            aws logs get-log-events --log-group-name "$LOG_GROUP" --log-stream-name "$STREAM" \
+              --limit 50 --query 'events[].message' --output text
+          else
+            echo "no log stream (or missing logs perms): $STREAM"
+          fi
+          echo "::endgroup::"
+          exit 0
