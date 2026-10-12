@@ -132,6 +132,11 @@ Where building the kit changed or filled in the design above, and why:
   `as`, the game's own name for the model: the response names the model that way and answers are signed as it, so a
   game can keep the ids its recordings use (Pac-Man keeps jevman's `opper/clef` while the request carries
   `sference/clef`).
+- **Review fixes.** `GameServer.models` (optional) lists the Opper ids a game plays: /api/warm and /api/decide refuse
+  any other with 400 before calling upstream. `GameDefinition.baselines` (optional) names non-model players. A
+  submission may not take a name or id on the game's own leaderboard.json, the kit's models or the baselines; a game
+  already in an earlier submission (by folder name) is refused; `recordedAt` must be a past ISO date, and game.json's
+  `updatedAt` reads only accepted submissions. Hidden paths are 404. The image's code is root-owned.
 - **Seeds.** A submission's games must be `game-01` to `game-N`, each once; game n is replayed on `seedFor(n - 1)`,
   which the game's `verify` checks against the recording. Pac-Man has no randomness, so its `seedFor` is constant.
 - **Settings.** One redirect URI per game comes from `PUBLIC_BASE_URL` + `APP_BASE_PATH` + slug, so jevman's

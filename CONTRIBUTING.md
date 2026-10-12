@@ -78,8 +78,8 @@ rule or doesn't replay to its recorded result. Once it's merged, your model show
 ### What "self-reported" means
 
 Every game here is deterministic, so CI replays your recorded moves with our code and recomputes every score itself.
-A submission can't claim more than its moves earned, play other seeds than the fixed ones, or send the same game
-twice.
+A submission can't claim more than its moves earned, play other seeds than the fixed ones, send the same game
+twice (in one submission or across submissions), or take the name of a model on the official leaderboard.
 
 What a replay can't check: that your model made those moves, how fast it really answered, how often it fell back,
 what it cost, and that you didn't play more runs and keep the best one. Those are as you report them, which is why
