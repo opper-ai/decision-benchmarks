@@ -28,12 +28,14 @@ ENV NODE_ENV=production \
     APP_BASE_PATH=${APP_BASE_PATH}
 WORKDIR /app
 # The service uses only Node built-ins and the games' own (Node-safe) code, so no node_modules ship in the image.
-COPY --chown=node:node package.json ./
-COPY --chown=node:node packages/kit/shared ./packages/kit/shared
-COPY --chown=node:node packages/kit/server ./packages/kit/server
-COPY --chown=node:node games ./games
-COPY --chown=node:node server ./server
-COPY --from=build --chown=node:node /app/dist ./dist
+# Everything is root-owned: the node user runs the code and cannot rewrite it. It needs no writable directory (high
+# scores go to S3 in production; HIGHSCORES_DIR is for local runs).
+COPY package.json ./
+COPY packages/kit/shared ./packages/kit/shared
+COPY packages/kit/server ./packages/kit/server
+COPY games ./games
+COPY server ./server
+COPY --from=build /app/dist ./dist
 USER node
 EXPOSE 3000
 # /health answers at the root whatever APP_BASE_PATH is.

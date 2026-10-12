@@ -41,11 +41,23 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       # Every submitted run of every game, replayed with our code (the registry's games and the Pac-Man fixture).
+      # The slugs are listed first: a failing list fails the step instead of looping over nothing.
       - name: Replay every submission
         run: |
-          for game in $(node --input-type=module -e "const r = await import('./games/registry.ts'); console.log([...r.REGISTRY, ...r.FIXTURES].map((g) => g.slug).join(' '))"); do
+          set -euo pipefail
+          games=$(node --input-type=module -e "const r = await import('./games/registry.ts'); console.log([...r.REGISTRY, ...r.FIXTURES].map((g) => g.slug).join(' '))")
+          if [ -z "$games" ]; then echo "no games listed in games/registry.ts" >&2; exit 1; fi
+          for game in $games; do
             npm run submissions -- --game "$game"
           done
+      # The image builds the registry's games only (none yet, and .dockerignore leaves the fixture out), so a real game
+      # is built here: the Pac-Man fixture, through the same build script (submissions, Vite, game.json's updatedAt).
+      - name: Build the Pac-Man fixture
+        run: |
+          set -euo pipefail
+          npm run build -- pacman
+          test -s dist/pacman/index.html
+          node -e "const g = JSON.parse(require('node:fs').readFileSync('dist/pacman/game.json', 'utf8')); if (Number.isNaN(Date.parse(g.updatedAt))) throw new Error('game.json has no updatedAt')"
       - run: npm run check-contract
       - name: Log in to GHCR (for the loadsecrets layer)
         if: env.NO_LOADSECRETS != 'true'
