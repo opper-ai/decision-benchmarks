@@ -50,8 +50,6 @@ export interface GameDefinition<Rec = unknown, R extends GameResult = GameResult
     maxRecordingBytes: number;
   };
   metric: Metric;
-  /** Names of the game's own non-model players (baselines): a submission may not take one. */
-  baselines?: readonly string[];
   /** Plays one game through `transport` (already bound to the model) and returns its result and recording. */
   play(o: { transport: Transport; seed: number; signal: AbortSignal; model: string }): Promise<{ result: R; recording: Rec }>;
   /** Replays a recording with our code and recomputes its result; anything it cannot replay exactly is refused. */

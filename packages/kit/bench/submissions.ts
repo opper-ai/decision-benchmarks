@@ -45,7 +45,11 @@ export function reservedNames(game: GameDefinition<unknown, GameResult>, leaderb
     add(m.id);
     add(m.name);
   }
-  for (const b of game.baselines ?? []) add(b);
+  for (const [name, b] of Object.entries(game.baselines ?? {})) {
+    add(name);
+    add(`baseline/${name}`);
+    add(b.name);
+  }
   if (leaderboardPath && existsSync(leaderboardPath)) {
     const board = JSON.parse(readFileSync(leaderboardPath, 'utf8')) as { entries?: unknown };
     for (const e of Array.isArray(board?.entries) ? (board.entries as { model?: unknown; name?: unknown }[]) : []) {

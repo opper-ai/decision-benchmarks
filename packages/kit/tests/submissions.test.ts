@@ -112,7 +112,7 @@ describe("the kit's submissions check", () => {
     expect(checkSubmission(game, folder({ root: subs, id: 'coin-pro', manifest: { name: 'ACME/COIN-PRO' } }), 'coin-pro')).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
     expect(checkSubmission(game, folder({ manifest: { name: 'GPT-6 Luna Decisions' } }), 'acme-coin')).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
     expect(checkSubmission(game, folder({ manifest: { name: 'opper/kev-4b' } }), 'acme-coin')).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
-    const withBaselines = { ...game, baselines: ['Greedy'] };
+    const withBaselines = { ...game, baselines: { greedy: { name: 'Greedy', transport: () => async () => { throw new Error('unused'); } } } };
     expect(checkSubmission(withBaselines, folder({ manifest: { name: 'greedy' } }), 'acme-coin')).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
     expect(checkSubmission(withBaselines, folder({ id: 'greedy' }), 'greedy')).toMatchObject({ error: 'greedy is on the official leaderboard already' });
   });
