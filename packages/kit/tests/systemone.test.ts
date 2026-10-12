@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleDecide, type DecideDeps } from '../server/decide';
-import { devTargetFromEnv, endpointFor, modelFor, TYPESAFE_BASE_URL } from '../server/jev';
+import { devTargetFromEnv, endpointFor, TYPESAFE_BASE_URL } from '../server/systemone';
 
 const body = { state: { maze: ['#'] }, questions: { blinky: { type: 'choice', instructions: 'chase', criteria: { left: 'a', up: 'b' } } } };
 const answers = { blinky: { type: 'choice', choice: 'up', confidence: 0.9, probabilities: { up: 0.9, left: 0.1 } } };
@@ -10,14 +10,10 @@ function deps(fetchImpl: DecideDeps['fetch'], over: Partial<DecideDeps> = {}): D
   return { apiKey: 'ts-key', baseUrl: TYPESAFE_BASE_URL, provider: 'typesafe', fetch: fetchImpl, now: () => (t += 100), ...over };
 }
 
-describe('jev targets', () => {
-  it('builds the endpoint and model for each provider', () => {
-    expect(endpointFor({ provider: 'opper', apiKey: 'k', baseUrl: 'https://api.opper.ai/' })).toBe('https://api.opper.ai/v3/compat/v1/systemone');
-    expect(endpointFor({ provider: 'typesafe', apiKey: 'k', baseUrl: 'https://api.typesafe.ai' })).toBe('https://api.typesafe.ai/v1/systemone');
-    expect(modelFor('opper')).toBe('typesafe/jev-1.13.0');
-    expect(modelFor('typesafe')).toBe('jev-1.13.0');
-    expect(modelFor('opper', { JEV_MODEL: 'opper/clef' })).toBe('opper/clef');
-    expect(modelFor('typesafe', { JEV_MODEL: ' ' })).toBe('jev-1.13.0');
+describe('System One targets', () => {
+  it('builds the endpoint for each provider', () => {
+    expect(endpointFor({ provider: 'opper', baseUrl: 'https://api.opper.ai/' })).toBe('https://api.opper.ai/v3/compat/v1/systemone');
+    expect(endpointFor({ provider: 'typesafe', baseUrl: 'https://api.typesafe.ai' })).toBe('https://api.typesafe.ai/v1/systemone');
   });
 
   it('prefers TYPESAFE_API_KEY over OPPER_API_KEY and honours base URL overrides', () => {
@@ -48,13 +44,13 @@ describe('handleDecide against TypeSafe directly', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ answers, costEstimated: true, traceId: 'req_1' });
     expect((res.body as { costUsd: number }).costUsd).toBeCloseTo(0.000042, 9);
-    expect(log.mock.calls[0][0]).toMatch(/^\[jev dev typesafe\] blinky ok in \d+ ms, cost ≈0\.000042 USD, request req_1$/);
+    expect(log.mock.calls[0][0]).toMatch(/^\[decide dev typesafe\] blinky ok in \d+ ms, cost ≈0\.000042 USD, request req_1$/);
   });
 
   it('reports TypeSafe errors without the key', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ error: 'bad key ts-key' }), { status: 500 }));
     const res = await handleDecide(body, deps(fetchMock, { keyMode: 'dev' }));
-    expect(res).toEqual({ status: 502, body: { error: 'jev 1.13 returned HTTP 500: bad key [redacted]' } });
+    expect(res).toEqual({ status: 502, body: { error: 'Jev 1.13 returned HTTP 500: bad key [redacted]' } });
   });
 
   it('redacts a key that an upstream error echoes even past the 200-character cut', async () => {

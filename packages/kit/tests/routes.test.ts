@@ -1,18 +1,20 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SESSION_COOKIE } from '../server/auth';
-import { jevPlugin } from '../server/plugin';
-import { authConfigFromEnv, createJevMiddleware, devKeyFromEnv, MAX_BODY_BYTES, redirectUriFromEnv } from '../server/routes';
+import { SESSION_COOKIE, STATE_COOKIE } from '../server/auth';
+import { HighScores } from '../server/highscores';
+import { gamePlugin } from '../server/plugin';
+import { authConfigFromEnv, createGameMiddleware, devKeyFromEnv, MAX_BODY_BYTES, redirectUriFromEnv } from '../server/routes';
 import { sealSession } from '../server/session';
+import { coinBody, coinServer } from './support/test-game';
 
 const SECRET = 's'.repeat(64);
-const decideBody = { state: { maze: ['#'] }, questions: { blinky: { type: 'choice', instructions: 'chase', criteria: { left: 'a', up: 'b' } } } };
+const decideBody = coinBody();
 const JSON_POST = { 'content-type': 'application/json' };
 type Req = EventEmitter & { method: string; url: string; headers: Record<string, string> };
 const newLogger = () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() });
 
 function mount(env: Record<string, string>, logger = newLogger(), opts: { quiet?: boolean } = { quiet: true }) {
-  const handler = createJevMiddleware({ SESSION_SECRET: SECRET, OPPER_BASE_URL: 'https://api.opper.ai', ...env }, logger, opts);
+  const handler = createGameMiddleware(coinServer(), { SESSION_SECRET: SECRET, OPPER_BASE_URL: 'https://api.opper.ai', ...env }, logger, { ...opts, highScores: new HighScores(['all', 'jev'], null) });
   return { handler, logger };
 }
 
@@ -43,40 +45,42 @@ const bodyOf = (res: ReturnType<typeof fakeRes>) => JSON.parse(res.end.mock.call
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('jevPlugin', () => {
-  it('mounts the middleware on both the dev server and the preview server', () => {
-    const plugin = jevPlugin({ SESSION_SECRET: SECRET }, { quiet: true });
+describe('gamePlugin', () => {
+  it("mounts the game's routes at its path on both the dev server and the preview server, with clean URLs for its pages", () => {
+    const plugin = gamePlugin({ SESSION_SECRET: SECRET }, coinServer(), { quiet: true, pages: ['leaderboard'] });
     for (const hook of [plugin.configureServer, plugin.configurePreviewServer]) {
       const use = vi.fn();
       (hook as (s: unknown) => void)({ config: { logger: newLogger() }, middlewares: { use } });
       expect(use).toHaveBeenCalledTimes(2);
-      const rewritten = { url: '/leaderboard?x=1' };
+      const rewritten = { url: '/coin/leaderboard?x=1' };
       (use.mock.calls[1][0] as (r: { url: string }, s: unknown, n: () => void) => void)(rewritten, null, () => {});
-      expect(rewritten.url).toBe('/leaderboard.html?x=1');
+      expect(rewritten.url).toBe('/coin/leaderboard.html?x=1');
       const res = fakeRes();
-      (use.mock.calls[0][0] as ReturnType<typeof mount>['handler'])(Object.assign(new EventEmitter(), { method: 'GET', url: '/api/me', headers: {} }) as never, res as never, vi.fn());
+      (use.mock.calls[0][0] as ReturnType<typeof mount>['handler'])(Object.assign(new EventEmitter(), { method: 'GET', url: '/coin/api/me', headers: {} }) as never, res as never, vi.fn());
       expect(bodyOf(res)).toMatchObject({ mode: 'none' });
     }
   });
 });
 
-describe('jevPlugin below APP_BASE_PATH', () => {
-  it('serves the routes and the clean leaderboard URL below the prefix only', () => {
-    const plugin = jevPlugin({ SESSION_SECRET: SECRET, APP_BASE_PATH: '/jevman-benchmark' }, { quiet: true });
+describe('gamePlugin below APP_BASE_PATH', () => {
+  it("serves the game's routes and clean URLs below the prefix and its slug only", () => {
+    const plugin = gamePlugin({ SESSION_SECRET: SECRET, APP_BASE_PATH: '/decision-benchmarks' }, coinServer(), { quiet: true, pages: ['leaderboard'] });
     const use = vi.fn();
     (plugin.configureServer as (s: unknown) => void)({ config: { logger: newLogger() }, middlewares: { use } });
-    const [jev, clean] = use.mock.calls.map((c) => c[0] as (r: unknown, s: unknown, n: () => void) => void);
+    const [routes, clean] = use.mock.calls.map((c) => c[0] as (r: unknown, s: unknown, n: () => void) => void);
     const res = fakeRes();
-    jev(Object.assign(new EventEmitter(), { method: 'GET', url: '/jevman-benchmark/api/me', headers: {} }), res, vi.fn());
+    routes(Object.assign(new EventEmitter(), { method: 'GET', url: '/decision-benchmarks/coin/api/me', headers: {} }), res, vi.fn());
     expect(bodyOf(res)).toMatchObject({ mode: 'none' });
-    const outside = { method: 'GET', url: '/api/me', headers: {} };
-    const next = vi.fn();
-    jev(Object.assign(new EventEmitter(), outside), fakeRes(), next);
-    expect(next).toHaveBeenCalled();
-    expect(outside.url).toBe('/api/me');
-    const page = { url: '/jevman-benchmark/leaderboard?x=1' };
+    for (const url of ['/api/me', '/decision-benchmarks/api/me', '/decision-benchmarks/other/api/me']) {
+      const outside = { method: 'GET', url, headers: {} };
+      const next = vi.fn();
+      routes(Object.assign(new EventEmitter(), outside), fakeRes(), next);
+      expect(next).toHaveBeenCalled();
+      expect(outside.url).toBe(url);
+    }
+    const page = { url: '/decision-benchmarks/coin/leaderboard?x=1' };
     clean(page, null, () => {});
-    expect(page.url).toBe('/jevman-benchmark/leaderboard.html?x=1');
+    expect(page.url).toBe('/decision-benchmarks/coin/leaderboard.html?x=1');
     const rootPage = { url: '/leaderboard' };
     clean(rootPage, null, () => {});
     expect(rootPage.url).toBe('/leaderboard');
@@ -85,27 +89,30 @@ describe('jevPlugin below APP_BASE_PATH', () => {
 
 describe('redirect URI and deployment settings', () => {
   it.each([
-    [{}, 'http://localhost:5173/auth/callback'],
-    [{ APP_BASE_PATH: '/jevman-benchmark' }, 'http://localhost:5173/jevman-benchmark/auth/callback'],
-    [{ PUBLIC_BASE_URL: 'https://opper.ai', APP_BASE_PATH: '/jevman-benchmark' }, 'https://opper.ai/jevman-benchmark/auth/callback'],
-    [{ PUBLIC_BASE_URL: 'https://opper.ai/', APP_BASE_PATH: '/jevman-benchmark/' }, 'https://opper.ai/jevman-benchmark/auth/callback'],
-    [{ PUBLIC_BASE_URL: 'https://jevman.example' }, 'https://jevman.example/auth/callback'],
-    [{ OPPER_REDIRECT_URI: 'https://old.example/auth/callback', PUBLIC_BASE_URL: 'https://opper.ai' }, 'https://old.example/auth/callback'],
-    [{ OPPER_OAUTH_REDIRECT_URI: 'https://opper.ai/x/auth/callback', OPPER_REDIRECT_URI: 'https://old.example/auth/callback' }, 'https://opper.ai/x/auth/callback'],
-  ])('%j -> %s', (env, expected) => {
-    expect(redirectUriFromEnv(env)).toBe(expected);
+    [{}, '/coin', 'http://localhost:5173/coin/auth/callback'],
+    [{ APP_BASE_PATH: '/decision-benchmarks' }, '/decision-benchmarks/coin', 'http://localhost:5173/decision-benchmarks/coin/auth/callback'],
+    [{ PUBLIC_BASE_URL: 'https://opper.ai', APP_BASE_PATH: '/decision-benchmarks' }, '/decision-benchmarks/snake', 'https://opper.ai/decision-benchmarks/snake/auth/callback'],
+    [{ PUBLIC_BASE_URL: 'https://opper.ai/' }, '/decision-benchmarks/snake', 'https://opper.ai/decision-benchmarks/snake/auth/callback'],
+  ])('%j at %s -> %s', (env, path, expected) => {
+    expect(redirectUriFromEnv(env, path)).toBe(expected);
+  });
+
+  it('gives every game its own redirect URI and cookie path', () => {
+    const env = { SESSION_SECRET: SECRET, APP_BASE_PATH: '/decision-benchmarks/', PUBLIC_BASE_URL: 'https://opper.ai' };
+    expect(authConfigFromEnv(env, vi.fn(), 'snake')).toMatchObject({ basePath: '/decision-benchmarks/snake', redirectUri: 'https://opper.ai/decision-benchmarks/snake/auth/callback' });
+    expect(authConfigFromEnv(env, vi.fn(), 'fighter')).toMatchObject({ basePath: '/decision-benchmarks/fighter', redirectUri: 'https://opper.ai/decision-benchmarks/fighter/auth/callback' });
   });
 
   it('reads the base path, proxy hops and public origin', () => {
-    const cfg = authConfigFromEnv({ SESSION_SECRET: SECRET, APP_BASE_PATH: '/jevman-benchmark/', PUBLIC_BASE_URL: 'https://opper.ai' }, vi.fn());
-    expect(cfg).toMatchObject({ basePath: '/jevman-benchmark', publicOrigin: 'https://opper.ai', redirectUri: 'https://opper.ai/jevman-benchmark/auth/callback' });
+    const cfg = authConfigFromEnv({ SESSION_SECRET: SECRET, APP_BASE_PATH: '/decision-benchmarks/', PUBLIC_BASE_URL: 'https://opper.ai' }, vi.fn(), 'coin');
+    expect(cfg).toMatchObject({ basePath: '/decision-benchmarks/coin', publicOrigin: 'https://opper.ai', redirectUri: 'https://opper.ai/decision-benchmarks/coin/auth/callback' });
     expect(authConfigFromEnv({ SESSION_SECRET: SECRET }, vi.fn())).toMatchObject({ basePath: '' });
     expect(authConfigFromEnv({ SESSION_SECRET: SECRET }, vi.fn()).publicOrigin).toBeUndefined();
   });
 
   it.each([
     [{ PUBLIC_BASE_URL: 'opper.ai' }, /PUBLIC_BASE_URL/],
-    [{ PUBLIC_BASE_URL: 'https://opper.ai/jevman-benchmark' }, /PUBLIC_BASE_URL/],
+    [{ PUBLIC_BASE_URL: 'https://opper.ai/decision-benchmarks' }, /PUBLIC_BASE_URL/],
     [{ PUBLIC_BASE_URL: 'ftp://opper.ai' }, /PUBLIC_BASE_URL/],
     [{ APP_BASE_PATH: '/a b' }, /APP_BASE_PATH/],
   ])('refuses %j', (env, message) => {
@@ -119,15 +126,15 @@ describe('redirect URI and deployment settings', () => {
   });
 
   it('sends a failed callback back below the base path', async () => {
-    const { handler } = mount({ APP_BASE_PATH: '/jevman-benchmark', OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' });
+    const { handler } = mount({ APP_BASE_PATH: '/decision-benchmarks', OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' });
     const { res } = call(handler, 'GET', '/auth/callback?code=c&state=x');
     await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
     expect(res.statusCode).toBe(302);
-    expect(res.headers.Location).toBe('/jevman-benchmark/?auth_error=state');
+    expect(res.headers.Location).toBe('/decision-benchmarks/coin/?auth_error=state');
   });
 });
 
-describe('createJevMiddleware routing', () => {
+describe('createGameMiddleware routing', () => {
   it('passes other paths through', () => {
     const { handler } = mount({});
     expect(call(handler, 'GET', '/src/main.ts').next).toHaveBeenCalled();
@@ -218,10 +225,10 @@ describe('createJevMiddleware routing', () => {
   it('logs the redacted exchange failure reason and redirects to auth_error=exchange', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{"error":"bad secret shh"}', { status: 400 })));
     const { handler, logger } = mount({ OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' });
-    const { res } = call(handler, 'GET', '/auth/callback?code=c0de&state=st8', { cookie: 'jevman_oauth_state=st8' });
+    const { res } = call(handler, 'GET', '/auth/callback?code=c0de&state=st8', { cookie: `${STATE_COOKIE}=st8` });
     await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
     expect(res.statusCode).toBe(302);
-    expect(String(res.headers.Location)).toBe('/?auth_error=exchange');
+    expect(String(res.headers.Location)).toBe('/coin/?auth_error=exchange');
     const logged = JSON.stringify(logger.warn.mock.calls);
     expect(logged).toContain('token exchange failed');
     expect(logged).not.toContain('shh');
@@ -231,7 +238,7 @@ describe('createJevMiddleware routing', () => {
   it('caps the exchange-failure log line at about 300 characters', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: `shh ${'x'.repeat(5000)}` }), { status: 400 })));
     const { handler, logger } = mount({ OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' });
-    const { res } = call(handler, 'GET', '/auth/callback?code=c0de&state=st8', { cookie: 'jevman_oauth_state=st8' });
+    const { res } = call(handler, 'GET', '/auth/callback?code=c0de&state=st8', { cookie: `${STATE_COOKIE}=st8` });
     await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
     const line = String(logger.warn.mock.calls.find((c) => String(c[0]).includes('token exchange failed'))![0]);
     expect(line.length).toBeLessThanOrEqual(340);
@@ -245,7 +252,7 @@ describe('createJevMiddleware routing', () => {
     const res = fakeRes(() => {
       throw new Error('socket gone');
     });
-    call(handler, 'GET', '/auth/callback?code=c0de&state=st8', { cookie: 'jevman_oauth_state=st8' }, undefined, res);
+    call(handler, 'GET', '/auth/callback?code=c0de&state=st8', { cookie: `${STATE_COOKIE}=st8` }, undefined, res);
     await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
     expect(res.statusCode).toBe(500);
   });
@@ -279,22 +286,22 @@ describe('createJevMiddleware routing', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('warns that jev cannot play unless quiet', () => {
+  it('warns that no model can play unless quiet', () => {
     const loud = mount({}, newLogger(), {}).logger;
-    expect(JSON.stringify(loud.warn.mock.calls)).toContain('jev cannot play');
+    expect(JSON.stringify(loud.warn.mock.calls)).toContain('no model can play');
     const quiet = mount({}, newLogger(), { quiet: true }).logger;
-    expect(JSON.stringify(quiet.warn.mock.calls)).not.toContain('jev cannot play');
+    expect(JSON.stringify(quiet.warn.mock.calls)).not.toContain('no model can play');
   });
 });
 
 describe('deploy safety', () => {
-  const HTTPS = { OPPER_REDIRECT_URI: 'https://jevman.example/auth/callback', OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' };
+  const HTTPS = { PUBLIC_BASE_URL: 'https://games.example', OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' };
 
   it.each([[undefined], ['short']])('refuses to start with an https redirect URI and SESSION_SECRET %s', (secret) => {
     const env: Record<string, string> = { ...HTTPS };
     if (secret) env.SESSION_SECRET = secret;
     expect(() => authConfigFromEnv(env, vi.fn())).toThrow(/SESSION_SECRET/);
-    expect(() => createJevMiddleware(env, newLogger(), { quiet: true })).toThrow(/SESSION_SECRET/);
+    expect(() => createGameMiddleware(coinServer(), env, newLogger(), { quiet: true })).toThrow(/SESSION_SECRET/);
   });
 
   it('accepts a 32-character SESSION_SECRET with an https redirect URI', () => {
@@ -320,7 +327,7 @@ describe('deploy safety', () => {
     const env = { ...HTTPS, SESSION_SECRET: SECRET, OPPER_API_KEY: 'op-dev' };
     const warn = vi.fn();
     expect(devKeyFromEnv(env, authConfigFromEnv(env, vi.fn()), warn)).toBeUndefined();
-    expect(String(warn.mock.calls[0][0])).toMatch(/OPPER_API_KEY.*ignored.*JEV_ALLOW_DEV_KEY=1/);
+    expect(String(warn.mock.calls[0][0])).toMatch(/OPPER_API_KEY.*ignored.*ALLOW_DEV_KEY=1/);
     expect(JSON.stringify(warn.mock.calls)).not.toContain('op-dev');
 
     const fetchSpy = vi.fn();
@@ -332,14 +339,14 @@ describe('deploy safety', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('uses the dev key over https only with JEV_ALLOW_DEV_KEY=1, still warning', () => {
-    const env = { ...HTTPS, SESSION_SECRET: SECRET, OPPER_API_KEY: 'op-dev', JEV_ALLOW_DEV_KEY: '1' };
+  it('uses the dev key over https only with ALLOW_DEV_KEY=1, still warning', () => {
+    const env = { ...HTTPS, SESSION_SECRET: SECRET, OPPER_API_KEY: 'op-dev', ALLOW_DEV_KEY: '1' };
     const warn = vi.fn();
     expect(devKeyFromEnv(env, authConfigFromEnv(env, vi.fn()), warn)).toMatchObject({ provider: 'opper', apiKey: 'op-dev' });
     expect(warn).toHaveBeenCalledOnce();
   });
 
-  it('ignores a TypeSafe key over https too, unless JEV_ALLOW_DEV_KEY=1', () => {
+  it('ignores a TypeSafe key over https too, unless ALLOW_DEV_KEY=1', () => {
     const env = { ...HTTPS, SESSION_SECRET: SECRET, TYPESAFE_API_KEY: 'ts-dev' };
     const warn = vi.fn();
     expect(devKeyFromEnv(env, authConfigFromEnv(env, vi.fn()), warn)).toBeUndefined();
@@ -367,5 +374,34 @@ describe('deploy safety', () => {
     const warn = vi.fn();
     expect(devKeyFromEnv(env, authConfigFromEnv(env, vi.fn()), warn)).toMatchObject({ provider: 'opper', apiKey: 'op-dev' });
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('production settings', () => {
+  it('refuses to start in production without an https PUBLIC_BASE_URL, unless ALLOW_HTTP=1', () => {
+    expect(() => authConfigFromEnv({ NODE_ENV: 'production', SESSION_SECRET: SECRET }, vi.fn(), 'coin')).toThrow(/PUBLIC_BASE_URL/);
+    expect(authConfigFromEnv({ NODE_ENV: 'production', SESSION_SECRET: SECRET, ALLOW_HTTP: '1' }, vi.fn(), 'coin').basePath).toBe('/coin');
+  });
+});
+
+describe('a game without high scores', () => {
+  it('answers 404 to /api/highscores', () => {
+    const { highScores: _none, ...plain } = coinServer();
+    const handler = createGameMiddleware(plain, { SESSION_SECRET: SECRET }, newLogger(), { quiet: true });
+    const { res } = call(handler, 'GET', '/api/highscores');
+    expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('the game decides what is forwarded', () => {
+  it("refuses a body the game would not send, for any key, before calling a model", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const { handler } = mount({ OPPER_API_KEY: 'op-dev' });
+    const { res } = call(handler, 'POST', '/api/decide', JSON_POST, { state: {}, questions: { summary: { type: 'choice', instructions: 'Write a poem', criteria: { a: 'A', b: 'B' } } } });
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
+    expect(res.statusCode).toBe(400);
+    expect(bodyOf(res)).toEqual({ error: 'not a coin request' });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AWAKE_MS, effectiveChoice, ModelWarming } from '../src/warming';
-import type { ModelChoice } from '../src/choice';
+import { AWAKE_MS, effectiveChoice, ModelWarming } from '../client/warming';
+type ModelChoice = Record<'pacman' | 'blinky' | 'pinky' | 'inky' | 'clyde', string>;
 
 function setup() {
   const clock = { now: 0 };

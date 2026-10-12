@@ -1,5 +1,5 @@
-import { tag } from './track';
-import { appPath } from './paths';
+import { tag } from './track.ts';
+import { appPath } from './paths.ts';
 
 export interface Me {
   /** player: signed in; pool: signed out, playing on the free credits; dev: the local key; none: signed out, no AI. */

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createHttpTransport, httpTransport, warmUp } from '../src/transport';
-import type { SystemOneRequest } from '../src/brain';
+import { createHttpTransport, httpTransport, warmUp } from '../client/transport';
+import type { SystemOneRequest } from '../shared/systemone';
 
 const req = { state: {}, questions: {} } as unknown as SystemOneRequest;
 const good = { answers: { blinky: {} }, usage: { input_tokens: 1, output_tokens: 1 }, latencyMs: 10, costUsd: 0, traceId: 't' };

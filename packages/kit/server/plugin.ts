@@ -1,27 +1,34 @@
 import type { Plugin } from 'vite';
-import { mountAt, normalizeBasePath } from './base-path.ts';
-import { createJevMiddleware, type PlayerCheck } from './routes.ts';
+import { mountAt } from '../shared/base-path.ts';
+import type { GameServer } from '../shared/game.ts';
+import { createGameMiddleware, gamePath } from './routes.ts';
 
-/** The production server's clean URL for the leaderboard page (`base` is APP_BASE_PATH, '' at the root). */
-export function cleanUrls(req: { url?: string }, _res: unknown, next: () => void, base = ''): void {
-  if (req.url?.split('?')[0] === `${base}/leaderboard`) req.url = req.url.replace(`${base}/leaderboard`, `${base}/leaderboard.html`);
+/**
+ * The production server's clean URLs for a game's other pages: `<base>/leaderboard` serves `leaderboard.html`.
+ * `base` is the game's path ('' at the root), `pages` the page names without .html.
+ */
+export function cleanUrls(req: { url?: string }, _res: unknown, next: () => void, base: string, pages: readonly string[]): void {
+  const [path, query] = (req.url ?? '').split(/(?=\?)/);
+  for (const page of pages) if (path === `${base}/${page}`) req.url = `${base}/${page}.html${query ?? ''}`;
   next();
 }
 
-/** Mounts the jev routes (Login with Opper, /api/me, /api/decide) on the Vite dev and preview servers, below APP_BASE_PATH. */
-export function jevPlugin(env: Record<string, string>, opts: { quiet?: boolean } = {}): Plugin {
-  const base = normalizeBasePath(env.APP_BASE_PATH);
-  const clean = (req: { url?: string }, res: unknown, next: () => void) => cleanUrls(req, res, next, base);
+/**
+ * Mounts one game's routes (Login with Opper, /api/me, /api/decide, /api/warm, /api/highscores) on the Vite dev and
+ * preview servers, at <APP_BASE_PATH>/<slug>, as the production service does.
+ */
+export function gamePlugin(env: Record<string, string | undefined>, game: GameServer, opts: { quiet?: boolean; pages?: readonly string[] } = {}): Plugin {
+  const base = gamePath(env, game.slug);
+  const clean = (req: { url?: string }, res: unknown, next: () => void) => cleanUrls(req, res, next, base, opts.pages ?? []);
+  const mount = (logger: { info(m: string): void; warn(m: string): void; error(m: string): void }) => mountAt(base, createGameMiddleware(game, env, logger, { quiet: opts.quiet }));
   return {
-    name: 'jev-decide',
+    name: 'decision-benchmarks-game',
     configureServer(server) {
-      // The high-score check runs the game's own code, loaded through Vite here (the production server uses the --ssr bundle).
-      const loadPlayerCheck = () => server.ssrLoadModule('/src/player-check.ts').then((m) => m.checkPlayerGame as PlayerCheck);
-      server.middlewares.use(mountAt(base, createJevMiddleware(env, server.config.logger, { ...opts, loadPlayerCheck })));
+      server.middlewares.use(mount(server.config.logger));
       server.middlewares.use(clean);
     },
     configurePreviewServer(server) {
-      server.middlewares.use(mountAt(base, createJevMiddleware(env, server.config.logger, opts)));
+      server.middlewares.use(mount(server.config.logger));
       server.middlewares.use(clean);
     },
   };

@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { BOARD_KEYS } from '../shared/lineups.ts';
 import { credentialsFromEnv, s3Store, type TextStore } from './s3.ts';
 
 /** One line on a board: three initials, the score, when, and a hash of the account (to trace abuse, never shown). */
@@ -45,7 +44,7 @@ const LOAD_RETRY_MS = 5_000;
 const SAVE_ATTEMPTS = 5;
 
 /**
- * The player high-score boards, one per lineup, top ten each. Kept in memory and saved whole to a store after each
+ * One game's player high-score boards (the game names them), top ten each. Kept in memory and saved whole to a store after each
  * entry: in production an S3 object, so they survive deploys and restarts. A save only replaces the version it read;
  * if another server wrote in between (old and new tasks overlap during a deploy), its boards are read and merged in
  * first. Nothing is shown or entered until the store has been read, and a store that can't be read is never
@@ -53,6 +52,7 @@ const SAVE_ATTEMPTS = 5;
  */
 export class HighScores {
   private readonly boards: Record<string, ScoreEntry[]> = {};
+  private readonly ids: readonly string[];
   private readonly store: TextStore | null;
   private readonly warn: (msg: string) => void;
   private loaded = false;
@@ -63,10 +63,11 @@ export class HighScores {
   private saving: Promise<boolean> = Promise.resolve(true);
   private retry: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(store: TextStore | null, warn: (msg: string) => void = () => {}) {
+  constructor(boardIds: readonly string[], store: TextStore | null, warn: (msg: string) => void = () => {}) {
+    this.ids = boardIds;
     this.store = store;
     this.warn = warn;
-    for (const k of BOARD_KEYS) this.boards[k] = [];
+    for (const k of boardIds) this.boards[k] = [];
     if (!store) this.loaded = true;
   }
 
@@ -92,9 +93,14 @@ export class HighScores {
     return this.loading;
   }
 
+  /** The board ids, in the game's order. */
+  get order(): string[] {
+    return [...this.ids];
+  }
+
   /** Every board, best first, without the account hashes. */
   view(): Record<string, PublicEntry[]> {
-    return Object.fromEntries(BOARD_KEYS.map((k) => [k, this.boards[k]!.map(({ initials, score, at }) => ({ initials, score, at }))]));
+    return Object.fromEntries(this.ids.map((k) => [k, this.boards[k]!.map(({ initials, score, at }) => ({ initials, score, at }))]));
   }
 
   /** The place a score would take on a board (1 to 10), or null if it would not make it. */
@@ -175,7 +181,7 @@ export class HighScores {
    */
   private merge(text: string): void {
     const data = JSON.parse(text) as Record<string, unknown>;
-    for (const k of BOARD_KEYS) {
+    for (const k of this.ids) {
       const stored = Array.isArray(data[k]) ? (data[k] as unknown[]) : [];
       const valid = stored.filter((e): e is ScoreEntry => !!e && typeof e === 'object' && cleanInitials((e as ScoreEntry).initials) !== null && Number.isInteger((e as ScoreEntry).score));
       const best = new Map<string, ScoreEntry>();
@@ -220,20 +226,21 @@ export function fileStore(file: string): TextStore {
 }
 
 /**
- * Where the boards are kept: the S3 object JEV_HIGHSCORES_BUCKET / JEV_HIGHSCORES_KEY (default highscores.json) in
- * AWS_REGION, with the task role's credentials; else the file JEV_HIGHSCORES_FILE, else one in the temp folder.
+ * Where a game's boards are kept: the S3 object <slug>/highscores.json in HIGHSCORES_BUCKET (below HIGHSCORES_PREFIX,
+ * if set) in AWS_REGION, with the task role's credentials; else <slug>-highscores.json in HIGHSCORES_DIR, else in
+ * the temp folder.
  */
-export function highScoresStore(env: Record<string, string | undefined>): TextStore {
-  const bucket = env.JEV_HIGHSCORES_BUCKET?.trim();
+export function highScoresStore(env: Record<string, string | undefined>, slug: string): TextStore {
+  const bucket = env.HIGHSCORES_BUCKET?.trim();
   if (bucket) {
     // AWS credentials and region may be outside the env the dev server passes (which keeps only its own prefixes).
     const aws = { ...process.env, ...env };
     return s3Store({
       bucket,
-      key: env.JEV_HIGHSCORES_KEY?.trim() || 'highscores.json',
+      key: [(env.HIGHSCORES_PREFIX ?? '').trim().replace(/^\/+|\/+$/g, ''), slug, 'highscores.json'].filter(Boolean).join('/'),
       region: aws.AWS_REGION || aws.AWS_DEFAULT_REGION || 'eu-north-1',
       credentials: credentialsFromEnv(aws),
     });
   }
-  return fileStore(env.JEV_HIGHSCORES_FILE || join(tmpdir(), 'jevman-highscores.json'));
+  return fileStore(join(env.HIGHSCORES_DIR || join(tmpdir(), 'decision-benchmarks'), `${slug}-highscores.json`));
 }

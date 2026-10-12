@@ -3,15 +3,23 @@ import { stat } from 'node:fs/promises';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { extname, join, resolve, sep } from 'node:path';
-import { mountedUrl, normalizeBasePath } from './base-path.ts';
-import { createJevMiddleware, type PlayerCheck } from './routes.ts';
+import { gameMount, mountedUrl, normalizeBasePath } from '../shared/base-path.ts';
+import type { GameServer } from '../shared/game.ts';
+import type { PoolAccess } from './decide.ts';
+import { authConfigFromEnv, createGameMiddleware, poolAccessFromEnv, type Middleware } from './routes.ts';
 
 export type Log = (event: string, details?: Record<string, unknown>) => void;
 
+/** A game the service mounts: its server side, and its `vite build` output (dist/<slug>). */
+export interface MountedGame {
+  server: GameServer;
+  distDir: string;
+}
+
 export interface AppOptions {
   env: Record<string, string | undefined>;
-  /** The `vite build` output. */
-  distDir: string;
+  /** The games, each at <APP_BASE_PATH>/<slug>/. */
+  games: readonly MountedGame[];
   /** The deployed Git commit (SOURCE_COMMIT, set at image build time). */
   commit: string;
   log?: Log;
@@ -19,6 +27,8 @@ export interface AppOptions {
   drainMs?: number;
   /** Hard limit from SIGTERM to exit; below ECS's 30 s stopTimeout, so the process exits before SIGKILL. */
   deadlineMs?: number;
+  /** The free credits for every game (null: none); by default from OPPER_POOL_API_KEY. Tests pass their own. */
+  poolAccess?: PoolAccess | null;
 }
 
 export interface App {
@@ -54,28 +64,33 @@ export const SHUTDOWN_DRAIN_MS = 5000;
 export const SHUTDOWN_DEADLINE_MS = 25_000;
 
 /**
- * The jevman production server: static build, Login with Opper, the jev proxy, /health and /revision.
- * With APP_BASE_PATH (e.g. /jevman-benchmark) all of it lives below that prefix, the prefix itself redirects to
- * `prefix/`, anything else is 404, and /health also answers at the root for load balancer health checks.
+ * The production service: every game at <APP_BASE_PATH>/<slug>/ (its built page and files, Login with Opper, /api/me,
+ * /api/decide, /api/warm, /api/highscores), with one free-credits pool and one visitor limiter for all of them. The
+ * bare `<base>/<slug>` redirects to `<base>/<slug>/`, an unknown slug is 404, and a game's files are only served
+ * below its own slug. /health answers at the root (for the load balancer) and below the base path, as does /revision.
  */
 export function createApp(opts: AppOptions): App {
   const log: Log = opts.log ?? ((event, details = {}) => console.log(JSON.stringify({ at: new Date().toISOString(), event, ...details })));
   const drainMs = opts.drainMs ?? SHUTDOWN_DRAIN_MS;
   const deadlineMs = opts.deadlineMs ?? SHUTDOWN_DEADLINE_MS;
-  const root = resolve(opts.distDir);
   const basePath = normalizeBasePath(opts.env.APP_BASE_PATH);
   const env = Object.fromEntries(Object.entries(opts.env).filter((e): e is [string, string] => typeof e[1] === 'string'));
-  // Throws for an https deployment without a real SESSION_SECRET, before anything listens.
-  const jev = createJevMiddleware(
-    env,
-    {
-      info: (msg) => log('jev', { msg }),
-      warn: (msg) => log('warn', { msg }),
-      error: (msg) => log('error', { msg }),
-    },
-    // The high-score check: the game's code bundled for the server at build time (vite build --ssr src/player-check.ts).
-    { loadPlayerCheck: () => import(new URL('../dist-ssr/player-check.js', import.meta.url).href).then((m: { checkPlayerGame: PlayerCheck }) => m.checkPlayerGame) },
-  );
+  const logger = (slug: string) => ({
+    info: (msg: string) => log('game', { game: slug, msg }),
+    warn: (msg: string) => log('warn', { game: slug, msg }),
+    error: (msg: string) => log('error', { game: slug, msg }),
+  });
+  // The deployment settings are checked once up front, so a misconfigured image refuses to start even with no games.
+  authConfigFromEnv(env, () => {});
+  // One pool and one limiter, shared by every game: a visitor's allowance does not grow with the number of games.
+  const poolAccess = opts.poolAccess !== undefined ? opts.poolAccess : (poolAccessFromEnv(env, (msg) => log('warn', { msg })) ?? null);
+  if (poolAccess) log('pool', { msg: 'free credits on: signed-out visitors play on OPPER_POOL_API_KEY until its balance runs out' });
+  const games = new Map<string, { root: string; routes: Middleware }>();
+  for (const g of opts.games) {
+    if (games.has(g.server.slug)) throw new Error(`two games are called ${g.server.slug}`);
+    // Throws for an https deployment without a real SESSION_SECRET, before anything listens.
+    games.set(g.server.slug, { root: resolve(g.distDir), routes: createGameMiddleware(g.server, env, logger(g.server.slug), { poolAccess }) });
+  }
   let ready = false;
   let draining = false;
   let shutdownPromise: Promise<'clean' | 'deadline'> | null = null;
@@ -85,7 +100,7 @@ export function createApp(opts: AppOptions): App {
     res.end(JSON.stringify(body));
   };
 
-  async function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  async function serveStatic(root: string, req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405, { Allow: 'GET, HEAD', ...SECURITY_HEADERS });
       res.end();
@@ -93,7 +108,7 @@ export function createApp(opts: AppOptions): App {
     }
     let path: string;
     try {
-      path = decodeURIComponent(new URL(req.url ?? '/', 'http://jevman').pathname);
+      path = decodeURIComponent(new URL(req.url ?? '/', 'http://game').pathname);
     } catch {
       return notFound(res);
     }
@@ -119,26 +134,39 @@ export function createApp(opts: AppOptions): App {
     res.end('Not found');
   }
 
+  const health = (res: http.ServerResponse) => {
+    const healthy = ready && !draining;
+    res.writeHead(healthy ? 200 : 503, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+    res.end(healthy ? 'ready' : 'not ready');
+  };
+
   const server = http.createServer((req, res) => {
-    const mounted = mountedUrl(req.url ?? '/', basePath);
+    const url = req.url ?? '/';
+    // The load balancer checks /health at the root, whatever the base path.
+    if (url.split('?')[0] === '/health') return health(res);
+    const mounted = mountedUrl(url, basePath);
     if (mounted.kind === 'bare') {
       res.writeHead(308, { Location: mounted.location, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
       res.end();
       return;
     }
-    // Outside the base path only /health answers (the load balancer may check either one).
-    if (mounted.kind === 'outside' && (req.url ?? '/').split('?')[0] !== '/health') return notFound(res);
-    if (mounted.kind === 'inside') req.url = mounted.url;
-    const path = (req.url ?? '/').split('?')[0];
-    if (path === '/health') {
-      const healthy = ready && !draining;
-      res.writeHead(healthy ? 200 : 503, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
-      res.end(healthy ? 'ready' : 'not ready');
+    if (mounted.kind === 'outside') return notFound(res);
+    const inside = mounted.url;
+    const path = inside.split('?')[0];
+    if (path === '/health') return health(res);
+    if (path === '/revision') return sendJson(res, 200, { app: 'decision-benchmarks', commit: opts.commit, draining, games: [...games.keys()] });
+    const at = gameMount(inside);
+    const game = at.kind === 'none' ? undefined : games.get(at.slug);
+    if (!game) return notFound(res);
+    if (at.kind === 'bare') {
+      res.writeHead(308, { Location: `${basePath}/${at.slug}/${at.query}`, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
+      res.end();
       return;
     }
-    if (path === '/revision') return sendJson(res, 200, { app: 'jevman', commit: opts.commit, draining });
-    jev(req, res, () => {
-      serveStatic(req, res).catch((err) => {
+    if (at.kind !== 'game') return notFound(res);
+    req.url = at.url;
+    game.routes(req, res, () => {
+      serveStatic(game.root, req, res).catch((err) => {
         log('error', { msg: `static: ${(err as Error)?.message ?? String(err)}` });
         if (!res.headersSent) notFound(res);
         else res.destroy();
@@ -152,7 +180,7 @@ export function createApp(opts: AppOptions): App {
         server.once('error', fail);
         server.listen(port, host, () => {
           const actual = (server.address() as AddressInfo).port;
-          log('listening', { port: actual, commit: opts.commit, ...(basePath ? { basePath } : {}) });
+          log('listening', { port: actual, commit: opts.commit, games: [...games.keys()], ...(basePath ? { basePath } : {}) });
           ready = true;
           log('ready');
           done(actual);

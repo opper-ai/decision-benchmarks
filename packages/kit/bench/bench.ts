@@ -1,308 +1,201 @@
-// Headless real-time benchmark: how long does Pac-Man survive, and how well does he play?
-// Run: npm run bench -- [--games 4] [--pacman jev|greedy] [--ghosts greedy|jev] [--max 120] [--record path.json]
-//                       [--pacman-model id] [--ghost-model id]
-// Leaderboard: npm run bench -- --models all|id,id [--games 8] [--parallel 4] [--max 300] [--out public/leaderboard.json]
-//   plays each model as Pac-Man against the scripted ghosts; every move is the model's own.
-// --record needs --games 1 and writes the game (steps, decisions, panel events) for src/replay.ts.
-// Your own model: --endpoint https://… plays Pac-Man through your HTTP endpoint (see CONTRIBUTING.md); with
-//   --submit submissions/<id> --name "My Model" --by <github-handle> [--url https://…] it plays the leaderboard's
-//   games and writes them as a submission to open a pull request with.
+// The bench: plays a game's benchmark against decision models and writes what it found.
+// Entry point: scripts/bench.ts (npm run bench -- --game <slug> ...), which picks the game from games/registry.ts.
+//
+//   --model <id> | --models all|<id>,<id>    listed models (packages/kit/shared/models.ts) through Opper (OPPER_API_KEY)
+//                                            or, for Jev, TypeSafe (TYPESAFE_API_KEY)
+//   --endpoint <url> [--format systemone|chat] [--chat-model <name>]
+//                                            your own model: System One ({ state, questions } in) or OpenAI chat
+//                                            completions through the chat adapter; BENCH_ENDPOINT_TOKEN is sent as a
+//                                            bearer token
+//   --games <n>  --parallel <n>  --seed <n>  how many games, how many at a time, one seed for every game (trying only)
+//   --leaderboard [--out <file>]             official runs: writes games/<slug>/public/leaderboard.json
+//   --submit <dir> --name <name> --by <github-handle> [--url <https://...>]
+//                                            records a submission (see CONTRIBUTING.md)
+//   --record <file>                          writes the recording of one game (--games 1), e.g. a demo for Watch
+//   --list-models                            compares the checked-in model list with GET /v3/models?type=evaluation
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { gzipSync } from 'node:zlib';
 import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { Scheduler, type Transport } from '../src/scheduler';
-import { createGame, step, type Controls } from '../src/sim';
-import type { DecideResponse } from '../src/brain';
-import { GHOST_IDS, type ActorId } from '../src/types';
-import { handleDecide } from '../server/decide';
-import { devTargetFromEnv, modelFor } from '../server/jev';
-import { Recorder, roundDt, type Recording } from '../src/replay';
-import { verifyGame } from './verify';
-import { emptyResult, finishResult, scriptedControls } from './game';
-import { GameStats } from '../src/stats';
-import { DECISION_MODELS, DEFAULT_MODEL, isModelId, modelName, type ModelId } from '../shared/models';
-import { BENCH_VERSION, rank, SUBMISSION_RULES, summarize, type GameResult, type Leaderboard, type LeaderboardEntry } from '../shared/leaderboard';
+import { gzipSync } from 'node:zlib';
+import { devTargetFromEnv } from '../server/systemone.ts';
+import type { Entry, Leaderboard } from '../shared/contract.ts';
+import type { GameDefinition, GameResult } from '../shared/game.ts';
+import { DECISION_MODELS, DEFAULT_MODEL, isModelId, modelName } from '../shared/models.ts';
+import type { Transport } from '../shared/systemone.ts';
+import { diffModels, fetchEvaluationModels } from './models.ts';
+import { boardFor, entryFor, playMany } from './results.ts';
+import { chatTransport, endpointTransport, systemOneTransport } from './transports.ts';
+import { warmUp } from './warm.ts';
 
-const { values } = parseArgs({
-  options: {
-    games: { type: 'string' },
-    pacman: { type: 'string', default: 'jev' },
-    ghosts: { type: 'string', default: 'greedy' },
-    max: { type: 'string' },
-    record: { type: 'string' },
-    // Without these the server's default plays: JEV_MODEL, else jev.
-    'pacman-model': { type: 'string' },
-    'ghost-model': { type: 'string' },
-    models: { type: 'string' },
-    parallel: { type: 'string' },
-    out: { type: 'string', default: 'public/leaderboard.json' },
-    endpoint: { type: 'string' },
-    submit: { type: 'string' },
-    name: { type: 'string' },
-    by: { type: 'string' },
-    url: { type: 'string' },
-  },
-});
-const leaderboard = values.models !== undefined;
-const submit = values.submit !== undefined;
-const games = Number(values.games ?? (leaderboard ? 8 : submit ? SUBMISSION_RULES.minGames : 4));
-const maxSeconds = Number(values.max ?? (leaderboard || submit ? SUBMISSION_RULES.maxSeconds : 120));
+/** A usage problem: the message is for the person running the bench. */
+export class BenchError extends Error {}
+
 const fail = (msg: string): never => {
-  console.error(msg);
-  process.exit(1);
-};
-const asModel = (v: string): ModelId => (isModelId(v) ? v : fail(`Unknown model ${v}; one of: ${DECISION_MODELS.map((m) => m.id).join(', ')}`));
-if (values.record && games !== 1) fail('--record needs --games 1');
-if (values.endpoint && (leaderboard || values['pacman-model'] || values.ghosts === 'jev')) fail('--endpoint plays Pac-Man only, instead of --models and --pacman-model');
-if (submit) {
-  if (!values.name || !values.by) fail('--submit needs --name "Model name" and --by <your GitHub handle>');
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(basename(values.submit!))) fail('--submit folder name is the model id: lowercase letters, digits and dashes, e.g. submissions/my-model');
-  if (games < SUBMISSION_RULES.minGames) fail(`a submission needs at least ${SUBMISSION_RULES.minGames} games`);
-  if (maxSeconds !== SUBMISSION_RULES.maxSeconds) fail(`a submission plays the leaderboard's ${SUBMISSION_RULES.maxSeconds} s games`);
-  if (leaderboard || values.pacman === 'greedy' || values.ghosts === 'jev') fail('--submit plays your model as Pac-Man against the scripted ghosts');
-}
-const FRAME = 1 / 60;
-
-// TYPESAFE_API_KEY calls api.typesafe.ai directly; otherwise OPPER_API_KEY goes through Opper.
-const target = devTargetFromEnv(process.env);
-const decide = (body: unknown, timeoutMs?: number) =>
-  handleDecide(body, { apiKey: target?.apiKey, baseUrl: target?.baseUrl ?? '', provider: target?.provider, fetch, now: () => performance.now(), timeoutMs });
-/**
- * A model behind your own HTTP endpoint: it gets the same request body jevman sends System One ({state, questions})
- * and answers {answers: {pacman: {type: 'choice', choice, probabilities?, confidence?}}, usage?, costUsd?}.
- * BENCH_ENDPOINT_TOKEN, if set, is sent as a bearer token. A game call gives up after 2 s, as the server's calls to
- * Opper do: by then the game has used its fallback, and a hung call would only hold one of the scheduler's slots.
- */
-async function endpointDecide(body: unknown, timeoutMs = 2000): Promise<{ status: number; body: unknown }> {
-  const t0 = performance.now();
-  try {
-    // Only the documented { state, questions } goes to a submitter's endpoint (keys are for signing on our server).
-    const { model: _model, keys: _keys, ...request } = body as Record<string, unknown>;
-    const token = process.env.BENCH_ENDPOINT_TOKEN;
-    const res = await fetch(values.endpoint!, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(request),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return { status: res.status, body: { error: `endpoint answered ${res.status}` } };
-    const out = (await res.json()) as { answers?: unknown; usage?: DecideResponse['usage']; costUsd?: number };
-    if (!out.answers || typeof out.answers !== 'object') return { status: 502, body: { error: 'endpoint answer has no answers object' } };
-    const response: DecideResponse = {
-      model: values.name ?? 'endpoint',
-      answers: out.answers as DecideResponse['answers'],
-      usage: out.usage ?? { input_tokens: 0, output_tokens: 0 },
-      latencyMs: Math.round(performance.now() - t0),
-      costUsd: typeof out.costUsd === 'number' ? out.costUsd : null,
-      traceId: null,
-    };
-    return { status: 200, body: response };
-  } catch (err) {
-    return (err as Error).name === 'TimeoutError' ? { status: 504, body: { error: 'endpoint timed out' } } : { status: 502, body: { error: (err as Error).message } };
-  }
-}
-const decideVia = values.endpoint ? endpointDecide : decide;
-const transport: Transport = async (body) => {
-  const result = await decideVia(body);
-  if (result.status !== 200) throw new Error((result.body as { error: string }).error);
-  return result.body as DecideResponse;
+  throw new BenchError(msg);
 };
 
-/**
- * Opper-hosted models scale down when idle and the first calls can take many seconds; a game would turn them into
- * fallbacks. Call until one answer comes back quickly.
- */
-async function warmUp(model: ModelId | undefined): Promise<string | null> {
-  const body = { ...(model ? { model } : {}), state: { note: 'warm-up' }, questions: { warmup: { type: 'choice', instructions: 'Pick one.', criteria: { a: 'Option A', b: 'Option B' } } } };
-  const started = performance.now();
-  for (let attempt = 1; performance.now() - started < 300_000; attempt++) {
-    const t0 = performance.now();
-    const res = await decideVia(body, 30_000);
-    const ms = Math.round(performance.now() - t0);
-    // Fast enough for the game's 2 s timeout, with room to spare.
-    if (res.status === 200 && ms < 1800) {
-      console.log(`  warm: ${nameOf(model)} answered in ${ms} ms (attempt ${attempt})`);
-      return null;
-    }
-    if (res.status !== 200 && res.status !== 504) return `${(res.body as { error: string }).error}`;
-  }
-  return 'did not answer within 1.8 s in 5 minutes of trying';
+/** One model the bench plays: its id on the leaderboard, its name, how to reach it. */
+interface Contender {
+  model: string;
+  name: string;
+  via: Entry['via'];
+  transport: Transport;
 }
 
-/** A model's display name; undefined is the server's default. */
-const nameOf = (model: ModelId | undefined) => (values.endpoint ? (values.name ?? values.endpoint) : modelName(model ?? modelFor(target?.provider ?? 'opper')));
-
-interface PlayOptions {
-  pacman: 'jev' | 'greedy';
-  ghosts: 'jev' | 'greedy';
-  pacmanModel?: ModelId;
-  ghostModel?: ModelId;
-  /** Records the game and hands over the recording once it is over. */
-  onRecording?: (rec: Recording) => void;
+export interface BenchPaths {
+  /** games/<slug>/public: where --leaderboard writes leaderboard.json. */
+  publicDir: string;
 }
 
-async function playOne(opts: PlayOptions): Promise<GameResult> {
-  const jevActors: ActorId[] = [...(opts.pacman === 'jev' ? ['pacman' as const] : []), ...(opts.ghosts === 'jev' ? GHOST_IDS : [])];
-  const realTime = jevActors.length > 0; // model latency only matters in real time; greedy-only games run flat out
-  const state = createGame();
-  const r = emptyResult();
-  const stats = new GameStats();
-  const recorder = opts.onRecording ? new Recorder() : null;
-  let frame = 0;
-  const scheduler = new Scheduler({
-    transport,
-    now: () => performance.now(),
-    actors: jevActors,
-    modelFor: (a) => (a === 'pacman' ? opts.pacmanModel : opts.ghostModel),
-    onEvent: (e) => {
-      recorder?.record(frame, e);
-      stats.onSchedulerEvent(e);
-      if (e.type === 'call') {
-        r.calls += 1;
-        r.cost += e.costUsd ?? 0;
-        if (Number.isFinite(e.latencyMs)) r.latencyMsSum += e.latencyMs;
-      }
+export const SUBMISSION_ID = /^[a-z0-9][a-z0-9-]*$/;
+
+/** Runs the bench for `game` with command-line `argv`; resolves once done, throws BenchError for a usage problem. */
+export async function runBench(game: GameDefinition<unknown, GameResult>, argv: string[], env: Record<string, string | undefined>, paths: BenchPaths, log: (line: string) => void = console.log): Promise<void> {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      game: { type: 'string' },
+      model: { type: 'string' },
+      models: { type: 'string' },
+      endpoint: { type: 'string' },
+      format: { type: 'string', default: 'systemone' },
+      'chat-model': { type: 'string' },
+      games: { type: 'string' },
+      seed: { type: 'string' },
+      parallel: { type: 'string' },
+      leaderboard: { type: 'boolean', default: false },
+      out: { type: 'string' },
+      submit: { type: 'string' },
+      name: { type: 'string' },
+      by: { type: 'string' },
+      url: { type: 'string' },
+      record: { type: 'string' },
+      'list-models': { type: 'boolean', default: false },
     },
   });
-  const scripted = scriptedControls();
-  const baseCtl: Controls = {
-    decide: (point, s) => (jevActors.includes(point.actor) ? scheduler.decide(point, s) : scripted.decide(point, s)),
-  };
-  const ctl = recorder ? recorder.wrap(baseCtl, () => frame) : baseCtl;
-  let last = performance.now();
-  while (state.status !== 'gameover' && r.survived < maxSeconds) {
-    let dt = FRAME;
-    if (realTime) {
-      await new Promise((res) => setTimeout(res, 16));
-      const now = performance.now();
-      dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-    }
-    if (recorder) {
-      dt = roundDt(dt);
-      recorder.frames.push(dt);
-    }
-    scheduler.update(state);
-    const fruitBefore = state.fruit;
-    stats.beforeStep(state);
-    step(state, dt, ctl);
-    stats.afterStep(state, dt);
-    if (!fruitBefore && state.fruit) r.fruitSpawned += 1;
-    for (const a of [state.pacman, ...GHOST_IDS.map((id) => state.ghosts[id])]) {
-      if (a.id !== 'pacman' && state.ghosts[a.id].state === 'house') continue;
-      const into = state.maze.neighbor(a.tile, a.dir);
-      if (!state.maze.isWalkable(a.tile) || (a.progress > 0 && !state.maze.isWalkable(into))) {
-        throw new Error(`${a.id} left the maze at (${a.tile.x},${a.tile.y}) heading ${a.dir}, progress ${a.progress.toFixed(2)}`);
-      }
-    }
-    if (state.status === 'playing') r.survived += dt;
-    frame += 1;
+
+  if (values['list-models']) {
+    const { added, gone } = diffModels(await fetchEvaluationModels());
+    log(added.length || gone.length ? '' : 'the checked-in list matches the live one');
+    for (const m of added) log(`new on Opper: ${m.id}${m.name ? ` (${m.name})` : ''}`);
+    for (const id of gone) log(`no longer listed: ${id}`);
+    return;
   }
-  finishResult(r, stats, state);
-  opts.onRecording?.(recorder!.finish(state, values.endpoint ? (values.name ?? 'endpoint') : (opts.pacmanModel ?? modelFor(target?.provider ?? 'opper'))));
-  return r;
+
+  const submit = values.submit !== undefined;
+  const leaderboard = values.leaderboard;
+  const games = Number(values.games ?? (leaderboard ? game.rules.officialGames : submit ? game.rules.minGames : 4));
+  if (!Number.isInteger(games) || games < 1) fail('--games must be a whole number of at least 1');
+  const parallel = Number(values.parallel ?? 4);
+  const fixedSeed = values.seed === undefined ? undefined : Number(values.seed);
+  if (fixedSeed !== undefined && !Number.isInteger(fixedSeed)) fail('--seed must be a whole number');
+  if (fixedSeed !== undefined && (submit || leaderboard)) fail('--seed is for trying a game; submissions and official runs play the fixed seeds');
+  if (values.record && games !== 1) fail('--record needs --games 1');
+  if (values.format !== 'systemone' && values.format !== 'chat') fail('--format is systemone or chat');
+  if (values.endpoint && (values.model || values.models)) fail('--endpoint plays your model, instead of --model or --models');
+  if (values.format === 'chat' && !values.endpoint) fail('--format chat needs --endpoint (a chat completions URL)');
+  if (values.format === 'chat' && !values['chat-model']) fail('--format chat needs --chat-model (the model name the endpoint expects)');
+  if (leaderboard && values.endpoint) fail('--leaderboard is for official runs of the listed models; send your model as a submission (--submit)');
+  if (submit) {
+    if (!values.endpoint) fail('--submit records your model through --endpoint');
+    if (!values.name || !values.by) fail('--submit needs --name "Model name" and --by <your GitHub handle>');
+    if (!SUBMISSION_ID.test(basename(values.submit!))) fail(`--submit folder name is the model id: lowercase letters, digits and dashes, e.g. games/${game.slug}/submissions/my-model`);
+    if (games < game.rules.minGames) fail(`a submission needs at least ${game.rules.minGames} games`);
+    if (!/^[A-Za-z0-9-]{1,39}$/.test(values.by!)) fail('--by must be a GitHub handle');
+    if (values.url !== undefined && !/^https:\/\/\S+$/.test(values.url)) fail('--url must start with https://');
+  }
+
+  const timeoutMs = game.timing.callTimeoutMs;
+  const contenders: Contender[] = [];
+  if (values.endpoint) {
+    const name = values.name ?? values.endpoint;
+    const common = { url: values.endpoint, token: env.BENCH_ENDPOINT_TOKEN, timeoutMs, name };
+    contenders.push({
+      model: submit ? basename(values.submit!) : name,
+      name,
+      via: values.format === 'chat' ? 'chat-adapter' : 'systemone',
+      transport: values.format === 'chat' ? chatTransport({ ...common, model: values['chat-model']! }) : endpointTransport(common),
+    });
+  } else {
+    const target = devTargetFromEnv(env);
+    if (!target) fail('set OPPER_API_KEY (or TYPESAFE_API_KEY for Jev) to play the listed models');
+    const ids = values.models === 'all' || values.models === '' ? DECISION_MODELS.map((m) => m.id as string) : values.models !== undefined ? values.models.split(',') : [values.model ?? DEFAULT_MODEL];
+    for (const id of ids) {
+      if (!isModelId(id)) fail(`Unknown model ${id}; one of: ${DECISION_MODELS.map((m) => m.id).join(', ')}`);
+      contenders.push({ model: id, name: modelName(id), via: 'systemone', transport: systemOneTransport(id, target, timeoutMs, `decision-benchmarks-bench-${game.slug}`) });
+    }
+  }
+
+  const out = values.out ?? join(paths.publicDir, 'leaderboard.json');
+  const entries: Entry[] = [];
+  const skipped: Leaderboard['skipped'] = [];
+  const write = () => {
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, `${JSON.stringify(boardFor(game, entries, skipped), null, 2)}\n`);
+  };
+  const seedOf = (i: number) => fixedSeed ?? game.rules.seedFor(i);
+  log(`${game.slug}: ${contenders.length} model${contenders.length === 1 ? '' : 's'} x ${games} games, ${parallel} at a time`);
+
+  for (const c of contenders) {
+    log(`\n${c.name} (${c.model})`);
+    // Warm first: a cold model's first answers would come too late and count as fallbacks.
+    const problem = await warmUp(c.transport, { fastMs: timeoutMs * 0.9, log });
+    if (problem) {
+      if (!leaderboard) fail(`${c.name}: ${problem}`);
+      // One unavailable model must not cost the others' results.
+      log(`  skipped: ${problem}`);
+      skipped.push({ model: c.model, reason: problem });
+      write();
+      continue;
+    }
+    const recordings: unknown[] = [];
+    const results = await playMany(games, parallel, async (i) => {
+      const { result, recording } = await game.play({ transport: c.transport, seed: seedOf(i), signal: new AbortController().signal, model: c.model });
+      recordings[i] = recording;
+      log(`  game ${i + 1}: ${game.metric.name.toLowerCase()} ${result.score}, calls ${result.calls}, fallbacks ${result.fallbacks}/${result.decisions}, $${result.cost.toFixed(4)}`);
+      return result;
+    });
+    const entry = entryFor(game, c.model, c.name, results, c.via);
+    log(`  MEAN ${entry.metric.mean} ± ${round2(2 * entry.metric.stdError)}, best ${entry.metric.best}, fallbacks ${(entry.fallbackRate * 100).toFixed(1)}%, latency ${entry.meanLatencyMs ?? '-'} ms, ${entry.costPerGame === null ? 'cost unknown' : `$${entry.costPerGame}/game`}`);
+    entries.push(entry);
+    if (leaderboard) write(); // after every model, so an interrupted run keeps what it has
+    if (values.record) {
+      mkdirSync(dirname(values.record), { recursive: true });
+      writeFileSync(values.record, JSON.stringify(recordings[0]));
+      log(`recorded the game to ${values.record}`);
+    }
+    if (submit) writeSubmission(game, values.submit!, recordings, seedOf, { name: values.name!, by: values.by!, url: values.url, via: c.via }, log);
+  }
+  if (leaderboard) {
+    write();
+    log(`\nwrote ${out}`);
+  }
 }
 
-/** Runs `n` games, at most `parallel` at a time. */
-async function playMany(n: number, parallel: number, play: () => Promise<GameResult>): Promise<GameResult[]> {
-  if (!Number.isInteger(parallel) || parallel < 1) fail('--parallel must be a whole number ≥ 1');
-  const results: GameResult[] = [];
-  for (let i = 0; i < n; i += parallel) results.push(...(await Promise.all(Array.from({ length: Math.min(parallel, n - i) }, play))));
-  return results;
-}
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Writes the games as a submission folder, after checking each one replays the way CI will check it. */
-function writeSubmission(recordings: Recording[]): void {
-  const dir = values.submit!;
+export function writeSubmission(game: GameDefinition<unknown, GameResult>, dir: string, recordings: unknown[], seedOf: (i: number) => number, who: { name: string; by: string; url?: string; via: Entry['via'] }, log: (line: string) => void = console.log): void {
   recordings.forEach((rec, i) => {
-    const verdict = verifyGame(rec);
-    if (!verdict.ok) fail(`game ${i + 1} does not replay: ${verdict.error}. Please open an issue: this is a jevman bug.`);
+    const verdict = game.verify(JSON.parse(JSON.stringify(rec)), { seed: seedOf(i) });
+    if (!verdict.ok) fail(`game ${i + 1} does not replay: ${verdict.error}. Please open an issue: this is a bug in the game or the kit.`);
   });
   mkdirSync(dir, { recursive: true });
   // A run replaces the folder's games: none of an earlier run may be left behind.
   for (const f of readdirSync(dir)) if (/^game-\d+\.json\.gz$/.test(f)) rmSync(join(dir, f));
-  recordings.forEach((rec, i) => writeFileSync(join(dir, `game-${String(i + 1).padStart(2, '0')}.json.gz`), gzipSync(JSON.stringify(rec))));
+  recordings.forEach((rec, i) => writeFileSync(join(dir, gameFile(i)), gzipSync(JSON.stringify(rec))));
   const manifest = {
-    name: values.name,
-    by: values.by,
-    ...(values.url ? { url: values.url } : {}),
-    benchVersion: BENCH_VERSION,
+    name: who.name,
+    by: who.by,
+    ...(who.url ? { url: who.url } : {}),
+    via: who.via,
+    benchVersion: game.benchVersion,
     recordedAt: new Date().toISOString(),
     games: recordings.length,
   };
   writeFileSync(join(dir, 'submission.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`\nwrote ${recordings.length} games to ${dir}. Check them with npm run submissions, then open a pull request (see CONTRIBUTING.md).`);
+  log(`\nwrote ${recordings.length} games to ${dir}. Check them with npm run submissions -- --game ${game.slug}, then open a pull request (see CONTRIBUTING.md).`);
 }
 
-const line = (r: GameResult) =>
-  `survived ${r.survived.toFixed(1)}s, score ${r.score}, pellets ${r.pellets}, deaths ${r.deaths}, level ${r.level}, ghosts ${r.ghostsEaten}, calls ${r.calls}, fallbacks ${r.fallbacks}/${r.decisions}, $${r.cost.toFixed(4)}`;
-
-if (leaderboard) {
-  const models = values.models === 'all' || values.models === '' ? DECISION_MODELS.map((m) => m.id) : values.models!.split(',').map(asModel);
-  const parallel = Number(values.parallel ?? 4);
-  console.log(`leaderboard: ${models.length} models × ${games} games, cap ${maxSeconds}s, ${parallel} at a time, scripted ghosts (via ${target?.provider ?? 'no key'})`);
-  const entries: LeaderboardEntry[] = [];
-  const skipped: Leaderboard['skipped'] = [];
-  const write = () => {
-    const board: Leaderboard = { generatedAt: new Date().toISOString(), settings: { gamesPerModel: games, maxSeconds, benchVersion: BENCH_VERSION, ghosts: 'scripted' }, entries: rank(entries), skipped };
-    mkdirSync(dirname(values.out!), { recursive: true });
-    writeFileSync(values.out!, `${JSON.stringify(board, null, 2)}\n`);
-    return board;
-  };
-  for (const model of models) {
-    console.log(`\n${modelName(model)} (${model})`);
-    const problem = await warmUp(model);
-    if (problem) {
-      // One unavailable model must not cost the others' results.
-      console.log(`  skipped: ${problem}`);
-      skipped.push({ model, reason: problem });
-      write();
-      continue;
-    }
-    const results = await playMany(games, parallel, () => playOne({ pacman: 'jev', ghosts: 'greedy', pacmanModel: model }));
-    for (const [i, r] of results.entries()) console.log(`  game ${i + 1}: ${line(r)}`);
-    const entry = summarize(model, results);
-    console.log(`  MEAN score ${entry.meanScore}, survived ${entry.meanSurvivedSeconds}s, pellets/life ${entry.pelletsPerLife}, fallbacks ${(entry.fallbackRate * 100).toFixed(1)}%, latency ${entry.meanLatencyMs} ms, $${entry.costPerGame}/game`);
-    entries.push(entry);
-    write(); // after every model, so an interrupted run keeps what it has
-  }
-  const board = write();
-  console.log(`\n${'model'.padEnd(12)} ${'score'.padStart(6)} ${'survived'.padStart(9)} ${'pel/life'.padStart(9)} ${'fallback'.padStart(9)} ${'latency'.padStart(8)} ${'$/game'.padStart(8)}`);
-  for (const s of board.skipped) console.log(`${modelName(s.model).padEnd(12)} skipped: ${s.reason}`);
-  for (const e of board.entries) {
-    console.log(`${e.name.padEnd(12)} ${String(e.meanScore).padStart(6)} ${`${e.meanSurvivedSeconds}s`.padStart(9)} ${String(e.pelletsPerLife).padStart(9)} ${`${(e.fallbackRate * 100).toFixed(1)}%`.padStart(9)} ${`${e.meanLatencyMs ?? '–'} ms`.padStart(8)} ${e.costPerGame.toFixed(4).padStart(8)}`);
-  }
-  console.log(`\nwrote ${values.out}`);
-} else {
-  const pacman = values.pacman === 'greedy' ? 'greedy' : 'jev';
-  const ghosts = values.ghosts === 'jev' ? 'jev' : 'greedy';
-  const pick = (v: string | undefined) => (v === undefined ? undefined : asModel(v));
-  const opts = { pacman, ghosts, pacmanModel: pick(values['pacman-model']), ghostModel: pick(values['ghost-model']) } as const;
-  const label = `pacman=${pacman === 'jev' ? nameOf(opts.pacmanModel) : 'greedy'} ghosts=${ghosts === 'jev' ? nameOf(opts.ghostModel) : 'greedy'}`;
-  console.log(`bench ${label}: ${games} games, cap ${maxSeconds}s${pacman === 'jev' || ghosts === 'jev' ? ` (real time, via ${target?.provider ?? 'no key'})` : ''}`);
-  const warm = async (model: ModelId | undefined) => {
-    const problem = await warmUp(model);
-    if (problem) fail(`${model}: ${problem}`);
-  };
-  if (pacman === 'jev') await warm(opts.pacmanModel);
-  if (ghosts === 'jev' && (pacman !== 'jev' || opts.ghostModel !== opts.pacmanModel)) await warm(opts.ghostModel);
-  const recordings: Recording[] = [];
-  const onRecording = submit
-    ? (rec: Recording) => recordings.push(rec)
-    : values.record
-      ? (rec: Recording) => {
-          const out = JSON.stringify(rec);
-          mkdirSync(dirname(values.record!), { recursive: true });
-          writeFileSync(values.record!, out);
-          console.log(`recorded ${rec.frames.length} frames to ${values.record} (${(out.length / 1024).toFixed(0)} KB)`);
-        }
-      : undefined;
-  const parallel = Number(values.parallel ?? (submit ? 4 : games));
-  const results = await playMany(games, parallel, () => playOne({ ...opts, onRecording }));
-  for (const [i, r] of results.entries()) console.log(`  game ${i + 1}: ${line(r)}`);
-  if (submit) writeSubmission(recordings);
-  const e = summarize(opts.pacmanModel ?? DEFAULT_MODEL, results);
-  console.log(`deaths by situation: ${JSON.stringify(e.deathsBy)}`);
-  console.log(`MEAN ${label}: score ${e.meanScore}, survived ${e.meanSurvivedSeconds}s, pellets ${e.meanPellets}, pellets/life ${e.pelletsPerLife}, ghosts ${e.meanGhostsEaten}, fruit eaten ${e.fruitEaten}, fallbacks ${(e.fallbackRate * 100).toFixed(1)}%, latency ${e.meanLatencyMs ?? '–'} ms, cost $${e.costPerGame.toFixed(4)}/game`);
-}
+/** Game i's file (from 0): game-01.json.gz, ..., game-100.json.gz. Its seed is the game's seedFor(i). */
+export const gameFile = (i: number): string => `game-${String(i + 1).padStart(2, '0')}.json.gz`;

@@ -4,23 +4,26 @@ import { answerMessage } from '../shared/answers.ts';
 export { answerMessage };
 
 /**
- * Signed model answers, so a high-score entry can only replay ghost moves the server actually got from a model. Each
- * answer to a game question is signed for its junction (the decision point's key), the question (which ghost), the
- * direction and the model; the recording carries the signature, and the high-score check verifies it.
+ * Signed model answers, so a high-score entry can only replay moves the server actually got from a model. Each answer
+ * is signed for its question's key, the question, the choice and the model; the recording carries the signature, and
+ * the game's high-score check verifies it. The key is per game, HMAC(SESSION_SECRET, "decision-benchmarks:answers:" +
+ * slug), so an answer signed for one game never verifies in another.
  */
 
-const signingKey = (secret: string): Buffer => createHmac('sha256', secret).update('jevman: answer signatures').digest();
+/** The signing key of one game. */
+export const answerKey = (secret: string, slug: string): Buffer => createHmac('sha256', secret).update(`decision-benchmarks:answers:${slug}`).digest();
 
-export function signAnswer(secret: string, message: string): string {
-  return createHmac('sha256', signingKey(secret)).update(message).digest('base64url').slice(0, 22);
+const SIG_CHARS = 22;
+
+export function signAnswer(key: Buffer, message: string): string {
+  return createHmac('sha256', key).update(message).digest('base64url').slice(0, SIG_CHARS);
 }
 
-/** A check for signatures made with `secret`, for the high-score check. */
-export function answerVerifier(secret: string): (message: string, sig: string) => boolean {
-  const key = signingKey(secret);
+/** A check for signatures made with one game's key, for that game's high-score check. */
+export function answerVerifier(key: Buffer): (message: string, sig: string) => boolean {
   return (message, sig) => {
-    if (typeof sig !== 'string' || sig.length !== 22) return false;
-    const want = Buffer.from(createHmac('sha256', key).update(message).digest('base64url').slice(0, 22));
+    if (typeof sig !== 'string' || sig.length !== SIG_CHARS) return false;
+    const want = Buffer.from(signAnswer(key, message));
     return timingSafeEqual(want, Buffer.from(sig));
   };
 }
@@ -28,16 +31,16 @@ export function answerVerifier(secret: string): (message: string, sig: string) =
 const MAX_KEYS = 8;
 
 /**
- * Signatures for a decide response: one per question the request named a junction key for and the model answered
- * with a direction. `model` is the listed model id the server called (the request's, else its default).
+ * Signatures for a decide response: one per question the game named a key for and the model answered with a choice.
+ * `model` is the id the answers are signed as (the game's own name for the model the server called).
  */
-export function signAnswers(secret: string, keys: unknown, answers: Record<string, unknown>, model: string): Record<string, string> {
+export function signAnswers(key: Buffer, keys: Record<string, string> | undefined, answers: Record<string, unknown>, model: string): Record<string, string> {
   if (!keys || typeof keys !== 'object' || Array.isArray(keys)) return {};
   const out: Record<string, string> = {};
-  for (const [question, key] of Object.entries(keys as Record<string, unknown>).slice(0, MAX_KEYS)) {
+  for (const [question, k] of Object.entries(keys).slice(0, MAX_KEYS)) {
     const answer = answers[question] as { choice?: unknown } | undefined;
-    if (typeof key !== 'string' || key.length > 64 || typeof answer?.choice !== 'string') continue;
-    out[question] = signAnswer(secret, answerMessage(key, question, answer.choice, model));
+    if (typeof k !== 'string' || k.length > 64 || typeof answer?.choice !== 'string') continue;
+    out[question] = signAnswer(key, answerMessage(k, question, answer.choice, model));
   }
   return out;
 }

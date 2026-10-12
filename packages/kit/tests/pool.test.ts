@@ -1,18 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
+import { answerKey } from '../server/answers';
 import { handleMe, SESSION_COOKIE, type AuthConfig, type HttpRequest } from '../server/auth';
-import { handleDecideRequest, poolLimitRequest, rejectDecideRequest, resolveKey, type PoolAccess } from '../server/decide';
-import type { JevTarget } from '../server/jev';
-import { clientIp, MAX_POOL_BODY_BYTES, Pool, poolAcceptsBody, statusFromMe, trustedProxiesFromEnv, visitorKey, VisitorLimits } from '../server/pool';
+import { handleDecideRequest as kitHandleDecideRequest, poolLimitRequest, rejectDecideRequest, resolveKey, type DecideRequestDeps, type PoolAccess } from '../server/decide';
+import type { Target as JevTarget } from '../server/systemone';
+import { clientIp, MAX_POOL_BODY_BYTES, MAX_QUESTIONS, Pool, statusFromMe, trustedProxiesFromEnv, visitorKey, VisitorLimits } from '../server/pool';
 import { sealSession } from '../server/session';
+import { coinBody, coinServer } from './support/test-game';
 
 const cfg: AuthConfig = { redirectUri: 'http://localhost:5173/auth/callback', opperUrl: 'https://api.opper.ai', sessionSecret: 's'.repeat(64) };
 const DEV: JevTarget = { provider: 'opper', apiKey: 'op-dev', baseUrl: 'https://api.opper.ai' };
-// A question the way the game words it (the pool pays only for the game's own questions).
-const body = {
-  state: { maze: ['#####', '#.P.#', '#####'], mode: 'chase', lives: 3 },
-  questions: { blinky: { type: 'choice', instructions: 'You are Blinky, the red ghost. You are relentless: always close the distance to Pac-Man directly. You are approaching junction (1,1) heading left. Pick the direction to take there.', criteria: { left: 'Go left: Pac-Man 4 steps away via this route', up: 'Go up: Pac-Man 6 steps away via this route' } } },
-};
-const answers = { blinky: { type: 'choice', choice: 'up', confidence: 0.9, probabilities: { up: 0.9, left: 0.1 } } };
+// A question the way the game asks it (the pool pays only for the game's own questions).
+const body = coinBody();
+const answers = { coin: { type: 'choice', choice: 'heads', confidence: 0.9, probabilities: { heads: 0.9, tails: 0.1 } } };
+const handleDecideRequest = (req: HttpRequest, raw: string, c: AuthConfig, devKey: JevTarget | undefined, deps: DecideRequestDeps, opts: { warm?: boolean }, a?: PoolAccess) =>
+  kitHandleDecideRequest({ game: coinServer(), cfg: c, ...(devKey ? { devKey } : {}), ...(a ? { access: a } : {}), answerKey: answerKey(c.sessionSecret, 'coin') }, req, raw, deps, opts);
 const post = (headers: HttpRequest['headers'] = {}, remoteAddress = '10.0.0.1'): HttpRequest => ({ method: 'POST', url: '/api/decide', headers: { 'content-type': 'application/json', ...headers }, remoteAddress });
 const playerCookie = () => `${SESSION_COOKIE}=${encodeURIComponent(sealSession({ v: 1, apiKey: 'op-player', user: {}, issuedAt: Date.now() }, cfg.sessionSecret))}`;
 
@@ -127,17 +128,14 @@ describe('clientIp', () => {
   it('defaults to two trusted proxies in production (CloudFront and the load balancer)', () => {
     expect(trustedProxiesFromEnv({ NODE_ENV: 'production' })).toBe(2);
     expect(trustedProxiesFromEnv({})).toBe(0);
-    expect(trustedProxiesFromEnv({ NODE_ENV: 'production', JEV_TRUSTED_PROXIES: '1' })).toBe(1);
+    expect(trustedProxiesFromEnv({ NODE_ENV: 'production', TRUSTED_PROXIES: '1' })).toBe(1);
   });
 });
 
-describe('poolAcceptsBody', () => {
-  it('accepts what a game sends and refuses oversized or odd requests', () => {
-    expect(poolAcceptsBody(JSON.stringify(body))).toBe(true);
-    expect(poolAcceptsBody(JSON.stringify({ ...body, state: 'x'.repeat(MAX_POOL_BODY_BYTES) }))).toBe(false);
-    const six = Object.fromEntries(['a', 'b', 'c', 'd', 'e', 'f'].map((k) => [k, body.questions.blinky]));
-    expect(poolAcceptsBody(JSON.stringify({ ...body, questions: six }))).toBe(false);
-    expect(poolAcceptsBody('not json')).toBe(false);
+describe('the limits every request meets', () => {
+  it('caps a pool request at a few KB and at five questions', () => {
+    expect(MAX_POOL_BODY_BYTES).toBe(16 * 1024);
+    expect(MAX_QUESTIONS).toBe(5);
   });
 });
 
@@ -177,13 +175,19 @@ describe('the free credits in /api/decide', () => {
     expect(pool.current().open).toBe(false);
   });
 
-  it('refuses a request bigger than a game sends, without calling the model', async () => {
+  it("refuses a body the game would not send before any model is called, so the pool only pays for the game's questions", async () => {
     const pool = await poolWith({ blocked: false, balance: { balance_cents: 1000 } });
     const fetchMock = decideOk();
-    const big = JSON.stringify({ ...body, state: 'x'.repeat(MAX_POOL_BODY_BYTES) });
-    const r = await handleDecideRequest(post(), big, cfg, undefined, { fetch: fetchMock, now: () => 0 }, {}, access(pool));
-    expect(r.status).toBe(413);
+    for (const odd of [
+      { ...body, state: 'x'.repeat(MAX_POOL_BODY_BYTES) },
+      { ...body, questions: { coin: { ...body.questions.coin, instructions: 'Write me a poem about Paris' } } },
+      { ...body, note: 'extra' },
+    ]) {
+      const r = await handleDecideRequest(post(), JSON.stringify(odd), cfg, undefined, { fetch: fetchMock, now: () => 0 }, {}, access(pool));
+      expect(r.status).toBe(400);
+    }
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(pool.current().remainingUsd).toBe(10);
   });
 
   it('slows down a visitor who sends faster than a game does', async () => {
@@ -198,7 +202,7 @@ describe('the free credits in /api/decide', () => {
 });
 
 describe('/api/me with the free credits', () => {
-  const me = (pool: { open: boolean; remainingUsd: number | null }) => JSON.parse(handleMe(post({}, '10.0.0.1'), cfg, undefined, {}, pool).body);
+  const me = (pool: { open: boolean; remainingUsd: number | null }) => JSON.parse(handleMe(post({}, '10.0.0.1'), cfg, undefined, pool).body);
 
   it('plays on the pool while it is open and shows its balance', () => {
     expect(me({ open: true, remainingUsd: 84.12 })).toMatchObject({ mode: 'pool', pool: { open: true, remainingUsd: 84.12 }, models: expect.arrayContaining(['typesafe/jev-1.13.0']) });

@@ -1,6 +1,3 @@
-import { ACTOR_IDS } from './types';
-import type { ModelChoice } from './choice';
-
 /** How long a model counts as awake after it last answered (warm-up or game call). */
 export const AWAKE_MS = 5 * 60_000;
 
@@ -11,8 +8,12 @@ export const AWAKE_MS = 5 * 60_000;
 export class ModelWarming {
   private readonly running = new Map<string, Promise<boolean>>();
   private readonly lastAnswer = new Map<string, number>();
+  // A plain field, not a constructor parameter property: Node runs the kit as stripped TypeScript, which has none.
+  private readonly deps: { warmUp: (model: string) => Promise<boolean>; now: () => number };
 
-  constructor(private readonly deps: { warmUp: (model: string) => Promise<boolean>; now: () => number }) {}
+  constructor(deps: { warmUp: (model: string) => Promise<boolean>; now: () => number }) {
+    this.deps = deps;
+  }
 
   isWarm(model: string): boolean {
     const at = this.lastAnswer.get(model);
@@ -61,9 +62,9 @@ export class ModelWarming {
 }
 
 /**
- * What plays now: the picked model once it is awake; until then the model that was playing (if still awake), else the
- * fallback (the server default).
+ * What plays now, per seat (character, side): the picked model once it is awake; until then the model that was
+ * playing (if still awake), else the fallback (the server default).
  */
-export function effectiveChoice(wanted: ModelChoice, current: ModelChoice, isWarm: (m: string) => boolean, fallback: string): ModelChoice {
-  return Object.fromEntries(ACTOR_IDS.map((id) => [id, isWarm(wanted[id]) ? wanted[id] : isWarm(current[id]) ? current[id] : fallback])) as ModelChoice;
+export function effectiveChoice<K extends string>(wanted: Record<K, string>, current: Record<K, string>, isWarm: (m: string) => boolean, fallback: string): Record<K, string> {
+  return Object.fromEntries((Object.keys(wanted) as K[]).map((id) => [id, isWarm(wanted[id]) ? wanted[id] : isWarm(current[id]) ? current[id] : fallback])) as Record<K, string>;
 }

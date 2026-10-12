@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { placeFor } from '../src/highscores';
+import { placeFor } from '../client/highscores';
 
 describe('placeFor', () => {
   it('finds the place a score would take on a loaded board', () => {

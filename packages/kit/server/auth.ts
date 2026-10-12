@@ -1,11 +1,12 @@
-import { DECISION_MODELS, DEFAULT_MODEL } from '../shared/models.ts';
 import { randomBytes } from 'node:crypto';
+import { DECISION_MODELS, DEFAULT_MODEL } from '../shared/models.ts';
 import { openSession, parseCookies, safeEqual, sealSession, serializeCookie, SESSION_MAX_AGE_S, type SessionData } from './session.ts';
 import type { PoolStatus } from './pool.ts';
 
 export const WALLET_URL = 'https://platform.opper.ai/wallet';
-export const SESSION_COOKIE = 'jevman_session';
-export const STATE_COOKIE = 'jevman_oauth_state';
+/** Cookie names; every game's cookies are scoped to its own path, so players sign in per game. */
+export const SESSION_COOKIE = 'db_session';
+export const STATE_COOKIE = 'db_oauth_state';
 
 export interface AuthConfig {
   clientId?: string;
@@ -13,7 +14,10 @@ export interface AuthConfig {
   redirectUri: string;
   opperUrl: string;
   sessionSecret: string;
-  /** APP_BASE_PATH, normalised ('' at the root): scopes the cookies and prefixes the app's own redirects. */
+  /**
+   * Where the game is mounted, APP_BASE_PATH plus its slug (`/decision-benchmarks/snake`; '' at the root): scopes the
+   * cookies and prefixes the game's own redirects.
+   */
   basePath?: string;
   /** The public origin (PUBLIC_BASE_URL, e.g. https://opper.ai): an `Origin` with its host is same-site. */
   publicOrigin?: string;
@@ -71,8 +75,8 @@ export function crossSite(req: HttpRequest, cfg: Pick<AuthConfig, 'publicOrigin'
   }
 }
 
-/** The session cookie's path: the whole app and nothing else on the host (`/jevman-benchmark` covers its subpaths). */
-export const sessionCookiePath = (cfg: AuthConfig): string => cfg.basePath || '/';
+/** The session cookie's path: the game and nothing else on the host (`/decision-benchmarks/snake/`). */
+export const sessionCookiePath = (cfg: AuthConfig): string => `${cfg.basePath ?? ''}/`;
 /** The OAuth state cookie only travels to the sign-in routes. */
 export const stateCookiePath = (cfg: AuthConfig): string => `${cfg.basePath ?? ''}/auth`;
 /** An app path ('/', '/?auth_error=…') below the base path, for the server's redirects. */
@@ -185,12 +189,12 @@ export function handleLogout(req: HttpRequest, cfg: AuthConfig): HttpResponse {
  * `devProvider` is where the server's own key sends calls when nobody is signed in (undefined: no dev key). `pool` is
  * the free credits, if configured: signed out, they play with mode "pool" while open, else "none" (sign in to play).
  */
-export function handleMe(req: HttpRequest, cfg: AuthConfig, devProvider: 'opper' | 'typesafe' | undefined, env: Record<string, string | undefined> = process.env, pool?: PoolStatus): HttpResponse {
+export function handleMe(req: HttpRequest, cfg: AuthConfig, devProvider: 'opper' | 'typesafe' | undefined, pool?: PoolStatus): HttpResponse {
   const session = sessionFrom(req, cfg);
   const base = { walletUrl: WALLET_URL, loginAvailable: loginConfigured(cfg) };
-  // Which decision models this key can play, and the one used when the game names none (JEV_MODEL, else jev).
+  // Which decision models this key can play (Opper ids), and the one used when a request names none.
   const models = (provider: 'opper' | 'typesafe') => ({
-    defaultModel: env.JEV_MODEL?.trim() || DEFAULT_MODEL,
+    defaultModel: DEFAULT_MODEL,
     models: provider === 'opper' ? DECISION_MODELS.map((m) => m.id) : [DEFAULT_MODEL],
   });
   if (session) {

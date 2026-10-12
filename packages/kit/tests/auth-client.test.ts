@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { accountNotice, fetchMe, walletNotice, type Me } from '../src/auth';
+import { accountNotice, fetchMe, walletNotice, type Me } from '../client/auth';
 
 const WALLET = 'https://platform.opper.ai/wallet';
 

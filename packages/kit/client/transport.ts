@@ -1,7 +1,7 @@
-import type { DecideResponse } from './brain';
-import type { Transport } from './scheduler';
-import { appPath } from './paths';
+import type { DecideResponse, Transport } from '../shared/systemone.ts';
+import { appPath } from './paths.ts';
 
+/** A little over the server's 2 s model timeout, so the server's own answer (a timeout, a fallback) arrives first. */
 const TIMEOUT_MS = 2500;
 
 export interface TransportHooks {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mountAt, mountedUrl, normalizeBasePath } from '../server/base-path';
+import { mountAt, mountedUrl, normalizeBasePath, gameMount } from '../shared/base-path';
 
 describe('normalizeBasePath', () => {
   it.each([
@@ -62,5 +62,20 @@ describe('mountAt', () => {
   it('is the handler itself without a base path', () => {
     const inner = vi.fn();
     expect(mountAt('', inner)).toBe(inner);
+  });
+});
+
+describe('gameMount', () => {
+  it.each([
+    ['/snake/', { kind: 'game', slug: 'snake', url: '/' }],
+    ['/snake/api/me?x=1', { kind: 'game', slug: 'snake', url: '/api/me?x=1' }],
+    ['/snake', { kind: 'bare', slug: 'snake', query: '' }],
+    ['/snake?model=a', { kind: 'bare', slug: 'snake', query: '?model=a' }],
+    ['/', { kind: 'none' }],
+    ['/Snake/', { kind: 'none' }],
+    ['/%2e%2e/', { kind: 'none' }],
+    ['//', { kind: 'none' }],
+  ])('%s -> %j', (url, expected) => {
+    expect(gameMount(url)).toEqual(expected);
   });
 });

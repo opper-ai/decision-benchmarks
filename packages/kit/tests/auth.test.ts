@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { crossSite, handleCallback, handleLogin, handleLogout, handleMe, opperExchange, sessionFrom, SESSION_COOKIE, STATE_COOKIE, type AuthConfig, type HttpRequest } from '../server/auth';
 import { openSession, sealSession } from '../server/session';
+import { DECISION_MODELS } from '../shared/models';
 
 const cfg: AuthConfig = { clientId: 'opper_app_x', clientSecret: 'shh', redirectUri: 'http://localhost:5173/auth/callback', opperUrl: 'https://api.opper.ai', sessionSecret: 's'.repeat(64) };
 const req = (url: string, headers: HttpRequest['headers'] = {}, method = 'GET'): HttpRequest => ({ method, url, headers });
@@ -140,9 +141,9 @@ describe('session lookup, logout and /api/me', () => {
   });
   it('describes the account without the key', () => {
     const player = JSON.parse(handleMe(signedIn('/api/me'), cfg, 'opper').body);
-    const all = ['typesafe/jev-1.13.0', 'opper/clef', 'opper/clef-flash', 'opper/kev-4b', 'berget/convaiinnovations/laya', 'openai/gpt-6-luna-decisions', 'empiriolabs/aplomb-1', 'microsoft/decision-1'];
+    const all = DECISION_MODELS.map((m) => m.id);
     expect(player).toEqual({ mode: 'player', user: { name: 'Ada' }, projectName: 'jevman', walletUrl: 'https://platform.opper.ai/wallet', loginAvailable: true, defaultModel: 'typesafe/jev-1.13.0', models: all });
-    // A TypeSafe key reaches jev only; the demo needs no models.
+    // A TypeSafe key reaches Jev only; the demo needs no models.
     expect(JSON.parse(handleMe(req('/api/me'), cfg, 'typesafe').body)).toMatchObject({ mode: 'dev', devProvider: 'typesafe', models: ['typesafe/jev-1.13.0'] });
     expect(JSON.parse(handleMe(req('/api/me'), cfg, 'opper').body)).toMatchObject({ mode: 'dev', models: all });
     expect(JSON.parse(handleMe(req('/api/me'), { ...cfg, clientId: undefined }, undefined).body)).toMatchObject({ mode: 'none', loginAvailable: false });
@@ -169,31 +170,31 @@ describe('crossSite', () => {
 });
 
 describe('below a base path', () => {
-  const based: AuthConfig = { ...cfg, basePath: '/jevman-benchmark', redirectUri: 'https://opper.ai/jevman-benchmark/auth/callback' };
+  const based: AuthConfig = { ...cfg, basePath: '/decision-benchmarks/snake', redirectUri: 'https://opper.ai/decision-benchmarks/snake/auth/callback' };
   const withState = (url: string) => req(url, { cookie: `${STATE_COOKIE}=st4te` });
 
   it('scopes the state cookie to the sign-in routes below the prefix', () => {
     const r = handleLogin(req('/auth/login'), based, () => 'st4te');
-    expect(setCookies(r)[0]).toBe(`${STATE_COOKIE}=st4te; Max-Age=600; Path=/jevman-benchmark/auth; HttpOnly; Secure; SameSite=Lax`);
-    expect(new URL(r.headers.Location as string).searchParams.get('redirect_uri')).toBe('https://opper.ai/jevman-benchmark/auth/callback');
+    expect(setCookies(r)[0]).toBe(`${STATE_COOKIE}=st4te; Max-Age=600; Path=/decision-benchmarks/snake/auth; HttpOnly; Secure; SameSite=Lax`);
+    expect(new URL(r.headers.Location as string).searchParams.get('redirect_uri')).toBe('https://opper.ai/decision-benchmarks/snake/auth/callback');
   });
 
   it('scopes the session cookie to the app and returns to the app', async () => {
     const r = await handleCallback(withState('/auth/callback?code=c&state=st4te'), based, async () => ({ apiKey: 'op-player', user: {} }), 10_000);
-    expect(r.headers.Location).toBe('/jevman-benchmark/');
+    expect(r.headers.Location).toBe('/decision-benchmarks/snake/');
     const cookies = setCookies(r);
-    expect(cookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`))).toMatch(/; Path=\/jevman-benchmark; HttpOnly; Secure; SameSite=Lax$/);
-    expect(cookies.find((c) => c.startsWith(`${STATE_COOKIE}=`))).toMatch(/Max-Age=0; Path=\/jevman-benchmark\/auth;/);
+    expect(cookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`))).toMatch(/; Path=\/decision-benchmarks\/snake\/; HttpOnly; Secure; SameSite=Lax$/);
+    expect(cookies.find((c) => c.startsWith(`${STATE_COOKIE}=`))).toMatch(/Max-Age=0; Path=\/decision-benchmarks\/snake\/auth;/);
   });
 
   it('sends sign-in errors back to the app', async () => {
     const r = await handleCallback(withState('/auth/callback?code=c&state=wrong'), based, vi.fn());
-    expect(r.headers.Location).toBe('/jevman-benchmark/?auth_error=state');
+    expect(r.headers.Location).toBe('/decision-benchmarks/snake/?auth_error=state');
   });
 
   it('clears the session cookie on the same path at sign-out', () => {
     const r = handleLogout(req('/auth/logout', { 'content-type': 'application/json' }, 'POST'), based);
-    expect(setCookies(r)).toEqual([`${SESSION_COOKIE}=; Max-Age=0; Path=/jevman-benchmark; HttpOnly; Secure; SameSite=Lax`]);
+    expect(setCookies(r)).toEqual([`${SESSION_COOKIE}=; Max-Age=0; Path=/decision-benchmarks/snake/; HttpOnly; Secure; SameSite=Lax`]);
   });
 });
 

@@ -11,7 +11,7 @@ export interface SessionData {
 
 export const SESSION_MAX_AGE_S = 30 * 24 * 3600;
 
-const keyFor = (secret: string): Buffer => Buffer.from(hkdfSync('sha256', secret, 'jevman', 'jevman-session-v1', 32));
+const keyFor = (secret: string): Buffer => Buffer.from(hkdfSync('sha256', secret, 'decision-benchmarks', 'decision-benchmarks-session-v1', 32));
 
 /** AES-256-GCM, encoded as base64url `iv.ciphertext.tag`. */
 export function sealSession(data: SessionData, secret: string): string {

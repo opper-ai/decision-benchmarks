@@ -1,16 +1,16 @@
 import { clearSessionCookie, crossSite, header, json, sessionFrom, WALLET_URL, type AuthConfig, type HttpRequest, type HttpResponse } from './auth.ts';
 import { signAnswers } from './answers.ts';
-import { endpointFor, modelFor, requestedModelFor, TYPESAFE_USD_PER_INPUT_TOKEN, type JevProvider, type JevTarget } from './jev.ts';
-import { clientIp, poolAcceptsBody, POOL_EMPTY_MESSAGE, type Pool, type VisitorLimits } from './pool.ts';
+import { endpointFor, TYPESAFE_USD_PER_INPUT_TOKEN, upstreamModel, type Provider, type Target } from './systemone.ts';
+import { clientIp, MAX_QUESTIONS, POOL_EMPTY_MESSAGE, type Pool, type VisitorLimits } from './pool.ts';
 import type { SessionData } from './session.ts';
+import type { GameServer } from '../shared/game.ts';
 import { DEFAULT_MODEL, isModelId, modelName } from '../shared/models.ts';
-
-export const JEV_MODEL = modelFor('opper');
+import { WARM_UP_REQUEST, type SystemOneRequest } from '../shared/systemone.ts';
 
 /** Whose key pays: a signed-in player's, the free credits' (signed out), or the local one from .env. */
 export type KeyMode = 'player' | 'pool' | 'dev';
 
-/** The free credits and their fair-use limits, when OPPER_POOL_API_KEY is set. */
+/** The free credits and their fair-use limits, when OPPER_POOL_API_KEY is set: one of each for every game. */
 export interface PoolAccess {
   pool: Pool;
   limits: VisitorLimits;
@@ -29,7 +29,9 @@ export interface DecideDeps {
   log?: (line: string) => void;
   keyMode?: KeyMode;
   /** Which System One API `baseUrl` points at (default Opper). */
-  provider?: JevProvider;
+  provider?: Provider;
+  /** Sent to Opper as X-Opper-Name, so traces show which game called. */
+  callName?: string;
 }
 
 export interface DecideResult {
@@ -37,14 +39,7 @@ export interface DecideResult {
   body: unknown;
 }
 
-interface DecideInput {
-  /** One of shared/models.ts; jev when omitted. */
-  model?: unknown;
-  state: unknown;
-  questions: Record<string, unknown>;
-}
-
-function isDecideInput(v: unknown): v is DecideInput {
+function isDecideInput(v: unknown): v is SystemOneRequest {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
   return o.state !== undefined && !!o.questions && typeof o.questions === 'object' && Object.keys(o.questions).length > 0;
@@ -60,35 +55,35 @@ function upstreamMessage(text: string): string {
   return text.slice(0, 200);
 }
 
+/**
+ * One System One call: checks the model against the list (the default when the request names none), calls it with
+ * the key in `deps`, and maps the upstream answer for the page. Used by the server and by the bench.
+ */
 export async function handleDecide(input: unknown, deps: DecideDeps): Promise<DecideResult> {
   const apiKey = deps.apiKey;
   const redact = (s: string): string => (apiKey ? s.split(apiKey).join('[redacted]') : s);
   const rawLog = deps.log ?? (() => {});
   const log = (line: string): void => rawLog(redact(line));
   const provider = deps.provider ?? 'opper';
-  const tag = `[${['jev', deps.keyMode, provider === 'typesafe' ? 'typesafe' : undefined].filter(Boolean).join(' ')}]`;
+  const tag = `[${['decide', deps.keyMode, provider === 'typesafe' ? 'typesafe' : undefined].filter(Boolean).join(' ')}]`;
   const timeoutMs = deps.timeoutMs ?? 2000;
-  if (!deps.apiKey) return { status: 500, body: { error: 'No TYPESAFE_API_KEY or OPPER_API_KEY in .env — all decisions are fallbacks' } };
+  if (!deps.apiKey) return { status: 500, body: { error: 'No TYPESAFE_API_KEY or OPPER_API_KEY in .env: every decision is a fallback' } };
   if (!isDecideInput(input)) return { status: 400, body: { error: 'Expected { state, questions } with at least one question' } };
-  // A model the game asks for must be on the shared list; without one, the server's default (JEV_MODEL or jev).
-  const requested = input.model ?? undefined;
-  if (requested !== undefined && !isModelId(requested)) {
-    return { status: 400, body: { error: `Unknown decision model: ${typeof requested === 'string' ? requested.slice(0, 80) : typeof requested}` } };
-  }
-  const model = requested === undefined ? modelFor(provider) : requestedModelFor(provider, requested);
-  if (model === null) return { status: 400, body: { error: `A TypeSafe key only reaches jev; ${requested} needs an Opper key` } };
-  // For logs and errors: TypeSafe's own id for jev reads as the listed model.
-  const label = modelName(requested ?? (model === requestedModelFor('typesafe', DEFAULT_MODEL) ? DEFAULT_MODEL : model));
+  const requested = input.model ?? DEFAULT_MODEL;
+  if (!isModelId(requested)) return { status: 400, body: { error: `Unknown decision model: ${typeof requested === 'string' ? requested.slice(0, 80) : typeof requested}` } };
+  const model = upstreamModel(provider, requested);
+  const label = modelName(requested);
+  if (model === null) return { status: 400, body: { error: `A TypeSafe key only reaches ${modelName(DEFAULT_MODEL)}; ${label} needs an Opper key` } };
 
-  const actors = `${Object.keys(input.questions).join(',')}${model === modelFor(provider, {}) ? '' : ` (${model})`}`;
+  const actors = `${Object.keys(input.questions).join(',')}${requested === DEFAULT_MODEL ? '' : ` (${requested})`}`;
   const started = deps.now();
   try {
-    const res = await deps.fetch(endpointFor({ provider, apiKey: deps.apiKey, baseUrl: deps.baseUrl }), {
+    const res = await deps.fetch(endpointFor({ provider, baseUrl: deps.baseUrl }), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${deps.apiKey}`,
         'Content-Type': 'application/json',
-        ...(provider === 'opper' ? { 'X-Opper-Name': 'jevman-decide' } : {}),
+        ...(provider === 'opper' ? { 'X-Opper-Name': deps.callName ?? 'decision-benchmarks' } : {}),
       },
       body: JSON.stringify({ model, state: input.state, questions: input.questions }),
       signal: AbortSignal.timeout(timeoutMs),
@@ -97,7 +92,7 @@ export async function handleDecide(input: unknown, deps: DecideDeps): Promise<De
     const latencyMs = Math.round(deps.now() - started);
     if (!res.ok) {
       const error = redact(`${label} returned HTTP ${res.status}: ${upstreamMessage(redact(text))}`);
-      log(`${tag} ${actors} failed after ${latencyMs} ms — ${error}`);
+      log(`${tag} ${actors} failed after ${latencyMs} ms: ${error}`);
       if (deps.keyMode === 'player') {
         if (res.status === 401) return { status: 401, body: { error: 'Your Opper sign-in has expired. Sign in again to keep playing.', signedOut: true, clearSession: true } };
         if (res.status === 402) return { status: 402, body: { error: 'Your Opper wallet is empty. Top it up to keep playing.', walletUrl: WALLET_URL } };
@@ -108,7 +103,7 @@ export async function handleDecide(input: unknown, deps: DecideDeps): Promise<De
       if (deps.keyMode === 'dev' && (res.status === 401 || res.status === 402)) {
         return { status: res.status, body: { error: res.status === 401 ? 'The API key in .env was rejected' : "The API key's Opper wallet is empty" } };
       }
-      // Any key (a player's or the local one) can lack access to a listed model; that is not a passing upstream error.
+      // Any key can lack access to a listed model; that is not a passing upstream error.
       if (res.status === 403) {
         const whose = deps.keyMode === 'player' ? 'your Opper account' : deps.keyMode === 'pool' ? 'the free credits' : 'this API key';
         return { status: 403, body: { error: `${label} is not enabled for ${whose}` } };
@@ -123,22 +118,12 @@ export async function handleDecide(input: unknown, deps: DecideDeps): Promise<De
       const costUsd = Number.isFinite(tokens) ? tokens * TYPESAFE_USD_PER_INPUT_TOKEN : null;
       const requestId = res.headers.get('x-typesafe-request-id');
       log(`${tag} ${actors} ok in ${latencyMs} ms, cost ${costUsd === null ? '?' : `≈${Number(costUsd.toPrecision(2))}`} USD, request ${requestId ?? '?'}`);
-      return { status: 200, body: { model, answers: json.answers ?? {}, usage, latencyMs, costUsd, costEstimated: true, traceId: requestId } };
+      return { status: 200, body: { model: requested, answers: json.answers ?? {}, usage, latencyMs, costUsd, costEstimated: true, traceId: requestId } };
     }
     const cost = res.headers.get('x-opper-cost');
     const traceId = res.headers.get('x-opper-trace-id');
     log(`${tag} ${actors} ok in ${latencyMs} ms, cost ${cost ?? '?'} USD, trace ${traceId ?? '?'}`);
-    return {
-      status: 200,
-      body: {
-        model: requested ?? model, // the game's id, even when Opper serves the model under another
-        answers: json.answers ?? {},
-        usage,
-        latencyMs,
-        costUsd: cost === null ? null : Number(cost),
-        traceId,
-      },
-    };
+    return { status: 200, body: { model: requested, answers: json.answers ?? {}, usage, latencyMs, costUsd: cost === null ? null : Number(cost), traceId } };
   } catch (err) {
     const e = err as Error;
     const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError';
@@ -152,7 +137,7 @@ export async function handleDecide(input: unknown, deps: DecideDeps): Promise<De
  * Where a decide call goes: the signed-in player's key (always via Opper), else the free credits while they last,
  * else the server's dev key, else nowhere.
  */
-export function resolveKey(session: SessionData | null, devKey: JevTarget | undefined, opperUrl: string, pool?: Pool): (JevTarget & { mode: KeyMode }) | null {
+export function resolveKey(session: SessionData | null, devKey: Target | undefined, opperUrl: string, pool?: Pool): (Target & { mode: KeyMode }) | null {
   if (session) return { provider: 'opper', apiKey: session.apiKey, baseUrl: opperUrl, mode: 'player' };
   if (pool?.current().open) return { provider: 'opper', apiKey: pool.apiKey, baseUrl: opperUrl, mode: 'pool' };
   if (devKey) return { ...devKey, mode: 'dev' };
@@ -166,13 +151,23 @@ export interface DecideRequestDeps {
   logError?: (line: string) => void;
 }
 
+/** What /api/decide needs to know about the game it serves and the keys it may use. */
+export interface DecideContext {
+  game: GameServer;
+  cfg: AuthConfig;
+  devKey?: Target;
+  access?: PoolAccess;
+  /** The game's answer-signing key (answers.ts). */
+  answerKey: Buffer;
+}
+
 /**
  * The answer to a /api/decide request that is refused before its body matters, or null to go ahead:
  * 405 for anything but POST, 403 cross-site, 415 unless JSON (a cross-site form can post text/plain
  * without a CORS preflight), and 401 `signedOut` when there is neither a session nor a dev key, or 402 `poolEmpty`
  * when the free credits would have paid but have run out.
  */
-export function rejectDecideRequest(req: HttpRequest, cfg: AuthConfig, devKey: JevTarget | undefined, access?: PoolAccess): HttpResponse | null {
+export function rejectDecideRequest(req: HttpRequest, cfg: AuthConfig, devKey: Target | undefined, access?: PoolAccess): HttpResponse | null {
   if (req.method !== 'POST') return json(405, { error: 'POST only' }, [], { Allow: 'POST' });
   if (crossSite(req, cfg)) return json(403, { error: 'Cross-site request refused' });
   if (!header(req, 'content-type').toLowerCase().startsWith('application/json')) return json(415, { error: 'Expected application/json' });
@@ -186,8 +181,11 @@ export function rejectDecideRequest(req: HttpRequest, cfg: AuthConfig, devKey: J
   return null;
 }
 
-/** Fair use of the free credits, checked once per request before its body is read: 429 when a visitor sends faster than a game does. */
-export function poolLimitRequest(req: HttpRequest, cfg: AuthConfig, devKey: JevTarget | undefined, access: PoolAccess | undefined): HttpResponse | null {
+/**
+ * Fair use of the free credits, checked once per request before its body is read: 429 when a visitor sends faster
+ * than a game does. The limiter is shared by every game.
+ */
+export function poolLimitRequest(req: HttpRequest, cfg: AuthConfig, devKey: Target | undefined, access: PoolAccess | undefined): HttpResponse | null {
   if (!access || resolveKey(sessionFrom(req, cfg), devKey, cfg.opperUrl, access.pool)?.mode !== 'pool') return null;
   const verdict = access.limits.take(clientIp(req, access.trustedProxies));
   if (verdict === 'rate') return json(429, { error: 'Too many requests for the free credits; slow down a little' }, [], { 'Retry-After': '1' });
@@ -197,31 +195,38 @@ export function poolLimitRequest(req: HttpRequest, cfg: AuthConfig, devKey: JevT
 /** A cold Opper-hosted model can take many seconds to answer its first call after being idle. */
 export const WARM_TIMEOUT_MS = 15_000; // a warm-up accepted late in the 5 s drain still ends before the 25 s shutdown deadline
 
-/** The fixed question /api/warm sends: the client only picks the model, never the content. */
-const WARM_UP = { state: { note: 'warm-up' }, questions: { warmup: { type: 'choice', instructions: 'Pick one.', criteria: { a: 'Option A', b: 'Option B' } } } };
-
 /**
- * /api/decide, independent of the HTTP server: picks the key, calls the model, and turns `clearSession` into a
- * Set-Cookie. With `warm` it is /api/warm: one fixed tiny call with a long timeout, so a model that has been idle is
- * awake before it has to play.
+ * /api/decide, independent of the HTTP server: picks the key, has the game rebuild or check the request (any key: the
+ * service only forwards what its games ask), calls the model, signs the answers with the game's key, and turns
+ * `clearSession` into a Set-Cookie. With `warm` it is /api/warm: one fixed tiny call with a long timeout, so a model
+ * that has been idle is awake before it has to play; the body only names the model.
  */
-export async function handleDecideRequest(req: HttpRequest, rawBody: string, cfg: AuthConfig, devKey: JevTarget | undefined, deps: DecideRequestDeps, opts: { warm?: boolean } = {}, access?: PoolAccess): Promise<HttpResponse> {
+export async function handleDecideRequest(ctx: DecideContext, req: HttpRequest, rawBody: string, deps: DecideRequestDeps, opts: { warm?: boolean } = {}): Promise<HttpResponse> {
+  const { cfg, devKey, access } = ctx;
   const refused = rejectDecideRequest(req, cfg, devKey, access);
   if (refused) return refused;
   const key = resolveKey(sessionFrom(req, cfg), devKey, cfg.opperUrl, access?.pool)!;
-  // The free credits pay only for what a real game sends (a warm-up's content is fixed below).
-  if (key.mode === 'pool' && !opts.warm && !poolAcceptsBody(rawBody)) return json(413, { error: 'That request is larger than a game sends' });
   const redact = (s: string) => [key.apiKey, devKey?.apiKey].reduce<string>((acc, k) => (k ? acc.split(k).join('[redacted]') : acc), s);
   try {
-    let input: unknown = null;
+    let parsed: unknown;
     try {
-      input = JSON.parse(rawBody);
+      parsed = JSON.parse(rawBody);
     } catch {
-      // handled as a 400 by handleDecide
+      return json(400, { error: 'Bad JSON' });
     }
+    let input: SystemOneRequest;
+    let keys: Record<string, string> | undefined;
+    let as: string | undefined;
     if (opts.warm) {
-      const model = input && typeof input === 'object' ? (input as { model?: unknown }).model : undefined;
-      input = { ...(model === undefined ? {} : { model }), ...WARM_UP };
+      const model = parsed && typeof parsed === 'object' ? (parsed as { model?: unknown }).model : undefined;
+      input = { ...(model === undefined ? {} : { model: model as string }), ...WARM_UP_REQUEST };
+    } else {
+      // The game's own check comes first: nothing it would not send reaches a model, whoever pays.
+      const verdict = ctx.game.decideRequest(parsed);
+      if (!verdict.ok) return json(400, { error: verdict.error });
+      const n = Object.keys(verdict.request.questions ?? {}).length;
+      if (n < 1 || n > MAX_QUESTIONS || Object.keys(verdict.keys ?? {}).length > MAX_QUESTIONS) return json(400, { error: `One to ${MAX_QUESTIONS} questions a call` });
+      ({ request: input, keys, as } = verdict);
     }
     const result = await handleDecide(input, {
       apiKey: key.apiKey,
@@ -231,14 +236,15 @@ export async function handleDecideRequest(req: HttpRequest, rawBody: string, cfg
       fetch: deps.fetch,
       now: deps.now,
       log: deps.log,
+      callName: `decision-benchmarks-${ctx.game.slug}`,
       ...(opts.warm ? { timeoutMs: WARM_TIMEOUT_MS } : {}),
     });
     const { clearSession, ...body } = result.body as Record<string, unknown>;
-    // Sign each answer for its junction, ghost, direction and model: a high-score entry may only replay these.
-    if (!opts.warm && result.status === 200 && input && typeof input === 'object') {
-      const requested = (input as { model?: unknown; keys?: unknown }).model;
-      const model = typeof requested === 'string' ? requested : process.env.JEV_MODEL?.trim() || DEFAULT_MODEL;
-      body.signatures = signAnswers(cfg.sessionSecret, (input as { keys?: unknown }).keys, (body.answers ?? {}) as Record<string, unknown>, model);
+    // Sign each answer for its key, question, choice and model: a high-score entry may only replay these.
+    if (!opts.warm && result.status === 200) {
+      const model = as ?? input.model ?? DEFAULT_MODEL;
+      body.model = model;
+      body.signatures = signAnswers(ctx.answerKey, keys, (body.answers ?? {}) as Record<string, unknown>, model);
       body.signedAs = model;
     }
     if (key.mode === 'pool' && access) {
@@ -247,7 +253,7 @@ export async function handleDecideRequest(req: HttpRequest, rawBody: string, cfg
     }
     return json(result.status, body, clearSession ? [clearSessionCookie(cfg)] : []);
   } catch (err) {
-    deps.logError?.(`[jev] /api/${opts.warm ? 'warm' : 'decide'} failure: ${redact((err as Error)?.message ?? String(err))}`);
+    deps.logError?.(`[${ctx.game.slug}] /api/${opts.warm ? 'warm' : 'decide'} failure: ${redact((err as Error)?.message ?? String(err))}`);
     return json(500, { error: 'internal error in /api/decide' });
   }
 }

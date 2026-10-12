@@ -1,5 +1,6 @@
-// Serving jevman below a path prefix (APP_BASE_PATH), e.g. https://opper.ai/jevman-benchmark/.
-// The proxies in front forward the full path, so the server removes the prefix itself.
+// Serving the games below a path prefix (APP_BASE_PATH), e.g. https://opper.ai/decision-benchmarks/, and each game
+// below its slug, e.g. https://opper.ai/decision-benchmarks/snake/. The proxies in front forward the full path, so the
+// server removes the prefixes itself. Isomorphic (the Vite config and the server both use it).
 
 /**
  * APP_BASE_PATH normalised: '' (served at the root, the default) or `/segment[/segment…]` without a trailing slash.
@@ -11,7 +12,7 @@ export function normalizeBasePath(raw: string | undefined): string {
   const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
   const segments = path.split('/').slice(1);
   if (!segments.every((s) => /^[A-Za-z0-9._~-]+$/.test(s) && s !== '.' && s !== '..')) {
-    throw new Error(`APP_BASE_PATH must be a path like /jevman-benchmark, got ${JSON.stringify(raw)}`);
+    throw new Error(`APP_BASE_PATH must be a path like /decision-benchmarks, got ${JSON.stringify(raw)}`);
   }
   return path;
 }
@@ -19,7 +20,7 @@ export function normalizeBasePath(raw: string | undefined): string {
 export type Mounted =
   /** Below the prefix: `url` is the request URL with the prefix removed (always starts with '/'). */
   | { kind: 'inside'; url: string }
-  /** Exactly the prefix (`/jevman-benchmark`, maybe with a query): redirect to `location`, the same with a slash. */
+  /** Exactly the prefix (`/decision-benchmarks`, maybe with a query): redirect to `location`, the same with a slash. */
   | { kind: 'bare'; location: string }
   /** Anywhere else on the host. */
   | { kind: 'outside' };
@@ -54,4 +55,29 @@ export function mountAt<Req extends { url?: string }, Res>(base: string, handler
       next();
     });
   };
+}
+
+/** A game's slug: lowercase letters, digits and dashes. */
+export const SLUG = /^[a-z0-9][a-z0-9-]*$/;
+
+export type GameMount =
+  /** Below a game's slug: `url` is the rest, starting with '/'. */
+  | { kind: 'game'; slug: string; url: string }
+  /** Exactly `/<slug>` (maybe with a query): redirect to the same with a slash. */
+  | { kind: 'bare'; slug: string; query: string }
+  /** Anything else: the root of the base path, or a path that is no slug. */
+  | { kind: 'none' };
+
+/**
+ * The second level of mounting: which game a URL (already below the base path) is for. Whether the slug is a game the
+ * service serves is the caller's question; an unknown one is a 404 there.
+ */
+export function gameMount(url: string): GameMount {
+  const q = url.indexOf('?');
+  const path = q === -1 ? url : url.slice(0, q);
+  const query = q === -1 ? '' : url.slice(q);
+  const m = /^\/([^/]+)(\/.*)?$/.exec(path);
+  if (!m || !SLUG.test(m[1]!)) return { kind: 'none' };
+  if (m[2] === undefined) return { kind: 'bare', slug: m[1]!, query };
+  return { kind: 'game', slug: m[1]!, url: `${m[2]}${query}` };
 }

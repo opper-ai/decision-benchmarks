@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { appPath, SHARE_URL, shareUrlFor, withBase } from '../src/paths';
+import { appPath, SHARE_URL, shareUrlFor, withBase } from '../client/paths';
 
 describe('client paths', () => {
   it.each([
     ['/', '/api/me', '/api/me'],
     ['/', '/', '/'],
-    ['/', '/?pacman=opper%2Fclef', '/?pacman=opper%2Fclef'],
-    ['/jevman-benchmark/', '/api/me', '/jevman-benchmark/api/me'],
-    ['/jevman-benchmark/', '/', '/jevman-benchmark/'],
-    ['/jevman-benchmark/', '/?pacman=opper%2Fclef', '/jevman-benchmark/?pacman=opper%2Fclef'],
-    ['/jevman-benchmark/', 'leaderboard', '/jevman-benchmark/leaderboard'],
-    ['/jevman-benchmark/', '/demo/jev-demo.json', '/jevman-benchmark/demo/jev-demo.json'],
+    ['/', '/?model=sference%2Fclef', '/?model=sference%2Fclef'],
+    ['/decision-benchmarks/snake/', '/api/me', '/decision-benchmarks/snake/api/me'],
+    ['/decision-benchmarks/snake/', '/', '/decision-benchmarks/snake/'],
+    ['/decision-benchmarks/snake/', '/?model=sference%2Fclef', '/decision-benchmarks/snake/?model=sference%2Fclef'],
+    ['/decision-benchmarks/snake/', 'leaderboard', '/decision-benchmarks/snake/leaderboard'],
+    ['/decision-benchmarks/snake/', '/demo/jev-demo.json', '/decision-benchmarks/snake/demo/jev-demo.json'],
   ])('withBase(%s, %s) = %s', (base, path, expected) => {
     expect(withBase(base, path)).toBe(expected);
   });
@@ -22,6 +22,6 @@ describe('client paths', () => {
 
   it('shares the bare origin at the root and the app address below a prefix', () => {
     expect(shareUrlFor('/', 'https://example.com', 'https://example.com/')).toBe('https://example.com');
-    expect(shareUrlFor('/jevman-benchmark/', 'https://opper.ai', 'https://opper.ai/jevman-benchmark/')).toBe('https://opper.ai/jevman-benchmark/');
+    expect(shareUrlFor('/decision-benchmarks/snake/', 'https://opper.ai', 'https://opper.ai/decision-benchmarks/snake/')).toBe('https://opper.ai/decision-benchmarks/snake/');
   });
 });
