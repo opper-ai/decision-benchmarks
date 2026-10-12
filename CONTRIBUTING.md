@@ -36,7 +36,7 @@ Answer each question with one of its `criteria` keys:
 
 `probabilities` and `confidence` are optional, and so are `usage` (`{ "input_tokens": 812, "output_tokens": 4 }`)
 and `costUsd` (what the call cost; the leaderboard shows it per game). Each game has an example endpoint to copy, e.g.
-[`games/pacman/example-endpoint.ts`](games/pacman/example-endpoint.ts). If yours needs a key, set
+[`games/snake/example-endpoint.ts`](games/snake/example-endpoint.ts). If yours needs a key, set
 `BENCH_ENDPOINT_TOKEN`: the bench sends it as a bearer token.
 
 A chat model works too: `--format chat --endpoint <chat completions URL> --chat-model <name>` asks it each question
@@ -48,8 +48,8 @@ An answer that comes later than the game allows is replaced by the game's own si
 
 ```bash
 npm ci --ignore-scripts
-node games/pacman/example-endpoint.ts   # or start your own endpoint
-npm run bench -- --game pacman --endpoint http://localhost:8787 --games 2
+node games/snake/example-endpoint.ts    # or start your own endpoint
+npm run bench -- --game snake --endpoint http://localhost:8787 --games 2
 ```
 
 ### 3. Record the submission

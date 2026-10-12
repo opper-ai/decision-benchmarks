@@ -16,6 +16,7 @@ packages/kit/        the harness: shared/ (types, models, stats, contract), clie
 games/registry.ts    the games the service serves and the build builds
 games/<slug>/        one game: game.ts (bench and replay), game.server.ts (service), src/, index.html, public/
                      (game.json, poster.png, leaderboard.json, community.json), submissions/, tests/
+games/snake/         Snake: our own game, the first built on the kit (see games/snake/README.md)
 games/pacman/        jevman on the kit: the kit's real-time test fixture, not served (jevman stays live in its own repo)
 games/fighter/       jev-fighter, being ported (it keeps its own setup for now)
 server/main.ts       the service: every registry game at <APP_BASE_PATH>/<slug>/
@@ -31,6 +32,7 @@ GAME=pacman npm run dev                       # one game's page and API on the V
 npm test                                      # every package's and game's tests
 npm run typecheck
 npm run bench -- --game pacman --games 2      # play a game with the default model (OPPER_API_KEY; paid calls)
+npm run bench -- --game snake --model baseline/greedy   # a game's free baseline: no key, no calls
 npm run bench -- --game <slug> --models all --leaderboard   # official runs: games/<slug>/public/leaderboard.json
 npm run bench -- --game <slug> --endpoint http://localhost:8787 --submit games/<slug>/submissions/my-model --name "My Model" --by you
 npm run submissions -- --game pacman          # replay every submission, write public/community.json

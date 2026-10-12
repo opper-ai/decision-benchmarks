@@ -58,7 +58,21 @@ export interface GameDefinition<Rec = unknown, R extends GameResult = GameResult
   verify(rec: unknown, o: { seed: number }): Verdict<R>;
   /** Game-specific numbers for a model's results, shown as the leaderboard entry's `extra`. */
   summarize?(results: R[]): Record<string, number | string>;
+  /**
+   * Free players for reference, by name: the bench plays one with `--model baseline/<name>`, without a key or a network
+   * call. Their results go to a file of their own (a game's baselines.json), never to the official leaderboard.
+   */
+  baselines?: Record<string, Baseline>;
 }
+
+/** A scripted player that answers the game's questions itself, through the same transport a model would. */
+export interface Baseline {
+  name: string;
+  transport(): Transport;
+}
+
+/** The model id a baseline plays under: `baseline/<name>`. */
+export const BASELINE_PREFIX = 'baseline/';
 
 /** Checks a server signature on an answer message (the server passes one with the game's key; tests pass a stand-in). */
 export type AnswerVerifier = (message: string, sig: string) => boolean;
@@ -85,6 +99,13 @@ export interface HighScoreBoard {
 
 export type HighScoreCheck = { ok: true; score: number; board: string } | { ok: false; error: string };
 
+/**
+ * Checks a seed token the server issued (GET <game>/api/seed): the seed it stands for and how long ago it was issued,
+ * or null when the token is not the server's or has expired. A game whose high scores play on issued seeds checks the
+ * token in the recording, so a player cannot pick a seed they like.
+ */
+export type SeedVerifier = (token: unknown) => { seed: number; ageMs: number } | null;
+
 export interface GameServer {
   slug: string;
   /** Required: the pool only pays for requests this game sends. Rebuild or strictly validate the request. */
@@ -98,7 +119,12 @@ export interface GameServer {
   highScores?: {
     /** Order matters: the hub shows the first board's top score. */
     boards: readonly HighScoreBoard[];
-    /** Replays a player's game for its score and board; signed model answers are checked with `verify`. */
-    check(rec: unknown, verify: AnswerVerifier): HighScoreCheck;
+    /** True when a player's game starts from a seed the server issues: the service then answers GET /api/seed. */
+    seeded?: boolean;
+    /**
+     * Replays a player's game for its score and board; signed model answers are checked with `verify`, and a seed
+     * token the server issued with `seeds`.
+     */
+    check(rec: unknown, verify: AnswerVerifier, seeds: SeedVerifier): HighScoreCheck;
   };
 }

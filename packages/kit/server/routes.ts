@@ -5,6 +5,7 @@ import { answerKey, answerVerifier } from './answers.ts';
 import { handleDecideRequest, poolLimitRequest, rejectDecideRequest, resolveKey, type DecideContext, type PoolAccess } from './decide.ts';
 import { accountHash, cleanInitials, HighScores, highScoresStore, visitorHash } from './highscores.ts';
 import { clientIp, MAX_POOL_BODY_BYTES, poolFromEnv, trustedProxiesFromEnv, visitorKey, VisitorLimits } from './pool.ts';
+import { issueSeed, seedKey, seedVerifier } from './seeds.ts';
 import { devTargetFromEnv, type Target } from './systemone.ts';
 import { normalizeBasePath } from '../shared/base-path.ts';
 import type { GameServer } from '../shared/game.ts';
@@ -155,7 +156,7 @@ export interface GameRouteOptions {
 
 /**
  * Connect-style middleware for one game's routes, with URLs relative to the game's path: Login with Opper, /api/me,
- * /api/decide, /api/warm and /api/highscores. Used by the service (packages/kit/server/app.ts) and the Vite dev and
+ * /api/decide, /api/warm, /api/highscores and, for a game whose high scores play on issued seeds, /api/seed. Used by the service (packages/kit/server/app.ts) and the Vite dev and
  * preview servers. The player, pool and dev keys never leave the server.
  */
 export function createGameMiddleware(game: GameServer, env: Record<string, string | undefined>, logger: RouteLogger, opts: GameRouteOptions = {}): Middleware {
@@ -187,6 +188,8 @@ export function createGameMiddleware(game: GameServer, env: Record<string, strin
   /** Accounts and addresses with a check running: one at a time each, so nobody can keep the server busy replaying. */
   const checking = new Set<string>();
   const verifyAnswer = answerVerifier(key);
+  const seeds = seedKey(cfg.sessionSecret, game.slug);
+  const verifySeed = seedVerifier(seeds, () => Date.now());
   const trustedProxies = access?.trustedProxies ?? trustedProxiesFromEnv(env);
 
   /**
@@ -222,7 +225,7 @@ export function createGameMiddleware(game: GameServer, env: Record<string, strin
         const who = session ? sender : visitorHash(visitor, initials, cfg.sessionSecret);
         // Never put an entry on boards that weren't read: saving them would replace the stored ones.
         if (!(await boards.ready().then(() => true, () => false))) return send(res, unavailable());
-        const result = check(body.recording, verifyAnswer);
+        const result = check(body.recording, verifyAnswer, verifySeed);
         if (!result.ok || result.board !== board) {
           logger.warn(`[${game.slug} highscores] refused an entry from ${who}: ${result.ok ? 'played for another board' : result.error}`);
           return send(res, json(422, { error: 'That game did not check out' }));
@@ -260,6 +263,12 @@ export function createGameMiddleware(game: GameServer, env: Record<string, strin
       }
       if (http.method === 'POST') return enterScore(req, res, http, scores, game.highScores.check);
       return send(res, json(405, { error: 'Method not allowed' }, [], { Allow: 'GET, POST' }));
+    }
+    if (path === '/api/seed') {
+      // A seed for a player's game, signed so its high-score entry can show it was dealt, not picked. Stateless and cheap.
+      if (!game.highScores?.seeded) return send(res, json(404, { error: 'This game issues no seeds' }));
+      if (http.method !== 'GET') return send(res, json(405, { error: 'GET only' }, [], { Allow: 'GET' }));
+      return send(res, json(200, issueSeed(seeds, Date.now())));
     }
     if (path === '/auth/login') return send(res, handleLogin(http, cfg));
     if (path === '/auth/callback') {

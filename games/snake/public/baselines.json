@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-10-12T15:26:51.944Z",
+  "game": "snake",
+  "benchVersion": 1,
+  "metric": {
+    "name": "Apples",
+    "unit": "apples",
+    "higherIsBetter": true
+  },
+  "entries": [
+    {
+      "model": "baseline/flood",
+      "name": "Flood fill",
+      "games": 100,
+      "metric": {
+        "mean": 48.85,
+        "stdError": 1.192,
+        "best": 68
+      },
+      "meanLatencyMs": 0,
+      "fallbackRate": 0,
+      "costPerGame": null,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 773.7,
+        "wallShare": 0,
+        "bodyShare": 0.55,
+        "starvedShare": 0.12,
+        "capShare": 0.33
+      }
+    },
+    {
+      "model": "baseline/greedy",
+      "name": "Greedy",
+      "games": 100,
+      "metric": {
+        "mean": 29.3,
+        "stdError": 1.051,
+        "best": 60
+      },
+      "meanLatencyMs": 0,
+      "fallbackRate": 0,
+      "costPerGame": null,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 375,
+        "wallShare": 0.21,
+        "bodyShare": 0.79,
+        "starvedShare": 0,
+        "capShare": 0
+      }
+    },
+    {
+      "model": "baseline/random",
+      "name": "Random",
+      "games": 100,
+      "metric": {
+        "mean": 0.45,
+        "stdError": 0.098,
+        "best": 5
+      },
+      "meanLatencyMs": 0,
+      "fallbackRate": 0,
+      "costPerGame": null,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 181.7,
+        "wallShare": 0.01,
+        "bodyShare": 0.01,
+        "starvedShare": 0.98,
+        "capShare": 0
+      }
+    }
+  ],
+  "skipped": []
+}

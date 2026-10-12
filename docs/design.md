@@ -159,3 +159,15 @@ Where building the kit changed or filled in the design above, and why:
   image built and smoke-tested. The deploy job comes with the infrastructure (step 0).
 - **games/fighter** stays outside the root typecheck and tests until it is ported (its video export needs
   mediabunny, which is not a root dependency).
+
+## Implementation notes (snake, the first game on the kit)
+
+- **Baselines.** `GameDefinition.baselines` lists a game's free scripted players, each a transport that answers the
+  game's questions itself. The bench plays them with `--model baseline/<name>` (no key, no warm-up) and writes them
+  only with `--leaderboard --out <file>` (snake's `public/baselines.json`): never into `leaderboard.json` or a
+  submission, so the hub never shows a baseline as a model. A game's page reads its baselines file itself.
+- **Issued seeds.** A game whose high scores need a dealt board sets `highScores.seeded`; the service then answers
+  `GET <game>/api/seed` with a random 31-bit seed and a stateless token signed with a per-game key
+  (`HMAC(SESSION_SECRET, "decision-benchmarks:seeds:" + slug)`, one hour). `highScores.check` gets a `SeedVerifier`
+  as its third argument, returning the seed and the token's age. The client side is `packages/kit/client/seeds.ts`.
+- **Snake** follows `games/snake/SPEC.md`; its last section lists where the build differs from the spec.
