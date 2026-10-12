@@ -1,125 +1,10 @@
 /* opper.ai's page chrome (header, footer, account), shared by every game: first, so the game's own rules win. */
 @import "../../../packages/kit/client/opper-chrome.css";
+/* The jevman page every game shares: tokens, account, sections, the leaderboard table. */
+@import "../../../packages/kit/client/page.css";
 
-/* Snake on opper.ai: jevman's look (the AI Roundtable's light and dark, Wix Madefor), with black arcade cabinets as the centre. */
-@font-face { font-family: 'Wix Madefor Display'; src: url('/fonts/wix-madefor-display-latin.woff2') format('woff2'); font-weight: 400 800; font-display: swap; }
-@font-face { font-family: 'Wix Madefor Text'; src: url('/fonts/wix-madefor-text-latin.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
+/* Snake on opper.ai: jevman's look, with black arcade cabinets as the centre. */
 @font-face { font-family: 'Press Start 2P'; src: url('/fonts/press-start-2p-latin.woff2') format('woff2'); font-weight: 400; font-display: swap; }
-@font-face { font-family: 'JetBrains Mono'; src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
-
-:root {
-  color-scheme: light;
-  --j-bg: #ffffff;
-  --j-text: #1b2e40;
-  --j-muted: #677584;
-  --j-line: #e4e8ec;
-  --j-soft: #f4f6f8;
-  --j-hl: #f1f5f9;
-  --j-track: #e8ecf0;
-  --j-green: #22c55e;
-  --j-danger: #b4532a;
-  --j-pac: #ffd800;
-  --j-card: #ffffff;
-  --j-seg-on: #ffffff;
-  --j-strong-line: #aeb9c4;
-  --j-btn-hover: #253e55;
-  --j-avatar: rgba(27, 46, 64, 0.1);
-  --j-on-board: #1b2e40; /* text on the white badges over the black board, in either theme */
-  --j-hair: #e4e8ec;
-  --j-keyrow: #f7f9fb;
-  --j-flash: #eef6ff;
-  --j-death: #fdecec;
-  --j-gain: #fff7cc;
-  --j-backup: #fff1e6;
-  --j-backup-ink: #a35a1f;
-  --j-you: #fff6bf;
-  --j-bar: #9aa7b3;
-  --j-display: 'Wix Madefor Display', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --j-body: 'Wix Madefor Text', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --j-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --j-pixel: 'Press Start 2P', 'JetBrains Mono', ui-monospace, monospace; /* the arcade's lettering */
-  --j-maze: #2121de;
-  --j-arc-yellow: #ffd800;
-  --j-arc-dim: #6c7a96;
-}
-/* Dark: opper.ai's dark palette (its .dark variables), on <html class="dark"> as on the site. */
-html.dark {
-  color-scheme: dark;
-  --j-bg: #222222;
-  --j-text: #fbfbfb;
-  --j-muted: #a1a1a1;
-  --j-line: #383838;
-  --j-soft: #2a2a2a;
-  --j-hl: #2e2e2e;
-  --j-track: #333333;
-  --j-green: #4ade80;
-  --j-danger: #f3a07c;
-  --j-card: #1d1d1d;
-  --j-seg-on: #3a3a3a;
-  --j-strong-line: #5c5c5c;
-  --j-btn-hover: #e5e5e5;
-  --j-avatar: rgba(255, 255, 255, 0.12);
-  --j-hair: #383838;
-  --j-keyrow: #262626;
-  --j-flash: rgba(255, 255, 255, 0.07);
-  --j-death: rgba(239, 68, 68, 0.2);
-  --j-gain: rgba(255, 216, 0, 0.16);
-  --j-backup: rgba(255, 140, 60, 0.18);
-  --j-backup-ink: #ffb27a;
-  --j-you: rgba(255, 216, 0, 0.16);
-  --j-bar: #6b6b6b;
-}
-* { box-sizing: border-box; }
-/* Jumps to #leaderboard, #add-model and #method stop below the fixed navbar, not under it. */
-html { scroll-behavior: smooth; scrollbar-gutter: stable; scroll-padding-top: 96px; }
-body { margin: 0; background: var(--j-bg); color: var(--j-text); font: 15px/1.5 var(--j-body); -webkit-font-smoothing: antialiased; }
-a { color: inherit; }
-button { font: inherit; color: inherit; cursor: pointer; }
-[hidden] { display: none !important; }
-:focus-visible { outline: 2px solid #3bb6c9; outline-offset: 2px; }
-.mono { font-family: var(--j-mono); font-variant-numeric: tabular-nums; }
-
-/* Account: the free credits (amount only, explained on hover) and Login/Sign up, or a signed-in player's menu. */
-.account { display: flex; align-items: center; gap: 12px; font-size: 14px; }
-.account-text { display: flex; align-items: center; gap: 10px; }
-.account-actions { display: flex; align-items: center; gap: 8px; }
-.account p { margin: 0; }
-.credits { position: relative; font-weight: 600; font-size: 14px; color: var(--j-green); padding: 4px 6px; border-radius: 6px; cursor: default; font-variant-numeric: tabular-nums; outline: none; }
-.credits.empty { color: var(--j-muted); }
-.credits:hover, .credits:focus-visible { background: var(--j-hl); }
-.credits[data-tip]:hover::after, .credits[data-tip]:focus-visible::after {
-  content: attr(data-tip); position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: max-content; max-width: 320px;
-  background: var(--j-card); color: var(--j-text); border: 1px solid var(--j-line); border-radius: 8px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; white-space: normal; box-shadow: 0 8px 24px -12px rgba(27, 46, 64, 0.35);
-}
-.badge { font: 600 10px var(--j-mono); text-transform: uppercase; letter-spacing: 0.06em; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--j-line); color: var(--j-muted); }
-.account .notice { color: var(--j-danger); font-size: 13px; }
-.user-menu { position: relative; }
-.user-menu summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; padding: 6px 10px; border-radius: 8px; font-weight: 500; }
-.user-menu summary::-webkit-details-marker { display: none; }
-.user-menu summary:hover, .user-menu[open] summary { background: var(--j-soft); }
-.user-menu .avatar { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--j-avatar); font-size: 11px; font-weight: 700; }
-.user-menu .name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.user-menu .chevron { width: 6px; height: 6px; border-right: 1.5px solid var(--j-muted); border-bottom: 1.5px solid var(--j-muted); transform: translateY(-2px) rotate(45deg); }
-.user-menu .menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 230px; display: grid; padding: 4px 0; background: var(--j-card); border: 1px solid var(--j-line); border-radius: 10px; box-shadow: 0 12px 30px -14px rgba(27, 46, 64, 0.4); }
-.user-menu .menu .who { padding: 8px 12px; border-bottom: 1px solid var(--j-line); font-size: 12px; color: var(--j-muted); }
-.user-menu .menu .who b { display: block; color: var(--j-text); font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
-.user-menu .menu a, .user-menu .menu button { text-align: left; background: none; border: 0; padding: 8px 12px; text-decoration: none; font-size: 14px; }
-.user-menu .menu a:hover, .user-menu .menu button:hover { background: var(--j-soft); }
-
-/* ---------- page column: opper.ai's (10 of 12 columns, at most 1280px) ---------- */
-/*
- * The footer (opper.ai's markup) lays its blocks out on a 12-column grid with 32px gaps. Below 1024px every block spans
- * all 12 columns, so those 11 gaps only add width: 352px of them, more than a 360px phone has, and the page scrolled
- * sideways. Without them it fits.
- */
-@media (max-width: 1023px) { .oc-footer .grid-cols-12.gap-8 { column-gap: 0; } }
-main { display: block; padding-bottom: 96px; }
-.col { width: calc(min(100%, 1280px) * 10 / 12); margin-inline: auto; }
-.col h1 { text-wrap: balance; }
-/* The H1 and its line sit together, as each section's heading and its line do. */
-.oc .hero { gap: 10px; }
-/* The H1 at the size of the page's section headings (the Leaderboard's), and a quieter line under it. */
-.oc .hero-sub { font-size: 17px; }
 
 /* ---------- the stage: the AI's cabinet (and yours beside it while you play), Play, the watch chips ---------- */
 .stage { max-width: 1120px; margin: 0 auto; padding: 0 24px; display: grid; justify-items: center; gap: 14px; }
@@ -168,15 +53,6 @@ main { display: block; padding-bottom: 96px; }
 .play-cta.stop .tri { border: 0; width: 9px; height: 9px; background: currentColor; }
 .swipe-pad { display: flex; align-items: center; justify-content: center; width: min(440px, 100%); height: 88px; border: 2px solid var(--j-maze); border-radius: 6px; background: #000; touch-action: none; user-select: none; -webkit-user-select: none; }
 .swipe-label { color: #fff; font: 10px/1.8 var(--j-pixel); text-transform: uppercase; }
-.notice-line { margin: 0; max-width: 560px; text-align: center; font-size: 14px; color: var(--j-text); }
-.notice-line a, .notice-line button { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; padding: 0; }
-.watch { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; max-width: 760px; }
-.watch-label { font-size: 13px; color: var(--j-muted); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-.chip { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 500; white-space: nowrap; border: 1px solid var(--j-line); background: var(--j-card); }
-.chip:hover { background: var(--j-soft); }
-.chip[aria-checked='true'] { background: var(--j-soft); border-color: var(--j-strong-line); }
-.chip .sub { font: 500 11px var(--j-mono); color: var(--j-muted); }
 
 /* ---------- cards: the opponent picker and the result, in the cabinet's look ---------- */
 .card { position: relative; width: min(400px, 100%); display: grid; gap: 12px; text-align: center; }
@@ -218,62 +94,18 @@ main { display: block; padding-bottom: 96px; }
 .initials input:focus { outline: none; border-bottom-color: #fff; }
 .over-btns { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 
-/* ---------- leaderboard, high scores, benchmark your model, method ---------- */
-.section { width: calc(min(100%, 1280px) * 10 / 12); margin: 88px auto 0; display: grid; gap: 14px; }
-.section .sub { max-width: 680px; margin: -4px 0 6px; color: var(--j-text); font: 500 17px/1.5 var(--j-display); text-align: left; }
-@media (min-width: 768px) { .section .sub { margin-inline: auto; text-align: center; } }
-.section .foot { margin: 0; font-size: 12.5px; color: var(--j-muted); }
-.tablecard { border: 1px solid var(--j-line); border-radius: 16px; overflow: hidden; }
-/* The table scrolls inside its card on narrow screens, never the page. */
-.table-scroll { overflow-x: auto; }
-.lbt { width: 100%; border-collapse: collapse; font-size: 14px; }
-.lbt th { text-align: left; font-weight: 500; font-size: 12px; padding: 10px 12px; white-space: nowrap; color: var(--j-muted); background: var(--j-soft); }
-.lbt td { padding: 12px 12px; vertical-align: middle; white-space: nowrap; border-top: 1px solid var(--j-line); }
-.lbt .r { text-align: right; }
-.lbt .rk { font: 600 13px var(--j-mono); width: 3.2em; color: var(--j-muted); }
-.lbt tr.tie .rk { color: var(--j-text); }
-.lbt .mdl b { display: block; font-weight: 600; }
-.lbt .mdl small { font-size: 12px; color: var(--j-muted); }
-.lbt .scw { display: grid; grid-template-columns: minmax(80px, 1fr) auto; gap: 10px; align-items: center; min-width: 170px; }
-.lbt .bar { height: 6px; border-radius: 99px; background: var(--j-track); overflow: hidden; }
-.lbt .bar i { display: block; height: 100%; border-radius: 99px; background: var(--j-bar); }
-.lbt tr.tie .bar i { background: var(--j-text); }
-.lbt .n { font-family: var(--j-mono); font-variant-numeric: tabular-nums; }
-.lbt .pm { font-size: 11px; color: var(--j-muted); }
-.lbt .run a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); }
-.lbt tr.group td { background: var(--j-soft); color: var(--j-muted); font-size: 12px; padding: 8px 12px; }
-.lbt tr.baseline { color: var(--j-muted); }
-.lbt tr.empty td { white-space: normal; color: var(--j-muted); }
+/* ---------- the players' high scores ---------- */
 .hs-list { list-style: none; margin: 0 auto; padding: 0; width: min(440px, 100%); border: 1px solid var(--j-line); border-radius: 16px; overflow: hidden; }
 .hs-list li { display: grid; grid-template-columns: 2.4em minmax(0, 1fr) auto; gap: 10px; padding: 10px 16px; font: 500 14px var(--j-mono); }
 .hs-list li + li { border-top: 1px solid var(--j-line); }
 .hs-list li .rk { color: var(--j-muted); }
 .hs-list li.none { grid-template-columns: 1fr; font: 14px var(--j-body); color: var(--j-muted); text-align: center; }
-.spec { margin: 0; border: 1px solid var(--j-line); border-radius: 16px; background: var(--j-card); overflow: hidden; }
-.spec > div { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; padding: 16px 20px; }
-.spec > div + div { border-top: 1px solid var(--j-line); }
-.spec dt { font: 600 15px/1.5 var(--j-display); }
-.spec dd { margin: 0; font-size: 15px; line-height: 1.55; }
-@media (max-width: 640px) { .spec > div { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 14px 16px; } }
-.steps { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.step { border: 1px solid var(--j-line); border-radius: 16px; padding: 18px 18px 20px; background: var(--j-card); display: grid; gap: 8px; align-content: start; }
-.step .n { font: 600 12px var(--j-mono); letter-spacing: 0.06em; color: var(--j-muted); }
-.step h3 { margin: 0; font: 700 16px/1.3 var(--j-display); }
-.step p { margin: 0; font-size: 14.5px; line-height: 1.55; }
-.repo-line { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 18px; font-size: 14px; text-align: center; }
-.repo { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--j-line); border-radius: 999px; padding: 7px 14px; background: var(--j-card); font-weight: 600; text-decoration: none; }
-.repo:hover { background: var(--j-soft); }
-.repo .lic { font: 600 10.5px var(--j-mono); letter-spacing: 0.04em; color: var(--j-muted); border: 1px solid var(--j-line); border-radius: 6px; padding: 1px 6px; }
-.repo-line .or a { font-weight: 600; text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); }
-@media (max-width: 760px) { .steps { grid-template-columns: minmax(0, 1fr); } .repo-line { justify-content: flex-start; text-align: left; } }
 
 /* ---------- small screens ---------- */
 @media (max-width: 900px) {
   .stage { padding: 0 16px; }
-  .section { margin-top: 64px; }
 }
 @media (max-width: 520px) {
-  .user-menu .name { display: none; }
   .arena.racing { gap: 8px; }
   .arena.racing .tv { padding: 6px; row-gap: 6px; }
   .arena.racing .arcade-top { gap: 6px; padding: 0 2px; }
@@ -285,4 +117,3 @@ main { display: block; padding-bottom: 96px; }
   .play-cta { padding: 12px 13px; font-size: 9.5px; gap: 8px; }
   .card.arc { padding: 16px 12px 14px; }
 }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } html { scroll-behavior: auto; } }

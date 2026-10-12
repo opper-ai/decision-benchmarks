@@ -1,5 +1,6 @@
 import { accountNotice, fetchMe, POOL_EMPTY_NOTICE, renderAccount, renderDrawerAccount, signIn, takeAuthError, updatePoolAmount, walletNotice, type AccountView } from '../../../packages/kit/client/auth.ts';
 import { enterScore, fetchHighScores, placeFor, type Boards } from '../../../packages/kit/client/highscores.ts';
+import { loadLeaderboard } from '../../../packages/kit/client/leaderboard.ts';
 import { appPath } from '../../../packages/kit/client/paths.ts';
 import { fetchSeed } from '../../../packages/kit/client/seeds.ts';
 import { tag, track, trackClicks } from '../../../packages/kit/client/track.ts';
@@ -9,7 +10,6 @@ import { baselineName, baselineTransport, BASELINE_NAMES, isBaselineId, type Bas
 import { createGame, moveToward, step, type GameState, type Heading, type Move } from '../shared/engine.ts';
 import { playSnake } from '../shared/play.ts';
 import { BOARD, moveLetter, PLAYER_STEP_MS, type PlayerRecording } from '../shared/player-check.ts';
-import { fetchJson, leaderboardRows, renderLeaderboard } from './leaderboard.ts';
 import { loadDemo, RECORDINGS, type Demo, type DemoEntry } from './recordings.ts';
 import { AI, drawBoard, PLAYER } from './render.ts';
 
@@ -172,9 +172,7 @@ void fetchHighScores().then((view) => {
 });
 
 // ---------- the leaderboard ----------
-void Promise.all([fetchJson(appPath('/leaderboard.json')), fetchJson(appPath('/community.json')), fetchJson(appPath('/baselines.json'))]).then(([official, community, baselines]) =>
-  renderLeaderboard($<HTMLTableElement>('#leaderboard-table'), leaderboardRows(official, community, baselines)),
-);
+void loadLeaderboard($<HTMLTableElement>('#leaderboard-table'), appPath, { metric: 'Apples (mean ± margin)' });
 
 // ---------- Watch: recorded games only ----------
 const demos = new Map<string, Promise<Demo | null>>();

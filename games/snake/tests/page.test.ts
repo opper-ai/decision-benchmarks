@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { validateLeaderboard } from '../../../packages/kit/shared/contract';
-import { leaderboardRows } from '../src/leaderboard';
+import { leaderboardRows } from '../../../packages/kit/client/leaderboard';
 import { demoFrom, RECORDINGS } from '../src/recordings';
 
 const pub = (f: string) => JSON.parse(readFileSync(new URL(`../public/${f}`, import.meta.url), 'utf8'));
