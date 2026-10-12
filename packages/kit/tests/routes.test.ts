@@ -405,3 +405,50 @@ describe('the game decides what is forwarded', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('issued seeds', () => {
+  /** The coin game with high scores on issued seeds: a recording is the seed token and a claimed score. */
+  function seededHandler() {
+    const base = coinServer();
+    const server = {
+      ...base,
+      highScores: {
+        boards: base.highScores!.boards,
+        seeded: true,
+        check(rec: unknown, _verify: unknown, seeds: (token: unknown) => { seed: number; ageMs: number } | null) {
+          const r = rec as { token?: unknown; seed?: unknown } | null;
+          const issued = seeds(r?.token);
+          if (!issued || issued.seed !== r?.seed) return { ok: false as const, error: 'not a seed this server issued' };
+          return { ok: true as const, score: 1 + (issued.seed % 5), board: 'all' };
+        },
+      },
+    };
+    return createGameMiddleware(server, { SESSION_SECRET: SECRET }, newLogger(), { quiet: true, highScores: new HighScores(['all', 'jev'], null) });
+  }
+
+  it('issues a signed seed that the high-score check accepts, and refuses an edited one', async () => {
+    const handler = seededHandler();
+    const { res } = call(handler, 'GET', '/api/seed');
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Cache-Control']).toBe('no-store');
+    const issued = bodyOf(res) as { seed: number; token: string };
+    expect(issued.token.startsWith(`${issued.seed}.`)).toBe(true);
+    const enter = (recording: unknown) => {
+      const r = call(handler, 'POST', '/api/highscores', { ...JSON_POST, host: 'localhost:5173', origin: 'http://localhost:5173' }, { board: 'all', initials: 'ABC', recording }).res;
+      return vi.waitFor(() => {
+        expect(r.end).toHaveBeenCalled();
+        return r;
+      });
+    };
+    const ok = await enter({ token: issued.token, seed: issued.seed });
+    expect(ok.statusCode).toBe(200);
+    expect(bodyOf(ok)).toMatchObject({ score: 1 + (issued.seed % 5), place: 1 });
+    const forged = await enter({ token: issued.token.replace(/^\d+/, String(issued.seed + 1)), seed: issued.seed + 1 });
+    expect(forged.statusCode).toBe(422);
+  });
+
+  it('answers 404 for a game that issues none, and GET only', () => {
+    expect(call(mount({}).handler, 'GET', '/api/seed').res.statusCode).toBe(404);
+    expect(call(seededHandler(), 'POST', '/api/seed', JSON_POST).res.statusCode).toBe(405);
+  });
+});

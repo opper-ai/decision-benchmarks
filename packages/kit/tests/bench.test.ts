@@ -113,6 +113,27 @@ describe('runBench', () => {
     expect(calls.slice(0, 2)).toEqual(['opper/kev-4b:warmup', 'opper/kev-4b:coin']);
   });
 
+  it("plays a game's baselines without a key or a network call, and keeps them off the official leaderboard", async () => {
+    const f = vi.fn();
+    vi.stubGlobal('fetch', f);
+    const tails = { name: 'Always tails', transport: () => async (body: { questions: Record<string, unknown> }) => ({ answers: Object.fromEntries(Object.keys(body.questions).map((n) => [n, { type: 'choice', choice: 'tails' }])), usage: { input_tokens: 0, output_tokens: 0 }, latencyMs: 0, costUsd: null, traceId: null }) };
+    const game = coinDefinition({ baselines: { tails } });
+    const p = paths();
+    const out = join(p.publicDir, 'baselines.json');
+    await runBench(game, ['--game', 'coin', '--models', 'baseline/tails', '--leaderboard', '--out', out], {}, p, quiet);
+    const board = JSON.parse(readFileSync(out, 'utf8'));
+    expect(validateLeaderboard(board, 'coin')).toEqual([]);
+    expect(board.entries).toMatchObject([{ model: 'baseline/tails', name: 'Always tails', games: game.rules.officialGames, metric: { mean: 0 } }]);
+    const cases: [string[], RegExp][] = [
+      [['--model', 'baseline/heads'], /no baseline baseline\/heads; one of: baseline\/tails/],
+      [['--model', 'baseline/tails', '--leaderboard'], /never go on the leaderboard/],
+      [['--models', 'baseline/tails,opper/kev-4b', '--leaderboard', '--out', out], /never go on the leaderboard/],
+      [['--models', 'baseline/tails,opper/kev-4b'], /OPPER_API_KEY/],
+    ];
+    for (const [argv, message] of cases) await expect(runBench(game, argv, {}, paths(), quiet)).rejects.toThrow(message);
+    expect(f).not.toHaveBeenCalled();
+  });
+
   it('refuses what it cannot do, before calling anything', async () => {
     const f = vi.fn();
     vi.stubGlobal('fetch', f);
