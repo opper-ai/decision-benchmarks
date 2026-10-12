@@ -1,41 +1,39 @@
-# Build the static client with the full toolchain, then run the server on a slim Node image.
+# Build every game in games/registry.ts with the full toolchain, then run the service on a slim Node image.
 FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS build
-# Serve below a path prefix (e.g. /jevman-benchmark; empty = at the root), and the public origin for share links and
-# social-card tags (empty = https://opper.ai/jevman-benchmark/). Both are baked into the client at build time.
-ARG APP_BASE_PATH=
+# Serve below a path prefix (default /decision-benchmarks; each game at <prefix>/<slug>/), and the public origin for
+# share links and social-card tags (empty = https://opper.ai). Both are baked into the pages at build time.
+ARG APP_BASE_PATH=/decision-benchmarks
 ARG VITE_PUBLIC_URL=
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
-COPY index.html leaderboard.html vite.config.ts tsconfig.json ./
-COPY src ./src
-COPY shared ./shared
+# No install scripts: only the locked, reviewed dependencies' own code runs.
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY vite.config.ts tsconfig.json ./
+COPY packages ./packages
+COPY games ./games
 COPY server ./server
-COPY public ./public
 COPY scripts ./scripts
-COPY submissions ./submissions
-# Replays every submitted game; a submission that does not check out fails the build.
-RUN node --import tsx scripts/submissions.ts && APP_BASE_PATH="${APP_BASE_PATH}" VITE_PUBLIC_URL="${VITE_PUBLIC_URL}" npx vite build
-# The game's own code for the server's high-score check (it replays each entered game), as one file in dist-ssr.
-RUN npx vite build --ssr src/player-check.ts --outDir dist-ssr
+# Replays every game's submissions (a submission that does not check out fails the build), then builds dist/<slug>.
+RUN APP_BASE_PATH="${APP_BASE_PATH}" VITE_PUBLIC_URL="${VITE_PUBLIC_URL}" node scripts/build.ts && mkdir -p dist
 
-# The server on its own, without Opper's secrets loader (CI builds this target for pull requests from forks, which
+# The service on its own, without Opper's secrets loader (CI builds this target for pull requests from forks, which
 # cannot pull the private loadsecrets image).
 FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runtime
 ARG SOURCE_COMMIT=local
-# The server must strip the same prefix the client was built for.
-ARG APP_BASE_PATH=
+# The service must strip the same prefix the pages were built for.
+ARG APP_BASE_PATH=/decision-benchmarks
 ENV NODE_ENV=production \
     PORT=3000 \
     SOURCE_COMMIT=${SOURCE_COMMIT} \
     APP_BASE_PATH=${APP_BASE_PATH}
 WORKDIR /app
-# The server uses only Node built-ins, so no node_modules ship in the runtime image.
+# The service uses only Node built-ins and the games' own (Node-safe) code, so no node_modules ship in the image.
 COPY --chown=node:node package.json ./
+COPY --chown=node:node packages/kit/shared ./packages/kit/shared
+COPY --chown=node:node packages/kit/server ./packages/kit/server
+COPY --chown=node:node games ./games
 COPY --chown=node:node server ./server
-COPY --chown=node:node shared ./shared
 COPY --from=build --chown=node:node /app/dist ./dist
-COPY --from=build --chown=node:node /app/dist-ssr ./dist-ssr
 USER node
 EXPOSE 3000
 # /health answers at the root whatever APP_BASE_PATH is.

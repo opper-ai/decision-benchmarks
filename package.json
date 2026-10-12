@@ -1,20 +1,17 @@
 {
-  "name": "jevman",
+  "name": "decision-benchmarks",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "build": "node scripts/build.ts",
+    "start": "node server/main.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "smoke": "node --env-file-if-exists=.env --import tsx scripts/smoke.ts",
-    "bench": "node --env-file-if-exists=.env --import tsx scripts/bench.ts",
-    "deaths": "node --import tsx scripts/deaths.mts",
-    "leaderboard": "node --env-file-if-exists=.env --import tsx scripts/bench.ts --models all",
-    "submissions": "node --import tsx scripts/submissions.ts",
-    "build": "vite build && vite build --ssr src/player-check.ts --outDir dist-ssr",
-    "preview": "vite preview",
-    "start": "node server/main.ts"
+    "bench": "node --env-file-if-exists=.env scripts/bench.ts",
+    "submissions": "node scripts/submissions.ts",
+    "check-contract": "node scripts/check-contract.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

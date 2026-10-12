@@ -2,14 +2,16 @@
 *
 !package.json
 !package-lock.json
-!index.html
-!leaderboard.html
 !vite.config.ts
 !tsconfig.json
-!src/
+!packages/
+!games/
 !server/
-!shared/
-!public/
 !scripts/
-!submissions/
 !Dockerfile
+# Not served: the Pac-Man fixture lives on at opper.ai/jevman-benchmark, and the fighter is not on the kit yet. Remove a
+# line here when its game joins games/registry.ts.
+games/pacman/
+games/fighter/
+**/tests/
+**/node_modules/

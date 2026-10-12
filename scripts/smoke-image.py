@@ -1,6 +1,6 @@
-"""Run the built image with its real Node runtime: readiness, revision, the page, the API and a graceful stop.
+"""Run the built image with its real Node runtime: readiness, revision, every game's page and API, and a graceful stop.
 
-The image's APP_BASE_PATH (a build arg) decides where the app lives; /health also answers at the root.
+The image's APP_BASE_PATH (a build arg) decides where the games live; /health also answers at the root.
 OPPER_SSM_PREFIXES='[]' makes the loadsecrets entrypoint skip SSM, as it does outside AWS.
 """
 import json
@@ -57,35 +57,31 @@ try:
     if base:
         code, headers = status_of(root + base)
         assert (code, headers['Location']) == (308, base + '/'), (code, headers['Location'])
-        for outside in ('/', '/leaderboard', '/api/me'):
+        for outside in ('/', '/api/me', base + '/no-such-game/'):
             assert status_of(root + outside)[0] == 404, outside
     with urllib.request.urlopen(url + '/revision', timeout=2) as response:
         revision = json.load(response)
-    assert revision == {'app': 'jevman', 'commit': sha, 'draining': False}, revision
-    with urllib.request.urlopen(url + '/', timeout=2) as response:
-        page = response.read().decode()
-    assert '<title>jevman' in page and 'og:image' in page, 'index.html not served'
-    assert '%VITE_' not in page, 'a %VITE_...% placeholder was left in index.html'
-    assert f'src="{base}/assets/' in page, 'index.html was built for another base path'
-    with urllib.request.urlopen(url + '/leaderboard', timeout=2) as response:
-        assert 'Which AI plays Pac-Man best?' in response.read().decode(), 'leaderboard page not served'
-    with urllib.request.urlopen(url + '/leaderboard.json', timeout=2) as response:
-        assert json.load(response)['entries'], 'leaderboard results missing'
-    with urllib.request.urlopen(url + '/community.json', timeout=2) as response:
-        assert 'entries' in json.load(response), 'self-reported results missing'
-    with urllib.request.urlopen(url + '/og.png', timeout=2) as response:
-        assert response.headers['Content-Type'] == 'image/png', response.headers['Content-Type']
-    with urllib.request.urlopen(url + '/demo/jev-demo.json', timeout=5) as response:
-        assert json.load(response)['version'] == 1
-    with urllib.request.urlopen(url + '/api/me', timeout=2) as response:
-        me = json.load(response)
-    assert me['mode'] == 'none', me  # no server key in the image
-    request = urllib.request.Request(url + '/api/decide', data=b'{}', headers={'Content-Type': 'application/json'})
-    try:
-        urllib.request.urlopen(request, timeout=2)
-        raise AssertionError('/api/decide should refuse without a key')
-    except urllib.error.HTTPError as error:
-        assert error.code == 401, error.code
+    assert revision['app'] == 'decision-benchmarks' and revision['commit'] == sha and revision['draining'] is False, revision
+    # Every game the image serves: its page, built for its path, its hub files, and its API without a key.
+    for game in revision['games']:
+        at = url + '/' + game
+        code, headers = status_of(at)
+        assert (code, headers['Location']) == (308, base + '/' + game + '/'), (game, code, headers['Location'])
+        with urllib.request.urlopen(at + '/', timeout=2) as response:
+            page = response.read().decode()
+        assert '%VITE_' not in page, game + ': a %VITE_...% placeholder was left in index.html'
+        assert f'src="{base}/{game}/assets/' in page, game + ': index.html was built for another path'
+        with urllib.request.urlopen(at + '/game.json', timeout=2) as response:
+            assert json.load(response)['slug'] == game, game
+        with urllib.request.urlopen(at + '/api/me', timeout=2) as response:
+            me = json.load(response)
+        assert me['mode'] == 'none', me  # no server key in the image
+        request = urllib.request.Request(at + '/api/decide', data=b'{}', headers={'Content-Type': 'application/json'})
+        try:
+            urllib.request.urlopen(request, timeout=2)
+            raise AssertionError('/api/decide should refuse without a key')
+        except urllib.error.HTTPError as error:
+            assert error.code == 401, error.code
     started = time.monotonic()
     # ECS waits 30 s (stopTimeout) after SIGTERM before SIGKILL; the server must exit cleanly within that.
     subprocess.run(['docker', 'stop', '--time', '30', container], check=True, stdout=subprocess.DEVNULL)

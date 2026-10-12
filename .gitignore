@@ -4,6 +4,6 @@ dist/
 .env
 .env.*
 !.env.example
-public/community.json
-dist-ssr
+# Built from each game's submissions/ by npm run submissions (and the build).
+games/*/public/community.json
 envs/
