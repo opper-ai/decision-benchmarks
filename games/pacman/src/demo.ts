@@ -1,6 +1,6 @@
-import { Replay, type Recording } from './replay';
-import type { SchedulerEvent } from './scheduler';
-import type { GameState } from './sim';
+import { Replay, type Recording } from './replay.ts';
+import type { SchedulerEvent } from './scheduler.ts';
+import type { GameState } from './sim.ts';
 
 /** Seconds of demo time the finished game stays on screen before the demo starts over. */
 export const DEMO_LOOP_PAUSE_S = 3;
@@ -33,10 +33,12 @@ export class DemoPlayer {
   private pending = 0;
   private endedFor = 0;
 
-  constructor(
-    private readonly rec: Recording,
-    private readonly opts: { onLoop?: () => void } = {},
-  ) {
+  private readonly rec: Recording;
+  private readonly opts: { onLoop?: () => void };
+
+  constructor(rec: Recording, opts: { onLoop?: () => void } = {}) {
+    this.rec = rec;
+    this.opts = opts;
     this.replay = new Replay(rec);
   }
 

@@ -1,10 +1,10 @@
-import type { Decision } from './brain';
-import { ARCADE_FILL, GHOST_NAMES, ghostIcon, type Lineup } from './overlay';
-import type { SchedulerEvent } from './scheduler';
-import { fruitForLevel, type GameState, type Status } from './sim';
-import { FRUIT_EMOJI } from './render';
-import type { Dir, GhostId } from './types';
-import { modelName } from '../shared/models';
+import type { Decision } from './brain.ts';
+import { ARCADE_FILL, GHOST_NAMES, ghostIcon, type Lineup } from './overlay.ts';
+import type { SchedulerEvent } from './scheduler.ts';
+import { fruitForLevel, type GameState, type Status } from './sim.ts';
+import { FRUIT_EMOJI } from './render.ts';
+import type { Dir, GhostId } from './types.ts';
+import { modelName } from '../shared/models.ts';
 
 const ARROW: Record<Dir, string> = { up: '↑', left: '←', down: '↓', right: '→' };
 const DIR_NAME: Record<Dir, string> = { up: 'Up', left: 'Left', down: 'Down', right: 'Right' };
@@ -58,10 +58,12 @@ export class ActivityLog {
   private droppedEl: HTMLElement | null = null;
 
   /** `onOpenChange` lays the page out (the panel opens beside the board); the log only says when. */
-  constructor(
-    private readonly root: HTMLElement,
-    private readonly opts: { onOpenChange?: (open: boolean) => void } = {},
-  ) {
+  private readonly root: HTMLElement;
+  private readonly opts: { onOpenChange?: (open: boolean) => void };
+
+  constructor(root: HTMLElement, opts: { onOpenChange?: (open: boolean) => void } = {}) {
+    this.root = root;
+    this.opts = opts;
     this.render();
   }
 

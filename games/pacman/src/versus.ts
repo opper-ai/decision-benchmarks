@@ -1,4 +1,4 @@
-import type { Leaderboard } from '../shared/leaderboard';
+import type { Leaderboard } from '../shared/leaderboard.ts';
 
 export interface Versus {
   score: number;

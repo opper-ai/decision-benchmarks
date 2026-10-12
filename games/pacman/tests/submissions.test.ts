@@ -6,11 +6,16 @@ import { describe, expect, it } from 'vitest';
 import type { Recording } from '../src/replay';
 import { recordGame } from './record-game';
 import { createGame, step } from '../src/sim';
-import { checkSubmission } from '../scripts/submissions';
+import { checkSubmission as kitCheckSubmission } from '../../../packages/kit/bench/submissions';
+import { verifyGame } from '../bench/verify';
+import pacman from '../game';
 import { BENCH_VERSION, type SubmissionRules } from '../shared/leaderboard';
 
 // Short games keep the replays quick; the rules are the same apart from the cap.
 const RULES: SubmissionRules = { minGames: 3, maxSeconds: 20, maxStep: 0.05 };
+/** Pac-Man as the kit's submissions check sees it, with those rules. */
+const game = { ...pacman, rules: { ...pacman.rules, minGames: RULES.minGames }, verify: (rec: unknown) => verifyGame(rec as Recording, RULES) };
+const checkSubmission = (dir: string, id: string, _rules: SubmissionRules) => kitCheckSubmission(game, dir, id);
 
 // Different step timings make different games, as real-time runs do.
 /** The step that ends the opening "ready" pause. */
@@ -44,7 +49,7 @@ describe('checkSubmission', () => {
     const checked = checkSubmission(folder(), 'acme-pac', RULES);
     expect(checked).toMatchObject({ entry: { model: 'acme-pac', name: 'Acme Pac', by: 'acme', selfReported: true, games: RULES.minGames } });
     const mean = recorded.slice(0, RULES.minGames).reduce((a, g) => a + g.final.score, 0) / RULES.minGames;
-    expect('entry' in checked && checked.entry.meanScore).toBe(Math.round(mean));
+    expect('entry' in checked && checked.entry.metric.mean).toBeCloseTo(mean, 2);
   });
 
   it('refuses the whole submission when one game does not check out', () => {
@@ -87,7 +92,7 @@ describe('checkSubmission', () => {
   });
 
   it('refuses a submission posing as a model we benchmark, and checks who and where', () => {
-    expect(checkSubmission(folder({ manifest: { name: 'jev 1.13' } }), 'acme-pac', RULES)).toMatchObject({ error: expect.stringMatching(/main leaderboard/) });
+    expect(checkSubmission(folder({ manifest: { name: 'jev 1.13' } }), 'acme-pac', RULES)).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
     expect(checkSubmission(folder({ manifest: { by: 'not a handle!' } }), 'acme-pac', RULES)).toMatchObject({ error: expect.stringMatching(/GitHub handle/) });
     expect(checkSubmission(folder({ manifest: { url: 'javascript:alert(1)' } }), 'acme-pac', RULES)).toMatchObject({ error: expect.stringMatching(/https/) });
   });

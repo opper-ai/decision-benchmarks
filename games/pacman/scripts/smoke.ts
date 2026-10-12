@@ -1,10 +1,12 @@
-// One real batched jev call built from a real game state. Run: npm run smoke
-import { buildRequest, parseAnswer, type DecideResponse } from '../src/brain';
-import { optionFeatures } from '../src/features';
-import { createGame, nextDecisionPoint } from '../src/sim';
-import { ACTOR_IDS } from '../src/types';
-import { handleDecide } from '../server/decide';
-import { devTargetFromEnv, modelFor } from '../server/jev';
+// One real batched call to the default decision model, built from a real game state (a paid call: run it by hand).
+// Run: node --env-file-if-exists=.env games/pacman/scripts/smoke.ts
+import { buildRequest, parseAnswer, type DecideResponse } from '../src/brain.ts';
+import { optionFeatures } from '../src/features.ts';
+import { createGame, nextDecisionPoint } from '../src/sim.ts';
+import { ACTOR_IDS } from '../src/types.ts';
+import { handleDecide } from '../../../packages/kit/server/decide.ts';
+import { devTargetFromEnv } from '../../../packages/kit/server/systemone.ts';
+import { DEFAULT_MODEL } from '../../../packages/kit/shared/models.ts';
 
 // TYPESAFE_API_KEY calls api.typesafe.ai directly; otherwise OPPER_API_KEY goes through Opper.
 const target = devTargetFromEnv(process.env);
@@ -25,7 +27,7 @@ if (batch.length !== 5) {
   process.exit(1);
 }
 
-console.log(`smoke via ${target?.provider ?? 'no key'} (${target ? modelFor(target.provider) : '-'})`);
+console.log(`smoke via ${target?.provider ?? 'no key'} (${DEFAULT_MODEL})`);
 const result = await handleDecide(buildRequest(state, batch), {
   apiKey: target?.apiKey,
   baseUrl: target?.baseUrl ?? '',

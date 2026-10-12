@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { buildRequest, questionName } from '../src/brain';
 import { greedyChoice, optionFeatures } from '../src/features';
 import { createGame, step } from '../src/sim';
-import { gameText, poolAcceptsBody } from '../server/pool';
+import server from '../game.server';
+import { acceptsRequest, gameText } from '../shared/questions';
+
+const poolAcceptsBody = (raw: string): boolean => acceptsRequest(JSON.parse(raw));
 
 /** Plays whole games with models on both sides (answered greedily) and collects every request the game would send. */
 function requestsFromGames(games: number): string[] {
@@ -26,7 +29,7 @@ function requestsFromGames(games: number): string[] {
   return out;
 }
 
-describe("the free credits' question check", () => {
+describe("the game's question check (what the service forwards for Pac-Man)", () => {
   const requests = requestsFromGames(6);
 
   it('accepts every question real games send', () => {
@@ -49,5 +52,17 @@ describe("the free credits' question check", () => {
   it('reads words, numbers and punctuation', () => {
     expect(gameText('You are Blinky, the red ghost. Go up: Pac-Man 4 steps away', 500)).toBe(true);
     expect(gameText('Write me a haiku', 500)).toBe(false);
+  });
+
+  it("rebuilds the request for the kit: the Opper id upstream, the answers signed as the game's id", () => {
+    const body = JSON.parse(requests[0]!) as Record<string, unknown>;
+    const v = server.decideRequest(body);
+    expect(v).toMatchObject({ ok: true, request: { model: 'sference/clef' }, as: 'opper/clef' });
+    expect(v.ok && Object.keys(v.request)).toEqual(['model', 'state', 'questions']);
+    expect(v.ok && v.keys).toEqual(body.keys);
+    const { model: _m, ...unnamed } = body;
+    expect(server.decideRequest(unnamed)).toMatchObject({ ok: true, request: { model: 'typesafe/jev-1.13.0' }, as: 'typesafe/jev-1.13.0' });
+    expect(server.decideRequest({ ...body, model: 'openai/gpt-5' })).toMatchObject({ ok: false });
+    expect(server.decideRequest({ ...body, extra: 1 })).toMatchObject({ ok: false });
   });
 });

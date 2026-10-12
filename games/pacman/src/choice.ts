@@ -1,5 +1,5 @@
-import { DEFAULT_MODEL, isModelId, modelName, type ModelId } from '../shared/models';
-import { ACTOR_IDS, GHOST_IDS, type ActorId } from './types';
+import { DEFAULT_MODEL, fromOpperId, isModelId, modelName, type ModelId } from '../shared/models.ts';
+import { ACTOR_IDS, GHOST_IDS, type ActorId } from './types.ts';
 
 /** Which decision model plays each character. Values are model ids from modelOptions. */
 export type ModelChoice = Record<ActorId, string>;
@@ -12,10 +12,19 @@ export interface ModelInfo {
 
 const STORAGE_KEY = 'jevman.models';
 
+/** /api/me names models by their Opper ids (the kit's); the game names them by its own. */
+export function gameModels<M extends ModelInfo>(me: M): M {
+  return {
+    ...me,
+    ...(me.models ? { models: me.models.map(fromOpperId) } : {}),
+    ...(me.defaultModel ? { defaultModel: fromOpperId(me.defaultModel) } : {}),
+  };
+}
+
 export function modelOptions(me: ModelInfo): { id: string; label: string }[] {
   const listed = (me.models ?? [DEFAULT_MODEL]).filter(isModelId).map((id) => ({ id, label: modelName(id) }));
   const def = me.defaultModel ?? DEFAULT_MODEL;
-  // An operator's JEV_MODEL may name a System One model that isn't on the shared list.
+  // The server's default may be a model this game does not list.
   return listed.some((o) => o.id === def) ? listed : [{ id: def, label: `${def} (server default)` }, ...listed];
 }
 
@@ -29,7 +38,7 @@ export function initialChoice(me: ModelInfo, stored: unknown): ModelChoice {
 
 export const setGhosts = (choice: ModelChoice, model: string): ModelChoice => ({ ...choice, ...Object.fromEntries(GHOST_IDS.map((id) => [id, model])) });
 
-/** The model to name in a request: none for the server default, so JEV_MODEL keeps applying. */
+/** The model to name in a request: none for the server default (Jev). */
 export const requestModel = (choice: ModelChoice, actor: ActorId, defaultModel: string): ModelId | undefined => {
   const model = choice[actor];
   return model === defaultModel || !isModelId(model) ? undefined : model;

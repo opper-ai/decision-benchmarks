@@ -1,9 +1,9 @@
 // What a benchmark game and a replayed submission share: the scripted rule for the actors no model plays, and how a
 // finished game becomes a GameResult.
-import { greedyChoice, optionFeatures } from '../src/features';
-import type { Controls, GameState } from '../src/sim';
-import type { GameStats } from '../src/stats';
-import type { GameResult } from '../shared/leaderboard';
+import { greedyChoice, optionFeatures } from '../src/features.ts';
+import type { Controls, GameState } from '../src/sim.ts';
+import type { GameStats } from '../src/stats.ts';
+import type { GameResult } from '../shared/leaderboard.ts';
 
 /** The classic rule for every actor no model plays: greedy, and like the scheduler, each escape question answered once. */
 export function scriptedControls(): Controls {

@@ -1,4 +1,4 @@
-import type { GhostId, Tile } from './types';
+import type { GhostId, Tile } from './types.ts';
 
 // '#' wall, '-' ghost-house door, '_' ghost-house interior (not walkable),
 // '.' pellet, 'o' power pellet, ' ' empty corridor. Row 14 wraps (tunnel).

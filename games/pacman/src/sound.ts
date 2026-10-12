@@ -1,4 +1,4 @@
-import type { GameState } from './sim';
+import type { GameState } from './sim.ts';
 
 /** What happened in one step of the game that deserves a sound ('start' is played when a new game begins). */
 export type SoundCue = 'pellet' | 'power' | 'ghost' | 'fruit' | 'death' | 'levelclear' | 'start';

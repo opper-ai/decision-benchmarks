@@ -1,6 +1,6 @@
-import { CLASSIC_LAYOUT, FRUIT_TILE, GHOST_DOOR_EXIT, HOUSE_TILES, PACMAN_START } from './layout';
-import { DIR_VEC, Maze, REVERSE } from './maze';
-import { GHOST_IDS, sameTile, type ActorId, type Dir, type GhostId, type Tile } from './types';
+import { CLASSIC_LAYOUT, FRUIT_TILE, GHOST_DOOR_EXIT, HOUSE_TILES, PACMAN_START } from './layout.ts';
+import { DIR_VEC, Maze, REVERSE } from './maze.ts';
+import { GHOST_IDS, sameTile, type ActorId, type Dir, type GhostId, type Tile } from './types.ts';
 
 export type GhostState = 'house' | 'normal' | 'frightened' | 'eaten';
 export type Mode = 'scatter' | 'chase';

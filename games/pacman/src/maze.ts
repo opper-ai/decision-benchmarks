@@ -1,4 +1,4 @@
-import { DIRS, type Dir, type Tile } from './types';
+import { DIRS, type Dir, type Tile } from './types.ts';
 
 export const DIR_VEC: Record<Dir, Tile> = {
   up: { x: 0, y: -1 },

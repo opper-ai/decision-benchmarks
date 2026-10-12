@@ -1,11 +1,11 @@
-import type { Leaderboard } from '../shared/leaderboard';
-import { boardOf } from '../shared/lineups';
-import { boardLabel, type BoardEntry, type Boards } from './highscores';
-import { modelName } from '../shared/models';
-import { logoFor } from './logos';
-import type { GameSummary } from './stats';
-import { GHOST_IDS, type GhostId } from './types';
-import { versus } from './versus';
+import type { Leaderboard } from '../shared/leaderboard.ts';
+import { boardOf } from '../shared/lineups.ts';
+import { boardLabel, type BoardEntry, type Boards } from './highscores.ts';
+import { modelName } from '../shared/models.ts';
+import { logoFor } from './logos.ts';
+import type { GameSummary } from './stats.ts';
+import { GHOST_IDS, type GhostId } from './types.ts';
+import { versus } from './versus.ts';
 
 /** Which model plays each ghost. */
 export type Lineup = Record<GhostId, string>;

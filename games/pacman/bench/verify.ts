@@ -3,13 +3,13 @@
 // Pac-Man's moves must also be ones the bench's scheduler could have made: each escape question answered once while
 // it is open, and no answer later than a model call can take.
 import { createHash } from 'node:crypto';
-import type { Recording } from '../src/replay';
-import type { SchedulerEvent } from '../src/scheduler';
-import { createGame, decisionPoints, step } from '../src/sim';
-import { GameStats } from '../src/stats';
-import { GHOST_IDS, type Dir } from '../src/types';
-import { SUBMISSION_RULES, type GameResult, type SubmissionRules } from '../shared/leaderboard';
-import { emptyResult, finishResult, scriptedControls } from './game';
+import type { Recording } from '../src/replay.ts';
+import type { SchedulerEvent } from '../src/scheduler.ts';
+import { createGame, decisionPoints, step } from '../src/sim.ts';
+import { GameStats } from '../src/stats.ts';
+import { GHOST_IDS, type Dir } from '../src/types.ts';
+import { SUBMISSION_RULES, type GameResult, type SubmissionRules } from '../shared/leaderboard.ts';
+import { emptyResult, finishResult, scriptedControls } from './scripted.ts';
 
 export type Verdict =
   | {

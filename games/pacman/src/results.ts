@@ -1,6 +1,6 @@
-import { jointLeaders, type Community, type Leaderboard, type LeaderboardEntry } from '../shared/leaderboard';
-import { logoFor, makerOf, pageOf } from './logos';
-import { tag } from './track';
+import { jointLeaders, type Community, type Leaderboard, type LeaderboardEntry } from '../shared/leaderboard.ts';
+import { logoFor, makerOf, pageOf } from './logos.ts';
+import { tag } from '../../../packages/kit/client/track.ts';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, cls?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);

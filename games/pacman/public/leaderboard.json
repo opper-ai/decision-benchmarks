@@ -1,185 +1,187 @@
 {
   "generatedAt": "2026-10-10T07:49:48.287Z",
-  "settings": {
-    "gamesPerModel": 100,
-    "maxSeconds": 300,
-    "benchVersion": 1,
-    "ghosts": "scripted"
+  "game": "pacman",
+  "benchVersion": 1,
+  "metric": {
+    "name": "Score",
+    "unit": "points",
+    "higherIsBetter": true
   },
   "entries": [
     {
       "model": "typesafe/jev-1.13.0",
       "name": "jev 1.13",
       "games": 100,
-      "meanScore": 2750,
-      "bestScore": 6380,
-      "scoreStdError": 109,
-      "meanSurvivedSeconds": 60.9,
-      "meanPellets": 188,
-      "pelletsPerLife": 63,
-      "meanGhostsEaten": 2,
-      "fruitEaten": "143/166",
-      "bestLevel": 2,
-      "fallbackRate": 0.034,
+      "metric": {
+        "mean": 2750,
+        "stdError": 109,
+        "best": 6380
+      },
       "meanLatencyMs": 290,
+      "fallbackRate": 0.034,
       "costPerGame": 0.00593,
-      "deathsBy": {
-        "ghost ahead in corridor": 171,
-        "at/near junction": 115,
-        "waiting at junction": 14
+      "via": "systemone",
+      "extra": {
+        "meanSurvivedSeconds": 60.9,
+        "meanPellets": 188,
+        "pelletsPerLife": 63,
+        "meanGhostsEaten": 2,
+        "fruitEaten": "143/166",
+        "bestLevel": 2
       }
     },
     {
       "model": "openai/gpt-6-luna-decisions",
       "name": "GPT-6 Luna",
       "games": 100,
-      "meanScore": 2568,
-      "bestScore": 5920,
-      "scoreStdError": 75,
-      "meanSurvivedSeconds": 60.7,
-      "meanPellets": 193,
-      "pelletsPerLife": 64,
-      "meanGhostsEaten": 1.6,
-      "fruitEaten": "119/179",
-      "bestLevel": 2,
-      "fallbackRate": 0.044,
+      "metric": {
+        "mean": 2568,
+        "stdError": 75,
+        "best": 5920
+      },
       "meanLatencyMs": 179,
+      "fallbackRate": 0.044,
       "costPerGame": 0.00968,
-      "deathsBy": {
-        "ghost ahead in corridor": 99,
-        "at/near junction": 156,
-        "waiting at junction": 45
+      "via": "systemone",
+      "extra": {
+        "meanSurvivedSeconds": 60.7,
+        "meanPellets": 193,
+        "pelletsPerLife": 64,
+        "meanGhostsEaten": 1.6,
+        "fruitEaten": "119/179",
+        "bestLevel": 2
       }
     },
     {
-      "model": "opper/clef-flash",
+      "model": "cloudflare:global/clef-flash",
       "name": "Clef Flash",
       "games": 100,
-      "meanScore": 2538,
-      "bestScore": 4260,
-      "scoreStdError": 60,
-      "meanSurvivedSeconds": 57.5,
-      "meanPellets": 203,
-      "pelletsPerLife": 68,
-      "meanGhostsEaten": 0.7,
-      "fruitEaten": "153/186",
-      "bestLevel": 2,
-      "fallbackRate": 0.026,
+      "metric": {
+        "mean": 2538,
+        "stdError": 60,
+        "best": 4260
+      },
       "meanLatencyMs": 256,
+      "fallbackRate": 0.026,
       "costPerGame": 0.00362,
-      "deathsBy": {
-        "ghost ahead in corridor": 121,
-        "at/near junction": 177,
-        "waiting at junction": 2
+      "via": "systemone",
+      "extra": {
+        "meanSurvivedSeconds": 57.5,
+        "meanPellets": 203,
+        "pelletsPerLife": 68,
+        "meanGhostsEaten": 0.7,
+        "fruitEaten": "153/186",
+        "bestLevel": 2
       }
     },
     {
-      "model": "opper/clef",
+      "model": "sference/clef",
       "name": "Clef",
       "games": 100,
-      "meanScore": 2476,
-      "bestScore": 4820,
-      "scoreStdError": 65,
-      "meanSurvivedSeconds": 48.9,
-      "meanPellets": 189,
-      "pelletsPerLife": 63,
-      "meanGhostsEaten": 1.5,
-      "fruitEaten": "124/179",
-      "bestLevel": 2,
-      "fallbackRate": 0.046,
+      "metric": {
+        "mean": 2476,
+        "stdError": 65,
+        "best": 4820
+      },
       "meanLatencyMs": 398,
+      "fallbackRate": 0.046,
       "costPerGame": 0.01728,
-      "deathsBy": {
-        "at/near junction": 200,
-        "ghost ahead in corridor": 64,
-        "waiting at junction": 36
+      "via": "systemone",
+      "extra": {
+        "meanSurvivedSeconds": 48.9,
+        "meanPellets": 189,
+        "pelletsPerLife": 63,
+        "meanGhostsEaten": 1.5,
+        "fruitEaten": "124/179",
+        "bestLevel": 2
       }
     },
     {
-      "model": "microsoft/decision-1",
+      "model": "azure:global/microsoft-decision-1",
       "name": "Microsoft Decision 1",
       "games": 100,
-      "meanScore": 2390,
-      "bestScore": 4420,
-      "scoreStdError": 79,
-      "meanSurvivedSeconds": 48.4,
-      "meanPellets": 183,
-      "pelletsPerLife": 61,
-      "meanGhostsEaten": 1.3,
-      "fruitEaten": "104/157",
-      "bestLevel": 2,
-      "fallbackRate": 0.021,
+      "metric": {
+        "mean": 2390,
+        "stdError": 79,
+        "best": 4420
+      },
       "meanLatencyMs": 301,
+      "fallbackRate": 0.021,
       "costPerGame": 0.00264,
-      "deathsBy": {
-        "at/near junction": 158,
-        "waiting at junction": 43,
-        "ghost ahead in corridor": 99
+      "via": "systemone",
+      "extra": {
+        "meanSurvivedSeconds": 48.4,
+        "meanPellets": 183,
+        "pelletsPerLife": 61,
+        "meanGhostsEaten": 1.3,
+        "fruitEaten": "104/157",
+        "bestLevel": 2
       }
     },
     {
       "model": "empiriolabs/aplomb-1",
       "name": "Aplomb 1",
       "games": 100,
-      "meanScore": 1693,
-      "bestScore": 3520,
-      "scoreStdError": 63,
-      "meanSurvivedSeconds": 39.1,
-      "meanPellets": 140,
-      "pelletsPerLife": 47,
-      "meanGhostsEaten": 0.4,
-      "fruitEaten": "108/120",
-      "bestLevel": 1,
-      "fallbackRate": 0.032,
+      "metric": {
+        "mean": 1693,
+        "stdError": 63,
+        "best": 3520
+      },
       "meanLatencyMs": 308,
+      "fallbackRate": 0.032,
       "costPerGame": 0.00138,
-      "deathsBy": {
-        "ghost ahead in corridor": 177,
-        "at/near junction": 104,
-        "waiting at junction": 19
+      "via": "systemone",
+      "extra": {
+        "meanSurvivedSeconds": 39.1,
+        "meanPellets": 140,
+        "pelletsPerLife": 47,
+        "meanGhostsEaten": 0.4,
+        "fruitEaten": "108/120",
+        "bestLevel": 1
       }
     },
     {
       "model": "opper/kev-4b",
       "name": "Kev 4B",
       "games": 100,
-      "meanScore": 1506,
-      "bestScore": 5280,
-      "scoreStdError": 45,
-      "meanSurvivedSeconds": 47.5,
-      "meanPellets": 127,
-      "pelletsPerLife": 42,
-      "meanGhostsEaten": 0.2,
-      "fruitEaten": "88/101",
-      "bestLevel": 1,
-      "fallbackRate": 0.045,
+      "metric": {
+        "mean": 1506,
+        "stdError": 45,
+        "best": 5280
+      },
       "meanLatencyMs": 231,
+      "fallbackRate": 0.045,
       "costPerGame": 0.00282,
-      "deathsBy": {
-        "ghost ahead in corridor": 128,
-        "at/near junction": 172
+      "via": "systemone",
+      "extra": {
+        "meanSurvivedSeconds": 47.5,
+        "meanPellets": 127,
+        "pelletsPerLife": 42,
+        "meanGhostsEaten": 0.2,
+        "fruitEaten": "88/101",
+        "bestLevel": 1
       }
     },
     {
       "model": "berget/convaiinnovations/laya",
       "name": "Laya",
       "games": 100,
-      "meanScore": 639,
-      "bestScore": 1200,
-      "scoreStdError": 12,
-      "meanSurvivedSeconds": 37.5,
-      "meanPellets": 57,
-      "pelletsPerLife": 19,
-      "meanGhostsEaten": 0.1,
-      "fruitEaten": "7/8",
-      "bestLevel": 1,
-      "fallbackRate": 0.003,
+      "metric": {
+        "mean": 639,
+        "stdError": 12,
+        "best": 1200
+      },
       "meanLatencyMs": 104,
+      "fallbackRate": 0.003,
       "costPerGame": 0.0034,
-      "deathsBy": {
-        "at/near junction": 144,
-        "ghost ahead in corridor": 139,
-        "waiting at junction": 17
+      "via": "systemone",
+      "extra": {
+        "meanSurvivedSeconds": 37.5,
+        "meanPellets": 57,
+        "pelletsPerLife": 19,
+        "meanGhostsEaten": 0.1,
+        "fruitEaten": "7/8",
+        "bestLevel": 1
       }
     }
   ],

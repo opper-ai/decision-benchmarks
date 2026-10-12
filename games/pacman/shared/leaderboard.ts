@@ -1,17 +1,19 @@
-import { modelName, type ModelId } from './models.ts';
+import type { Community as ContractCommunity, Leaderboard as ContractBoard } from '../../../packages/kit/shared/contract.ts';
+import type { GameResult as KitGameResult } from '../../../packages/kit/shared/game.ts';
+import { jointLeaders as kitJointLeaders, stdError, tooCloseToCall as kitTooCloseToCall } from '../../../packages/kit/shared/stats.ts';
+import { fromOpperId, modelName } from './models.ts';
 
-/** One benchmark game, as scripts/bench.ts plays it. */
-export interface GameResult {
+/**
+ * Pac-Man's results as its page shows them: jevman's leaderboard shape. The files it serves are in the kit's contract
+ * shape (packages/kit/shared/contract.ts), which `fromContract` turns into this.
+ */
+
+/** One benchmark game, as the bench plays it (games/pacman/bench/play.ts). */
+export interface GameResult extends KitGameResult {
   survived: number;
-  score: number;
   pellets: number;
   deaths: number;
   level: number;
-  calls: number;
-  decisions: number;
-  fallbacks: number;
-  latencyMsSum: number;
-  cost: number;
   fruitSpawned: number;
   fruitEaten: number;
   ghostsEaten: number;
@@ -53,7 +55,7 @@ export interface Leaderboard {
   /** Best first: by mean score. */
   entries: LeaderboardEntry[];
   /** Models that could not play (not warm in time, not enabled for the key, ...). */
-  skipped: { model: ModelId; reason: string }[];
+  skipped: { model: string; reason: string }[];
 }
 
 const round = (n: number, places = 0) => Math.round(n * 10 ** places) / 10 ** places;
@@ -85,35 +87,18 @@ export function summarize(model: string, games: GameResult[], name: string = mod
   };
 }
 
-function stdError(xs: number[]): number {
-  if (xs.length < 2) return 0;
-  const m = xs.reduce((a, x) => a + x, 0) / xs.length;
-  const variance = xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1);
-  return Math.sqrt(variance / xs.length);
-}
-
-/** Whether two models' mean scores are within the margin of error (about two standard errors of the difference). */
+/** Whether two models' mean scores are within the margin of error (the kit's rule; no margin, no tie). */
 export function tooCloseToCall(a: LeaderboardEntry, b: LeaderboardEntry): boolean {
   if (a.scoreStdError === undefined || b.scoreStdError === undefined) return false;
-  return Math.abs(a.meanScore - b.meanScore) < 2 * Math.hypot(a.scoreStdError, b.scoreStdError);
+  return kitTooCloseToCall({ mean: a.meanScore, stdError: a.scoreStdError }, { mean: b.meanScore, stdError: b.scoreStdError });
 }
 
-/**
- * The models tied for first (entries best first): the leader, every model within the margin of error of it, and any
- * model scoring between them. A 24-game run has a wider margin than a 100-game one, so it can tie the leader while a
- * better score with a narrower margin doesn't; ranking that better score below it would read wrong.
- */
-export function jointLeaders(entries: LeaderboardEntry[]): LeaderboardEntry[] {
-  let last = 0;
-  entries.forEach((e, i) => {
-    if (i > 0 && tooCloseToCall(entries[0], e)) last = i;
-  });
-  return last > 0 ? entries.slice(0, last + 1) : [];
-}
+/** The models tied for first (entries best first), by the kit's rule; an entry without a margin ties nobody. */
+export const jointLeaders = (entries: LeaderboardEntry[]): LeaderboardEntry[] => kitJointLeaders(entries, (e) => ({ mean: e.meanScore, stdError: e.scoreStdError ?? Number.NaN }));
 
 export const rank = (entries: LeaderboardEntry[]): LeaderboardEntry[] => [...entries].sort((a, b) => b.meanScore - a.meanScore);
 
-/** A model its makers benchmarked themselves and submitted by pull request (submissions/<id>/). */
+/** A model its makers benchmarked themselves and submitted by pull request (games/pacman/submissions/<id>/). */
 export interface CommunityEntry extends LeaderboardEntry {
   /** Who submitted it (GitHub handle or organisation). */
   by: string;
@@ -142,3 +127,52 @@ export interface SubmissionRules {
   maxStep: number;
 }
 export const SUBMISSION_RULES: SubmissionRules = { minGames: 24, maxSeconds: 300, maxStep: 0.05 };
+
+/** Pac-Man's own numbers for a model's games, as the leaderboard entry's `extra` (the kit's contract shape). */
+export function extraFor(games: GameResult[]): Record<string, number | string> {
+  const e = summarize('', games, '');
+  return { meanSurvivedSeconds: e.meanSurvivedSeconds, meanPellets: e.meanPellets, pelletsPerLife: e.pelletsPerLife, meanGhostsEaten: e.meanGhostsEaten, fruitEaten: e.fruitEaten, bestLevel: e.bestLevel };
+}
+
+const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+
+/** A results file in the kit's contract shape, as this page shows it. Models are named by the game's own ids. */
+export function fromContract(board: ContractBoard): Leaderboard {
+  const entries = board.entries.map((e): LeaderboardEntry => ({
+    model: fromOpperId(e.model),
+    name: e.name,
+    games: e.games,
+    meanScore: Math.round(e.metric.mean),
+    bestScore: e.metric.best,
+    scoreStdError: e.metric.stdError,
+    meanSurvivedSeconds: num(e.extra?.meanSurvivedSeconds),
+    meanPellets: num(e.extra?.meanPellets),
+    pelletsPerLife: num(e.extra?.pelletsPerLife),
+    meanGhostsEaten: num(e.extra?.meanGhostsEaten),
+    fruitEaten: typeof e.extra?.fruitEaten === 'string' ? e.extra.fruitEaten : '0/0',
+    bestLevel: num(e.extra?.bestLevel, 1),
+    fallbackRate: e.fallbackRate,
+    meanLatencyMs: e.meanLatencyMs,
+    costPerGame: e.costPerGame ?? 0,
+    deathsBy: {},
+  }));
+  return {
+    generatedAt: board.generatedAt,
+    settings: { gamesPerModel: Math.max(0, ...entries.map((e) => e.games)), maxSeconds: SUBMISSION_RULES.maxSeconds, benchVersion: board.benchVersion, ghosts: 'scripted' },
+    entries,
+    skipped: board.skipped,
+  };
+}
+
+/** community.json in the kit's contract shape, as this page shows it. */
+export function communityFromContract(board: ContractCommunity): Community {
+  const base = fromContract(board);
+  return {
+    generatedAt: board.generatedAt,
+    benchVersion: board.benchVersion,
+    entries: base.entries.map((e, i) => {
+      const c = board.entries[i]!;
+      return { ...e, model: c.model, by: c.by, ...(c.url ? { url: c.url } : {}), selfReported: true as const };
+    }),
+  };
+}

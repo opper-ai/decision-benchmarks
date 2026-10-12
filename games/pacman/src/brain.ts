@@ -1,7 +1,7 @@
-import type { ModelId } from '../shared/models';
-import { fruitRoute, goalFor, greedyChoice, isTrap, NEARBY_STEPS, optionFeatures, type OptionFeatures } from './features';
-import { occupiedTile, type DecisionPoint, type GameState } from './sim';
-import { GHOST_IDS, type ActorId, type Dir, type GhostId, type Tile } from './types';
+import { parseChoice, type ChoiceQuestion, type DecideResponse, type SystemOneRequest } from '../../../packages/kit/shared/systemone.ts';
+import { fruitRoute, goalFor, greedyChoice, isTrap, NEARBY_STEPS, optionFeatures, type OptionFeatures } from './features.ts';
+import { occupiedTile, type DecisionPoint, type GameState } from './sim.ts';
+import { GHOST_IDS, type ActorId, type Dir, type GhostId, type Tile } from './types.ts';
 
 export const ACTOR_NAMES: Record<ActorId, string> = {
   pacman: 'Pac-Man',
@@ -26,35 +26,7 @@ export interface PendingQuestion {
   features: OptionFeatures[];
 }
 
-export interface ChoiceQuestion {
-  type: 'choice';
-  instructions: string;
-  criteria: Record<string, string>;
-}
-
-export interface SystemOneRequest {
-  /** Which decision model answers (shared/models.ts); the server uses jev when it is missing. */
-  model?: ModelId;
-  state: Record<string, unknown>;
-  questions: Record<string, ChoiceQuestion>;
-  /** Each question's junction (decision point key), so the server can sign its answer for that junction. */
-  keys?: Record<string, string>;
-}
-
-export interface DecideResponse {
-  /** The model the server called (missing from older servers). */
-  model?: string;
-  answers: Record<string, unknown>;
-  usage: { input_tokens: number; output_tokens: number };
-  latencyMs: number;
-  costUsd: number | null;
-  /** True when costUsd is estimated from token usage (TypeSafe's API sends no cost). */
-  costEstimated?: boolean;
-  /** The server's signature on each answer (by question), and the model id it signed them as. */
-  signatures?: Record<string, string>;
-  signedAs?: string;
-  traceId: string | null;
-}
+export type { ChoiceQuestion, DecideResponse, SystemOneRequest };
 
 export interface Decision {
   actor: ActorId;
@@ -213,22 +185,16 @@ export function buildRequest(state: GameState, batch: PendingQuestion[]): System
 }
 
 export function parseAnswer(answer: unknown, q: PendingQuestion): Decision | null {
-  if (!answer || typeof answer !== 'object') return null;
-  const a = answer as { type?: unknown; choice?: unknown; confidence?: unknown; probabilities?: unknown };
-  if (a.type !== 'choice' || typeof a.choice !== 'string') return null;
-  const choice = a.choice as Dir;
-  if (!q.point.options.includes(choice)) return null;
-  const raw = (a.probabilities && typeof a.probabilities === 'object' ? a.probabilities : {}) as Record<string, unknown>;
-  const probabilities: Partial<Record<Dir, number>> = {};
-  for (const d of q.point.options) if (typeof raw[d] === 'number') probabilities[d] = raw[d] as number;
+  const parsed = parseChoice(answer, q.point.options);
+  if (!parsed) return null;
   return {
     actor: q.point.actor,
     key: q.point.key,
     tile: q.point.tile,
-    choice,
+    choice: parsed.choice,
     options: q.point.options,
-    probabilities,
-    confidence: typeof a.confidence === 'number' ? a.confidence : null,
+    probabilities: parsed.probabilities,
+    confidence: parsed.confidence,
     source: 'jev',
     ...(q.point.escape ? { escape: true } : {}),
   };

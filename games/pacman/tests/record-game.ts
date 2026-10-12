@@ -1,6 +1,6 @@
 import { Recorder, type Recording } from '../src/replay';
 import { createGame, decisionPoints, step, type Controls } from '../src/sim';
-import { scriptedControls } from '../scripts/game';
+import { scriptedControls } from '../bench/scripted';
 
 /**
  * A whole game recorded the way the bench records one, with the scripted rule playing Pac-Man too. Like the bench's

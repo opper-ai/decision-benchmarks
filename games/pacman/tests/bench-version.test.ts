@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildRequest, fallbackDecision } from '../src/brain';
 import { optionFeatures } from '../src/features';
 import { createGame, decisionPoints, step } from '../src/sim';
-import { scriptedControls } from '../scripts/game';
+import { scriptedControls } from '../bench/scripted';
 import { BENCH_VERSION } from '../shared/leaderboard';
 import { ACTOR_IDS } from '../src/types';
 

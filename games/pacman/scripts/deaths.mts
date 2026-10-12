@@ -1,12 +1,12 @@
 // Replays recorded games (bench --record) and explains each of Pac-Man's deaths.
-// Run: npm run deaths -- recording.json [...]
+// Run: node games/pacman/scripts/deaths.mts recording.json [...]
 import { readFileSync } from 'node:fs';
-import { criteriaFor } from '../src/brain';
-import { greedyChoice, optionFeatures } from '../src/features';
-import { createGame, step, type DecisionPoint } from '../src/sim';
-import type { Recording } from '../src/replay';
-import type { Decision } from '../src/brain';
-import { GHOST_IDS, type Dir } from '../src/types';
+import { criteriaFor } from '../src/brain.ts';
+import { greedyChoice, optionFeatures } from '../src/features.ts';
+import { createGame, step, type DecisionPoint } from '../src/sim.ts';
+import type { Recording } from '../src/replay.ts';
+import type { Decision } from '../src/brain.ts';
+import { GHOST_IDS, type Dir } from '../src/types.ts';
 
 for (const file of process.argv.slice(2)) {
   const rec = JSON.parse(readFileSync(file, 'utf8')) as Recording;

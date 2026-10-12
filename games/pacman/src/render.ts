@@ -1,7 +1,7 @@
-import { FRUIT_TILE, HOUSE_TILES } from './layout';
-import { DIR_VEC } from './maze';
-import { actorPosition, DYING_SECONDS, isJevDriven, type Actor, type GameState, type Ghost } from './sim';
-import { ACTOR_IDS, GHOST_IDS, type Dir, type GhostId } from './types';
+import { FRUIT_TILE, HOUSE_TILES } from './layout.ts';
+import { DIR_VEC } from './maze.ts';
+import { actorPosition, DYING_SECONDS, isJevDriven, type Actor, type GameState, type Ghost } from './sim.ts';
+import { ACTOR_IDS, GHOST_IDS, type Dir, type GhostId } from './types.ts';
 
 export const TILE = 20;
 export const GHOST_COLORS: Record<GhostId, string> = { blinky: '#ff0000', pinky: '#ffb8ff', inky: '#00ffff', clyde: '#ffb852' };

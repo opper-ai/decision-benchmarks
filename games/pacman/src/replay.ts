@@ -1,6 +1,6 @@
-import type { SchedulerEvent } from './scheduler';
-import { createGame, step, type Controls, type GameState, type PacmanControl } from './sim';
-import type { Dir } from './types';
+import type { SchedulerEvent } from './scheduler.ts';
+import { createGame, step, type Controls, type GameState, type PacmanControl } from './sim.ts';
+import type { Dir } from './types.ts';
 
 type CallEvent = Extract<SchedulerEvent, { type: 'call' }>;
 /** A scheduler event as stored in a recording: call events drop traceId, which points at the recorder's own Opper traces. */

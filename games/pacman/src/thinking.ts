@@ -1,7 +1,7 @@
-import type { Decision } from './brain';
-import { DIR_VEC } from './maze';
-import { GHOST_COLORS, TILE } from './render';
-import type { ActorId, Dir } from './types';
+import type { Decision } from './brain.ts';
+import { DIR_VEC } from './maze.ts';
+import { GHOST_COLORS, TILE } from './render.ts';
+import type { ActorId, Dir } from './types.ts';
 
 /** How long the odds stay on the board after a decision (fading out over the last part). */
 export const SHOW_MS = 1600;

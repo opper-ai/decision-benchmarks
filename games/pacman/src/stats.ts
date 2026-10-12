@@ -1,9 +1,9 @@
-import { DEFAULT_MODEL } from '../shared/models';
-import { ACTOR_NAMES } from './brain';
-import { REVERSE } from './maze';
-import type { SchedulerEvent } from './scheduler';
-import { escapePoint, type GameState } from './sim';
-import { sameTile, type GhostId, type Tile } from './types';
+import { DEFAULT_MODEL } from '../shared/models.ts';
+import { ACTOR_NAMES } from './brain.ts';
+import { REVERSE } from './maze.ts';
+import type { SchedulerEvent } from './scheduler.ts';
+import { escapePoint, type GameState } from './sim.ts';
+import { sameTile, type GhostId, type Tile } from './types.ts';
 
 export type DeathContext = 'waiting at junction' | 'ghost ahead in corridor' | 'ghost from behind' | 'at/near junction';
 

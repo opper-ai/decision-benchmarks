@@ -4,8 +4,8 @@ import type { Recording } from '../src/replay';
 import { recordGame } from './record-game';
 import { createGame, decisionPoints, step, type DecisionPoint } from '../src/sim';
 import type { Dir } from '../src/types';
-import { scriptedControls } from '../scripts/game';
-import { verifyGame as verifyWith } from '../scripts/verify';
+import { scriptedControls } from '../bench/scripted';
+import { verifyGame as verifyWith } from '../bench/verify';
 import type { SubmissionRules } from '../shared/leaderboard';
 
 // Short games keep the replays quick (CI runners are slow); the rules are the bench's apart from the cap.
@@ -74,7 +74,7 @@ describe('verifyGame', () => {
     longer.frames.push(1 / 60);
     longer.final.frames += 1;
     expect(verifyGame(longer)).toMatchObject({ ok: false, error: expect.stringMatching(/past the 30 s cap/) });
-    const demo = JSON.parse(readFileSync('public/demo/jev-demo.json', 'utf8')) as Recording;
+    const demo = JSON.parse(readFileSync(new URL('../public/demo/jev-demo.json', import.meta.url), 'utf8')) as Recording;
     expect(verifyWith(demo).ok).toBe(true);
     demo.frames.push(1 / 60);
     demo.final.frames += 1;

@@ -1,4 +1,4 @@
-import { appPath } from './paths';
+import { appPath } from '../../../packages/kit/client/paths.ts';
 
 /**
  * Each decision model's maker mark, as the maker shows it on its own profiles (site, GitHub, Hugging Face). Jared

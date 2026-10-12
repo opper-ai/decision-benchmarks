@@ -1,8 +1,8 @@
-import { questionName } from './brain';
-import { createGame, step } from './sim';
-import { GHOST_IDS, type Dir, type GhostId } from './types';
-import { answerMessage } from '../shared/answers';
-import { boardOf, type GhostLineup } from '../shared/lineups';
+import { questionName } from './brain.ts';
+import { createGame, step } from './sim.ts';
+import { GHOST_IDS, type Dir, type GhostId } from './types.ts';
+import { answerMessage } from '../../../packages/kit/shared/answers.ts';
+import { boardOf, type GhostLineup } from '../shared/lineups.ts';
 
 /** Longest game a check replays: half an hour of steps at the fixed rate. */
 export const MAX_PLAYER_STEPS = 60 * 60 * 30;

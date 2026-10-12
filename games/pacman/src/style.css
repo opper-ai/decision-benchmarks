@@ -1,3 +1,6 @@
+/* opper.ai's page chrome (header, footer, account), shared by every game: first, so the game's own rules win. */
+@import "../../../packages/kit/client/opper-chrome.css";
+
 /* jevman on opper.ai: the AI Roundtable look (light, navy, Wix Madefor), with the black arcade board as the centre. */
 @font-face { font-family: 'Wix Madefor Display'; src: url('/fonts/wix-madefor-display-latin.woff2') format('woff2'); font-weight: 400 800; font-display: swap; }
 @font-face { font-family: 'Wix Madefor Text'; src: url('/fonts/wix-madefor-text-latin.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }

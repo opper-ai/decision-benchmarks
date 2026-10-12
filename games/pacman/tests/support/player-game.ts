@@ -3,7 +3,7 @@ import { greedyChoice, optionFeatures } from '../../src/features';
 import { Recorder, roundDt, type Recording } from '../../src/replay';
 import { createGame, step, type Controls } from '../../src/sim';
 import type { Dir } from '../../src/types';
-import { answerMessage, signAnswer } from '../../server/answers';
+import { answerKey, answerMessage, signAnswer } from '../../../../packages/kit/server/answers';
 import { MIXED_LINEUP } from '../../shared/lineups';
 
 export const TEST_SECRET = 's'.repeat(64);
@@ -22,7 +22,7 @@ export function playAndRecord(seed: number, maxSteps = 6000, lineup: Record<stri
       const dir = greedyChoice(s, point, optionFeatures(s, point));
       if (dir === null) return null;
       const model = lineup[point.actor]!;
-      rec.decisions.push([frame, point.key, dir, `${model}~${signAnswer(secret, answerMessage(point.key, questionName(point), dir, model))}`]);
+      rec.decisions.push([frame, point.key, dir, `${model}~${signAnswer(answerKey(secret, 'pacman'), answerMessage(point.key, questionName(point), dir, model))}`]);
       return dir;
     },
   };

@@ -1,4 +1,4 @@
-import type { Dir } from './types';
+import type { Dir } from './types.ts';
 
 /** The direction of a swipe from (x0, y0) to (x1, y1), or null for a tap or a swipe shorter than `min` pixels. */
 export function swipeDir(x0: number, y0: number, x1: number, y1: number, min = 18): Dir | null {

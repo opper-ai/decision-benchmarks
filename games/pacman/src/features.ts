@@ -1,7 +1,7 @@
-import { SCATTER_CORNERS } from './layout';
-import { DIR_VEC, REVERSE } from './maze';
-import { occupiedTile, optionsAt, type DecisionPoint, type GameState, type Ghost } from './sim';
-import { GHOST_IDS, sameTile, type ActorId, type Dir, type GhostId, type Tile } from './types';
+import { SCATTER_CORNERS } from './layout.ts';
+import { DIR_VEC, REVERSE } from './maze.ts';
+import { occupiedTile, optionsAt, type DecisionPoint, type GameState, type Ghost } from './sim.ts';
+import { GHOST_IDS, sameTile, type ActorId, type Dir, type GhostId, type Tile } from './types.ts';
 
 export type GoalKind = 'pacman' | 'ambush' | 'flank' | 'corner' | 'flee' | 'eat' | 'hunt';
 

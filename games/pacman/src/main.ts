@@ -1,33 +1,34 @@
-import { ActivityLog, type Subject } from './activity';
-import { accountNotice, fetchMe, POOL_EMPTY_NOTICE, poolAmount, renderAccount, renderDrawerAccount, signIn, takeAuthError, updatePoolAmount, walletNotice, type AccountView } from './auth';
-import { initialChoice, modelOptions, requestModel, type ModelChoice } from './choice';
-import { DemoPlayer, loadRecording } from './demo';
-import { greedyChoice, optionFeatures } from './features';
-import { logoFor } from './logos';
-import { boardLabel, enterScore, fetchBoards, placeFor, type Boards } from './highscores';
-import { aiShareText, defaultLineup, GHOST_NAMES, hideOverlay, lineupNames, showGameOver, showHighScores, showPicker, type BoardEntryOption, type Lineup, type Picker } from './overlay';
-import { appPath, SHARE_URL } from './paths';
-import { drawGame, FRUIT_EMOJI, TILE } from './render';
-import { renderLeaderboard } from './results';
-import { Scheduler } from './scheduler';
-import { createGame, fruitForLevel, jevActors, step, type Controls, type GameState } from './sim';
-import { cuesBetween, snapshot, Sound } from './sound';
-import { RECORDINGS, TOP_RECORDED_SCORE } from './recordings';
-import { checkPlayerGame } from './player-check';
-import { Recorder, roundDt, type Recording } from './replay';
-import { GameStats } from './stats';
-import { Thinking } from './thinking';
-import { attachTouch } from './touch';
-import { tag, track, trackClicks } from './track';
-import { createHttpTransport, warmUp, type TransportHooks } from './transport';
-import { GHOST_IDS, type Dir } from './types';
-import { shareText, versus } from './versus';
-import { ModelWarming } from './warming';
-import type { Community, Leaderboard } from '../shared/leaderboard';
-import { BOARD_KEYS, boardOf, MIXED_LINEUP } from '../shared/lineups';
-import { DEFAULT_MODEL, modelName } from '../shared/models';
+import { ActivityLog, type Subject } from './activity.ts';
+import { accountNotice, fetchMe, POOL_EMPTY_NOTICE, poolAmount, renderAccount, renderDrawerAccount, signIn, takeAuthError, updatePoolAmount, walletNotice, type AccountView } from '../../../packages/kit/client/auth.ts';
+import { gameModels, initialChoice, modelOptions, requestModel, type ModelChoice } from './choice.ts';
+import { DemoPlayer, loadRecording } from './demo.ts';
+import { greedyChoice, optionFeatures } from './features.ts';
+import { logoFor } from './logos.ts';
+import { boardLabel, enterScore, fetchBoards, placeFor, type Boards } from './highscores.ts';
+import { aiShareText, defaultLineup, GHOST_NAMES, hideOverlay, lineupNames, showGameOver, showHighScores, showPicker, type BoardEntryOption, type Lineup, type Picker } from './overlay.ts';
+import { appPath, SHARE_URL } from '../../../packages/kit/client/paths.ts';
+import { drawGame, FRUIT_EMOJI, TILE } from './render.ts';
+import { renderLeaderboard } from './results.ts';
+import { Scheduler } from './scheduler.ts';
+import { createGame, fruitForLevel, jevActors, step, type Controls, type GameState } from './sim.ts';
+import { cuesBetween, snapshot, Sound } from './sound.ts';
+import { RECORDINGS, TOP_RECORDED_SCORE } from './recordings.ts';
+import { checkPlayerGame } from './player-check.ts';
+import { Recorder, roundDt, type Recording } from './replay.ts';
+import { GameStats } from './stats.ts';
+import { Thinking } from './thinking.ts';
+import { attachTouch } from './touch.ts';
+import { tag, track, trackClicks } from '../../../packages/kit/client/track.ts';
+import { createHttpTransport, warmUp, type TransportHooks } from '../../../packages/kit/client/transport.ts';
+import { GHOST_IDS, type Dir } from './types.ts';
+import { shareText, versus } from './versus.ts';
+import { ModelWarming } from '../../../packages/kit/client/warming.ts';
+import type { Community as ContractCommunity, Leaderboard as ContractBoard } from '../../../packages/kit/shared/contract.ts';
+import { communityFromContract, fromContract, type Community, type Leaderboard } from '../shared/leaderboard.ts';
+import { BOARD_KEYS, boardOf, MIXED_LINEUP } from '../shared/lineups.ts';
+import { DEFAULT_MODEL, modelName, opperIdOf } from '../shared/models.ts';
 
-trackClicks(appPath('/'));
+trackClicks(appPath('/'), 'jevman');
 /** A game's props for Plausible: AI ghosts (and which lineup) or the classic ghosts. */
 const gameProps = (l: Lineup | null) => ({ game: 'jevman', mode: l ? 'ai_ghosts' : 'classic', lineup: l ? (boardOf(l) ?? 'custom') : 'classic' });
 const scoreBand = (score: number) => (score < 1000 ? '0-999' : score < 3000 ? '1000-2999' : score < 6000 ? '3000-5999' : '6000+');
@@ -56,7 +57,7 @@ const loadFor = (model: string): Promise<Recording | null> => {
   return p;
 };
 const firstLoad = loadFor(DEFAULT_MODEL);
-const me = await fetchMe();
+const me = gameModels(await fetchMe());
 const authError = takeAuthError();
 const rec = await firstLoad;
 const loaded = new Map<string, Recording>(rec ? [[DEFAULT_MODEL, rec]] : []);
@@ -158,7 +159,7 @@ showAccount({ ...account, notice: accountNotice(me, authError, false) });
 if (me.mode === 'pool') {
   setInterval(() => {
     if (document.hidden || account.kind !== 'pool') return;
-    void fetchMe().then((fresh) => {
+    void fetchMe().then(gameModels).then((fresh) => {
       if (account.kind !== 'pool') return;
       if (fresh.mode === 'pool') {
         updatePoolAmount(accountEl, fresh.pool?.remainingUsd ?? null);
@@ -228,7 +229,8 @@ const transport = createHttpTransport(hooks);
 const warmProblems = new Map<string, string>();
 const warming = new ModelWarming({
   warmUp: async (m) => {
-    const r = await warmUp(m === defaultModel ? undefined : m, hooks);
+    // The server warms models by their Opper ids.
+    const r = await warmUp(m === defaultModel ? undefined : opperIdOf(m), hooks);
     if (r.ok) warmProblems.delete(m);
     else if (r.account) warmProblems.set(m, r.error);
     return r.ok;
@@ -810,9 +812,9 @@ window.addEventListener('keydown', (e) => {
 // ---------- the leaderboard below ----------
 const NO_SUBMISSIONS: Community = { generatedAt: '', benchVersion: 0, entries: [] };
 void Promise.all([
-  fetch(appPath('/leaderboard.json')).then((r) => (r.ok ? (r.json() as Promise<Leaderboard>) : null)),
+  fetch(appPath('/leaderboard.json')).then((r) => (r.ok ? r.json().then((b: ContractBoard) => fromContract(b)) : null)),
   fetch(appPath('/community.json'))
-    .then((r) => (r.ok ? (r.json() as Promise<Community>) : NO_SUBMISSIONS))
+    .then((r) => (r.ok ? r.json().then((c: ContractCommunity) => communityFromContract(c)) : NO_SUBMISSIONS))
     .catch(() => NO_SUBMISSIONS),
 ])
   .then(([b, community]) => {

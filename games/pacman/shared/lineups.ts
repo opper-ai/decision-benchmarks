@@ -1,3 +1,5 @@
+import { modelName } from './models.ts';
+
 /**
  * The ghost lineups the picker offers, and so the player high-score boards: one board per lineup. Shared by the page
  * and the server (Node built-ins only, so the server can run it as is).
@@ -20,3 +22,6 @@ export function boardOf(lineup: GhostLineup): string | null {
   const first = lineup.blinky;
   return SOLO_MODELS.includes(first) && GHOST_NAMES_IN_ORDER.every((g) => lineup[g] === first) ? first : null;
 }
+
+/** "Mixed", "All jev", "All Luna": a board's name as the picker's lineups name it. */
+export const boardLabel = (key: string): string => (key === 'mixed' ? 'Mixed' : `All ${modelName(key).replace(/ 1\.13$/, '').replace(/ 4B$/, '').replace(/^GPT-6 /, '')}`);

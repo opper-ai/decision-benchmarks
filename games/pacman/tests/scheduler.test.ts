@@ -346,7 +346,7 @@ describe('a model per character', () => {
     expect(byActor).toEqual({ pacman: 'opper/kev-4b', blinky: 'typesafe/jev-1.13.0' });
   });
 
-  it('names no model unless one was chosen, so the server default (JEV_MODEL or jev) applies', async () => {
+  it('names no model unless one was chosen, so the server default (Jev) applies', async () => {
     const one = harness();
     one.scheduler.update(createGame());
     expect(one.calls.map((c) => c.body.model)).toEqual([undefined]);
