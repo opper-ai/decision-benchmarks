@@ -1,11 +1,10 @@
 // What the page reads and calls, all on the game's own path: the account (/api/me), model answers through the kit's
 // transport (/api/decide and /api/warm: the free credits, your Opper sign-in, or a local key, never a key in the
-// browser), the recorded matches for Watch (demo/) and the result files (leaderboard.json, community.json,
-// baselines.json). Matches played here are never uploaded: the player can download theirs.
+// browser) and the recorded matches for Watch (demo/). The kit's leaderboard module reads the result files. Matches
+// played here are never uploaded: the player can download theirs.
 import { fetchMe, type Me } from '../../../packages/kit/client/auth.ts';
 import { appPath } from '../../../packages/kit/client/paths.ts';
 import { createHttpTransport, warmUp, type TransportHooks } from '../../../packages/kit/client/transport.ts';
-import type { Community, Leaderboard } from '../../../packages/kit/shared/contract.ts';
 import type { Adapter } from '../shared/adapter.ts';
 import { decodeReplay, encodeReplay, type Replay } from '../shared/replay.ts';
 import { transportAdapter } from '../shared/transport-adapter.ts';
@@ -52,16 +51,6 @@ export async function getDemo(file: string): Promise<Replay> {
   const bytes = new Uint8Array(await res.arrayBuffer());
   // A server may already have unpacked it (Content-Encoding); a gzip file starts 1f 8b.
   return bytes[0] === 0x1f && bytes[1] === 0x8b ? decodeReplay(bytes) : (JSON.parse(new TextDecoder().decode(bytes)) as Replay);
-}
-
-/** The official runs, the self-reported runs (built by CI from submissions) and the baselines' own results. */
-export async function getBoards(): Promise<{ official: Leaderboard | null; community: Community | null; baselines: Leaderboard | null }> {
-  const [official, community, baselines] = await Promise.all([
-    getJson<Leaderboard>('leaderboard.json').catch(() => null),
-    getJson<Community>('community.json').catch(() => null),
-    getJson<Leaderboard>('baselines.json').catch(() => null),
-  ]);
-  return { official, community, baselines };
 }
 
 /** Saves a match to the player's computer (gzipped JSON, as the bench writes them). Nothing is uploaded. */

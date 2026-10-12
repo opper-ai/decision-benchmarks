@@ -27,7 +27,8 @@ Recorded in [docs/specs/2026-10-12-port-to-kit.md](docs/specs/2026-10-12-port-to
   downloaded.
 - **The model list** comes from the kit (Opper's decision models, one route each); chat LLMs are no longer in the picker.
   The default opponent is Clef.
-- **The leaderboard page** reads the kit's result files (`leaderboard.json`, `community.json`) and `baselines.json`.
+- **The page** follows every game page's layout (Snake's, after jevman's): the recording on the stage, Fight an AI, then
+  the kit's shared leaderboard table over `leaderboard.json`, `community.json` and `baselines.json`, and the method.
 - **Dropped**: the fighter's own server, session and OAuth code, its bench, smoke, replays and gen-audio scripts, the
   direct System One, chat and OpenAI Decisions adapters, the Dockerfile, Railway and CI configuration, the raw audio
   sources (the generated, trimmed sounds in `public/audio` stay) and the sample replays.
@@ -41,4 +42,6 @@ Recorded in [docs/specs/2026-10-12-port-to-kit.md](docs/specs/2026-10-12-port-to
   dependencies are two type packages. It ships in the page bundle, never in the service.
 - The sounds and music were generated with ElevenLabs sound-effect and music models through Opper's audio API; the
   provider's terms for generated audio apply.
-- Fonts: Caveat and Wix Madefor, from Google Fonts.
+- Fonts, self-hosted in `public/fonts/` (the page shares opper.ai's origin, so it loads nothing from Google Fonts):
+  Caveat (Impallari Type, SIL Open Font License 1.1), Wix Madefor Display and Wix Madefor Text (Wix.com, SIL Open
+  Font License 1.1) and JetBrains Mono (JetBrains, SIL Open Font License 1.1), the latin subsets.

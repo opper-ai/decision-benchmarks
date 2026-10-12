@@ -88,9 +88,12 @@ brief's rules for opper.ai.
   names; the model must be listed (Jev by default). The fighter has no high scores, so it signs no answers.
 - **Model list**: the kit's `DECISION_MODELS`; Laya keeps its compact questions through an id-to-context map. Chat LLMs
   left the picker (the bench's `--format chat` covers them).
-- **Page**: routes are in the hash (`#/watch`, `#/leaderboard`), because the service serves a path without an extension
-  as an `.html` file. `#/still/<demo>?t=<tick>` draws one frame alone, used for the poster. Watch lists
-  `public/demo/index.json`; a played match lives in memory and can be downloaded, never uploaded.
+- **Page**: one page in the layout every game page shares (Snake's, after jevman's): opper.ai's chrome, the hero, the
+  stage playing a recording from `public/demo/index.json` with a chip per recording, one "Fight an AI" button that opens
+  the picker, then the Leaderboard (the kit's shared table), Benchmark your model and Method sections. The fonts are
+  self-hosted in `public/fonts/`. `#/watch/<demo>` picks a recording, `#/leaderboard` scrolls to the table, and
+  `#/still/<demo>?t=<tick>` draws one frame alone, used for the poster. A played match lives in memory and can be
+  replayed here or downloaded, never uploaded.
 - **Poster**: tick 997 of the payoff-vs-greedy demo (the greedy baseline's special), from the still route in headless
   Chrome at 1280x720, quantized to 256 colours (100 KB).
 - **Build and types**: the fighter's `tsconfig` settings (ES2023, `verbatimModuleSyntax`) moved to the root config, which

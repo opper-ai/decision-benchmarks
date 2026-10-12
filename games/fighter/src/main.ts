@@ -1,140 +1,282 @@
-import { POOL_EMPTY_NOTICE, poolAmount, signIn, signOut, takeAuthError, walletNotice } from '../../../packages/kit/client/auth.ts';
+// Jev Fighter's page, laid out as every game page is (Snake's, after jevman's): opper.ai's chrome, the hero, the stage
+// playing a recorded match with a chip per recording, one "Fight an AI" button, then the Leaderboard, Benchmark your
+// model and Method sections. Watch plays recordings only: no model is called for a visitor who did not ask to fight.
+import { accountNotice, fetchMe, POOL_EMPTY_NOTICE, renderAccount, renderDrawerAccount, signIn, takeAuthError, updatePoolAmount, walletNotice, type AccountView, type Me } from '../../../packages/kit/client/auth.ts';
+import { fmt, loadLeaderboard } from '../../../packages/kit/client/leaderboard.ts';
+import { appPath } from '../../../packages/kit/client/paths.ts';
+import { tag, track, trackClicks } from '../../../packages/kit/client/track.ts';
 import type { TransportHooks } from '../../../packages/kit/client/transport.ts';
 import type { Replay } from '../shared/replay.ts';
-import { getDemo, getMe, type Me } from './api.ts';
+import { getDemo, getDemos, type Demo } from './api.ts';
 import { audio } from './audio.ts';
 import { h } from './dom.ts';
-import './style.css';
-import { fightView } from './views/fight.ts';
-import { leaderboardView } from './views/leaderboard.ts';
+import { live, pickerCard } from './views/fight.ts';
 import { posesView } from './views/poses.ts';
 import { replayView } from './views/replay.ts';
 import { stillView } from './views/still.ts';
-import { watchView } from './views/watch.ts';
 
-// One page, routed by the address's hash (#/watch, #/leaderboard, ...), so it works below any base path.
-const app = document.getElementById('app')!;
-let me: Me = { mode: 'none', walletUrl: 'https://platform.opper.ai/wallet', loginAvailable: false };
-let notice: { text: string; link?: string } | null = null;
-let cleanup: () => void = () => {};
-/** The match just played on this page: Watch can replay it, nothing else keeps it. */
-let lastMatch: Replay | null = null;
+const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
+const DEMO = /^#\/(?:watch|still)\/([a-z0-9][a-z0-9-]*\.fight\.json\.gz)/;
 
-const account = h('div.account', { 'aria-live': 'polite' });
-
-/** Who plays the models: the free credits, your Opper account or the local key; and sign in or out. */
-function paintAccount(): void {
-  const parts: (Node | string)[] = [];
-  if (me.mode === 'player') {
-    parts.push(h('span', null, me.user?.email ?? me.user?.name ?? 'Signed in'), h('button.btn.small', { type: 'button', onclick: () => void signOut() }, 'Sign out'));
-  } else {
-    if (me.mode === 'pool') {
-      const amount = me.pool?.open === false ? null : poolAmount(me.pool?.remainingUsd ?? null);
-      parts.push(h('span.credits', { title: 'Free credits: a shared pool for everyone to try the models' }, me.pool?.open === false ? 'Free credits used up' : `Free credits${amount ? ` ${amount}` : ''}`));
-    } else if (me.mode === 'dev') parts.push(h('span.badge', { title: 'Models play on the key in .env' }, 'Local key'));
-    if (me.loginAvailable) parts.push(h('button.btn.small.primary', { type: 'button', onclick: signIn }, 'Login with Opper'));
+// A recorded match's frame on its own, filling the window (#/still/<file>?t=<tick>): for the poster and embeds.
+// The pose sheet (#/poses) is a tool for tuning the animation.
+const special = location.hash.startsWith('#/still/') ? 'still' : location.hash === '#/poses' ? 'poses' : null;
+if (special) {
+  const host = h('div.tool');
+  document.body.replaceChildren(host);
+  document.body.classList.add('tool-page');
+  const file = DEMO.exec(location.hash)?.[1];
+  if (special === 'poses') posesView(host);
+  else if (file) {
+    const r = await getDemo(file).catch(() => null);
+    if (r) stillView(host, r, Number(new URLSearchParams(location.hash.split('?')[1] ?? '').get('t')) || 0);
   }
-  if (notice) parts.push(notice.link ? h('a.notice', { href: notice.link, target: '_blank', rel: 'noopener' }, notice.text) : h('span.notice', null, notice.text));
-  account.replaceChildren(...parts);
-}
+} else await page();
 
-const setNotice = (text: string, link?: string) => {
-  notice = { text, ...(link ? { link } : {}) };
-  paintAccount();
-};
+async function page(): Promise<void> {
+  trackClicks(appPath('/'), 'fighter');
 
-/** What the transport tells the page when a model call cannot be paid for. */
-const hooks: TransportHooks = {
-  onSignedOut: () => {
-    me = { ...me, mode: me.pool ? 'pool' : 'none', user: undefined };
-    setNotice('Your Opper sign-in has expired. Sign in again to keep playing.');
-  },
-  onPoolEmpty: () => {
-    if (me.pool) me = { ...me, pool: { ...me.pool, open: false } };
-    setNotice(POOL_EMPTY_NOTICE);
-  },
-  onWalletEmpty: (url) => {
-    const w = walletNotice(url);
-    setNotice(w.notice, w.noticeLink);
-  },
-};
-
-function header(path: string): HTMLElement {
-  const link = (href: string, text: string, active: boolean) => h(`a.nav${active ? '.active' : ''}`, { href }, text);
-  const toggle = (key: 'sound' | 'music', label: string, icon: string) => {
-    const b = h('button.btn.small.toggle', { type: 'button', 'aria-pressed': String(audio.settings[key]), title: `${label} on/off`, html: `${icon}<span>${label}</span>` });
-    b.addEventListener('click', () => audio.set({ [key]: !audio.settings[key] }));
-    audio.onChange(() => b.setAttribute('aria-pressed', String(audio.settings[key])));
-    return b;
+  // ---------- the opper.ai chrome: the phone menu, the account, the theme ----------
+  const drawer = $('#oc-drawer');
+  const menuButton = document.getElementById('oc-menu-button');
+  const setDrawer = (open: boolean) => {
+    drawer.hidden = !open;
+    menuButton?.setAttribute('aria-expanded', String(open));
   };
-  const SPEAKER = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
-  const NOTE = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 18V6l11-2v12" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="17.5" cy="16" r="2.5" fill="currentColor"/></svg>';
-  return h(
-    'header.top',
-    null,
-    h('a.logo', { href: '#/' }, 'Jev Fighter'),
-    h('nav', null, link('#/', 'Play', path === '/' || path === ''), link('#/watch', 'Watch', path.startsWith('/watch') || path === '/replay'), link('#/leaderboard', 'Leaderboard', path === '/leaderboard')),
-    h('div.audio-toggles', null, toggle('sound', 'Sound', SPEAKER), toggle('music', 'Music', NOTE)),
-    account,
-  );
-}
-
-async function route(): Promise<void> {
-  cleanup();
-  cleanup = () => {};
-  audio.scene(false);
-  const path = location.hash.replace(/^#/, '').split('?')[0] || '/';
-  // A recorded match's frame on its own, filling the window (#/still/<file>?t=<tick>): for posters and embeds.
-  const still = /^\/still\/([a-z0-9][a-z0-9-]*\.fight\.json\.gz)$/.exec(path);
-  if (still) {
-    const r = await getDemo(still[1]!).catch(() => null);
-    if (r) cleanup = stillView(app, r, Number(new URLSearchParams(location.hash.split('?')[1] ?? '').get('t')) || 0);
-    return;
-  }
-  const main = h('main');
-  app.replaceChildren(header(path), main);
-  paintAccount();
-  const demo = /^\/watch\/([a-z0-9][a-z0-9-]*\.fight\.json\.gz)$/.exec(path);
-  try {
-    if (demo) {
-      main.append(h('p.note.page', null, 'Loading the match...'));
-      const r = await getDemo(demo[1]!);
-      cleanup = replayView(main, r, { link: `#/watch/${demo[1]}` });
-    } else if (path === '/replay' && lastMatch) {
-      cleanup = replayView(main, lastMatch, { note: 'The match you just played. It is not saved anywhere: download it to keep it.' });
-    } else if (path.startsWith('/watch')) {
-      await watchView(main);
-    } else if (path === '/leaderboard') {
-      await leaderboardView(main);
-    } else if (path === '/poses') {
-      posesView(main);
-    } else {
-      cleanup = fightView(main, {
-        me,
-        hooks,
-        signIn,
-        watch: (r) => {
-          lastMatch = r;
-          navigate('#/replay');
-        },
-        navigate,
-      });
+  menuButton?.addEventListener('click', () => setDrawer(drawer.hidden !== false));
+  const famToggle = $<HTMLButtonElement>('#oc-fam-toggle');
+  famToggle.addEventListener('click', () => {
+    const open = famToggle.getAttribute('aria-expanded') !== 'true';
+    famToggle.setAttribute('aria-expanded', String(open));
+    $('#oc-fam').hidden = !open;
+  });
+  drawer.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('[data-close], a')) setDrawer(false);
+  });
+  // The theme follows the system while the visitor hasn't picked one on opper.ai (index.html sets it before the first paint).
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    let picked: string | null = null;
+    try {
+      picked = localStorage.getItem('theme');
+    } catch {
+      // storage blocked: follow the system
     }
-  } catch (e) {
-    main.replaceChildren(h('div.page', null, h('h1', null, 'Something went wrong'), h('p', null, (e as Error).message)));
+    if (picked !== 'dark' && picked !== 'light') document.documentElement.classList.toggle('dark', e.matches);
+  });
+
+  let me: Me = await fetchMe();
+  const authError = takeAuthError();
+  const accountEl = $('#account');
+  let account: AccountView = { kind: me.mode === 'player' ? 'player' : me.mode === 'pool' ? 'pool' : me.mode === 'dev' ? 'dev' : me.pool ? 'pool-empty' : 'signed-out', me };
+  const showAccount = (view: AccountView) => {
+    account = view;
+    renderAccount(accountEl, view);
+    renderDrawerAccount($('#oc-drawer-account'), view);
+  };
+  showAccount({ ...account, notice: accountNotice(me, authError, false) });
+  if (me.mode === 'pool') {
+    setInterval(() => {
+      if (document.hidden || account.kind !== 'pool') return;
+      void fetchMe().then((fresh) => {
+        if (account.kind !== 'pool') return;
+        if (fresh.mode === 'pool') {
+          updatePoolAmount(accountEl, fresh.pool?.remainingUsd ?? null);
+          updatePoolAmount($('#oc-drawer-account'), fresh.pool?.remainingUsd ?? null);
+        } else if (fresh.mode === 'none' && fresh.pool && !fresh.unavailable) {
+          me = fresh;
+          showAccount({ kind: 'pool-empty', me: fresh });
+        }
+      });
+    }, 60_000);
   }
+  /** What the transport tells the page when a model call cannot be paid for; the picker reads `me` afresh. */
+  const hooks: TransportHooks = {
+    onSignedOut: () => {
+      me = { ...me, mode: me.pool ? 'pool' : 'none', user: undefined };
+      showAccount({ kind: 'signed-out', me, notice: 'Signed out. Sign in to fight a decision model.' });
+    },
+    onPoolEmpty: () => {
+      if (me.pool) me = { ...me, pool: { ...me.pool, open: false } };
+      showAccount({ kind: 'pool-empty', me, notice: POOL_EMPTY_NOTICE });
+    },
+    onWalletEmpty: (url) => showAccount({ ...account, ...walletNotice(url) }),
+  };
+
+  // ---------- the leaderboard ----------
+  const pct = (v: number | string) => `${fmt(Number(v))}%`;
+  void loadLeaderboard($<HTMLTableElement>('#leaderboard-table'), appPath, {
+    metric: 'Rounds won (mean ± margin)',
+    format: (n) => `${fmt(n)}%`,
+    scaleMax: 100,
+    best: false,
+    extra: [
+      { label: 'vs greedy', key: 'vsGreedy', format: pct },
+      { label: 'vs payoff', key: 'vsPayoff', format: pct },
+      { label: 'vs maximin', key: 'vsMaximin', format: pct },
+    ],
+  });
+
+  // ---------- the stage: a recording (Watch), the picker, a live fight ----------
+  const viewer = $('#viewer');
+  const overlay = $('#overlay');
+  const cta = $<HTMLButtonElement>('#play-cta');
+  const ctaLabel = $('#play-label');
+  const noticeEl = $('#notice');
+  const chipsEl = $('#watch-chips');
+  let cleanup: () => void = () => {};
+  /** Pauses the recording on the stage, if one plays. */
+  let pause: () => void = () => {};
+  let mode: 'watch' | 'fight' = 'watch';
+  /** Bumped by every switch, so a recording that loads late doesn't replace what came after it. */
+  let run = 0;
+
+  const setCta = (kind: 'fight' | 'stop') => {
+    cta.classList.toggle('stop', kind === 'stop');
+    ctaLabel.textContent = kind === 'fight' ? 'Fight an AI' : 'Stop the fight';
+  };
+  const notice = (text: string | null) => {
+    noticeEl.textContent = text ?? '';
+    noticeEl.hidden = text === null;
+  };
+  const closePicker = () => {
+    overlay.hidden = true;
+    overlay.replaceChildren();
+  };
+  const switchTo = (next: () => () => void) => {
+    run += 1;
+    cleanup();
+    cleanup = () => {};
+    pause = () => {};
+    closePicker();
+    cleanup = next();
+  };
+
+  const demos: Demo[] = await getDemos().catch(() => []);
+  const loaded = new Map<string, Promise<Replay | null>>();
+  const demoFor = (d: Demo) => {
+    let p = loaded.get(d.file);
+    if (!p) {
+      p = getDemo(d.file).catch(() => null);
+      loaded.set(d.file, p);
+      void p.then((r) => r ?? loaded.delete(d.file));
+    }
+    return p;
+  };
+  let watching: Demo | null = demos.find((d) => d.file === DEMO.exec(location.hash)?.[1]) ?? demos[0] ?? null;
+  const short = (title: string) => title.replace(/ baseline\b/g, '');
+
+  function renderChips(): void {
+    chipsEl.replaceChildren(
+      ...demos.map((d) => {
+        const b = h('button.chip', { type: 'button', role: 'radio', 'aria-checked': String(mode === 'watch' && d === watching), title: d.note ?? d.title }, h('span', null, short(d.title)));
+        const sub = h('span.sub');
+        void demoFor(d).then((r) => {
+          if (r) sub.textContent = r.result.rounds.filter((x) => x.winner === 0).length + '-' + r.result.rounds.filter((x) => x.winner === 1).length;
+        });
+        b.append(sub);
+        b.addEventListener('click', () => {
+          watching = d;
+          void watch(true);
+        });
+        return tag(b, 'click_watch', { source: d.file });
+      }),
+    );
+  }
+
+  /** Plays the chosen recording on the stage; `music` once the visitor picked it (not on page load). */
+  async function watch(music = false): Promise<void> {
+    mode = 'watch';
+    setCta('fight');
+    notice(null);
+    renderChips();
+    const d = watching;
+    switchTo(() => {
+      viewer.replaceChildren(h('div.viewer-loading', null, d ? 'Loading the match...' : 'No recorded matches yet.'));
+      return () => {};
+    });
+    if (!d) return;
+    const mine = run;
+    const r = await demoFor(d);
+    if (mine !== run) return;
+    if (!r) {
+      viewer.replaceChildren(h('div.viewer-loading', null, "This recording didn't load."));
+      return;
+    }
+    const v = replayView(viewer, r, { link: `#/watch/${d.file}`, music });
+    cleanup = v;
+    pause = v.pause;
+  }
+
+  function watchLast(r: Replay): void {
+    mode = 'watch';
+    setCta('fight');
+    renderChips();
+    switchTo(() => {
+      const v = replayView(viewer, r, { note: 'The match you just played. It is not saved anywhere: download it to keep it.' });
+      pause = v.pause;
+      return v;
+    });
+  }
+
+  function openPicker(): void {
+    // The recording pauses under the picker (its play button carries on).
+    pause();
+    const card = pickerCard({
+      me,
+      hooks,
+      signIn,
+      poolEmpty: account.kind === 'pool-empty',
+      close: closePicker,
+      start: (setup, plans) => {
+        track('play_start', { game: 'fighter', opponent: `${setup.left} vs ${setup.right}` });
+        mode = 'fight';
+        setCta('stop');
+        renderChips();
+        notice(null);
+        switchTo(() =>
+          live(viewer, setup, plans, {
+            // The match just played: replayed here, kept nowhere else.
+            watch: (r) => watchLast(r),
+            again: () => openPicker(),
+            ended: () => {
+              setCta('fight');
+              track('play_end', { game: 'fighter', opponent: `${setup.left} vs ${setup.right}` });
+            },
+          }),
+        );
+        viewer.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      },
+    });
+    overlay.replaceChildren(card);
+    overlay.hidden = false;
+    card.querySelector<HTMLElement>('.fight-go:not([disabled])')?.focus({ preventScroll: true });
+  }
+
+  cta.addEventListener('click', () => {
+    if (cta.classList.contains('stop')) {
+      void watch();
+      return;
+    }
+    openPicker();
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closePicker();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!drawer.hidden) return setDrawer(false);
+    if (!overlay.hidden) return closePicker();
+  });
+  window.addEventListener('hashchange', () => {
+    const file = DEMO.exec(location.hash)?.[1];
+    const d = demos.find((x) => x.file === file);
+    if (d) {
+      watching = d;
+      void watch(true);
+      $('#stage').scrollIntoView({ behavior: 'smooth' });
+    } else if (location.hash === '#/leaderboard') $('#leaderboard').scrollIntoView({ behavior: 'smooth' });
+  });
+  if (location.hash === '#/leaderboard') requestAnimationFrame(() => $('#leaderboard').scrollIntoView());
+  audio.scene(false);
+  await watch();
 }
-
-/** Goes to `hash`; going to the page already shown starts it afresh (a new fight). */
-export function navigate(hash: string): void {
-  if (location.hash === hash || (hash === '#/' && !location.hash)) void route();
-  else location.hash = hash;
-}
-
-window.addEventListener('hashchange', () => void route());
-
-const authError = takeAuthError();
-if (authError) notice = { text: authError };
-me = await getMe();
-if (me.unavailable && !notice) notice = { text: "Couldn't reach the server" };
-void route();

@@ -102,7 +102,7 @@ double-tap to dash), W jump, S block low, U I O punches, J K L kicks, H throw, Y
 play stays in your browser: watch it with its stats, export a clip, or download it.
 
 **Watch**: recorded benchmark matches (public/demo/), with every decision, the question it answered, a timeline and
-per-fighter stats. Space plays and pauses, arrows step, `[` `]` jump between decisions.
+per-fighter stats. Click the stage, then Space plays and pauses, arrows step, `[` `]` jump between decisions.
 
 ## Layout
 
