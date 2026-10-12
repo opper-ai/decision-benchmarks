@@ -89,6 +89,12 @@ export interface GameServer {
   slug: string;
   /** Required: the pool only pays for requests this game sends. Rebuild or strictly validate the request. */
   decideRequest(body: unknown): DecideRequestVerdict;
+  /**
+   * The Opper ids this game plays (what its requests carry upstream). When set, /api/warm and /api/decide refuse any
+   * other model with 400 before calling upstream, so the pool never pays for a model the game does not use. A request
+   * without a model plays the kit's default, which must then be listed.
+   */
+  models?: readonly string[];
   highScores?: {
     /** Order matters: the hub shows the first board's top score. */
     boards: readonly HighScoreBoard[];

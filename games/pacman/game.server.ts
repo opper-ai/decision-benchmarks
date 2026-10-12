@@ -4,7 +4,7 @@ import type { GameServer } from '../../packages/kit/shared/game.ts';
 import type { SystemOneRequest } from '../../packages/kit/shared/systemone.ts';
 import { checkPlayerGame } from './src/player-check.ts';
 import { BOARD_KEYS, boardLabel } from './shared/lineups.ts';
-import { DEFAULT_MODEL, isModelId, opperIdOf } from './shared/models.ts';
+import { DECISION_MODELS, DEFAULT_MODEL, isModelId, opperIdOf } from './shared/models.ts';
 import { acceptsRequest } from './shared/questions.ts';
 
 const server: GameServer = {
@@ -21,6 +21,8 @@ const server: GameServer = {
     if (!isModelId(model)) return { ok: false, error: `Unknown decision model: ${String(model).slice(0, 80)}` };
     return { ok: true, request: { model: opperIdOf(model), state: b.state, questions: b.questions }, ...(b.keys ? { keys: b.keys } : {}), as: model };
   },
+  /** The Opper ids of its lineup: /api/warm warms nothing else. */
+  models: DECISION_MODELS.map((m) => opperIdOf(m.id)),
   highScores: {
     boards: BOARD_KEYS.map((id) => ({ id, label: boardLabel(id) })),
     check(rec, verify) {

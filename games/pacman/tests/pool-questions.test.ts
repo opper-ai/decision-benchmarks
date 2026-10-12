@@ -65,4 +65,11 @@ describe("the game's question check (what the service forwards for Pac-Man)", ()
     expect(server.decideRequest({ ...body, model: 'openai/gpt-5' })).toMatchObject({ ok: false });
     expect(server.decideRequest({ ...body, extra: 1 })).toMatchObject({ ok: false });
   });
+
+  it('lists the Opper ids it plays, so /api/warm warms nothing else (greenpt/metis is in the kit, not in Pac-Man)', () => {
+    expect(server.models).toContain('sference/clef');
+    expect(server.models).toContain('typesafe/jev-1.13.0');
+    expect(server.models).not.toContain('greenpt/metis');
+    expect(server.models).not.toContain('opper/clef');
+  });
 });

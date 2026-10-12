@@ -303,6 +303,21 @@ describe('warming a model up', () => {
     expect((await handleDecideRequest(cross, '{}', cfg, DEV, { fetch: fetchMock, now: () => 0 }, { warm: true })).status).toBe(403);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("refuses a model the game does not play, warm-up and decide alike, before any upstream call", async () => {
+    const fetchMock = ok();
+    const game = { ...coinServer(), models: ['opper/kev-4b'] };
+    const call = (url: string, body: unknown, warm: boolean) => kitHandleDecideRequest({ game, cfg, devKey: DEV, answerKey: answerKey(cfg.sessionSecret, 'coin') }, { ...post, url }, JSON.stringify(body), { fetch: fetchMock, now: () => 0 }, { warm });
+    // Listed in the kit, but not one this game plays.
+    const warm = await call('/api/warm', { model: 'sference/clef' }, true);
+    expect(warm).toMatchObject({ status: 400 });
+    expect(JSON.parse(warm.body)).toEqual({ error: 'This game does not play sference/clef' });
+    expect((await call('/api/warm', {}, true)).status).toBe(400); // the kit's default, unlisted here
+    expect((await call('/api/decide', coinBody('sference/clef'), false)).status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((await call('/api/warm', { model: 'opper/kev-4b' }, true)).status).toBe(200);
+    expect((await call('/api/decide', coinBody('opper/kev-4b'), false)).status).toBe(200);
+  });
 });
 
 describe('signing answers per game', () => {

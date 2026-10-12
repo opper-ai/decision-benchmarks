@@ -228,6 +228,9 @@ export async function handleDecideRequest(ctx: DecideContext, req: HttpRequest, 
       if (n < 1 || n > MAX_QUESTIONS || Object.keys(verdict.keys ?? {}).length > MAX_QUESTIONS) return json(400, { error: `One to ${MAX_QUESTIONS} questions a call` });
       ({ request: input, keys, as } = verdict);
     }
+    // Only the models the game plays, warm-up included: nothing else reaches upstream, whoever pays.
+    const upstream = input.model ?? DEFAULT_MODEL;
+    if (ctx.game.models && !ctx.game.models.includes(upstream)) return json(400, { error: `This game does not play ${String(upstream).slice(0, 80)}` });
     const result = await handleDecide(input, {
       apiKey: key.apiKey,
       keyMode: key.mode,
