@@ -88,12 +88,15 @@ export class FightRenderer {
   /** Clock for bubble ages (ms). The exporter swaps in a virtual one. */
   now: () => number = () => performance.now();
 
-  constructor(
-    private canvas: HTMLCanvasElement,
-    private meta: [FighterMeta, FighterMeta],
-    /** Render at this exact size (CSS px, dpr 1) instead of the canvas's layout size. */
-    private fixed?: { width: number; height: number },
-  ) {
+  private canvas: HTMLCanvasElement;
+  private meta: [FighterMeta, FighterMeta];
+  /** Render at this exact size (CSS px, dpr 1) instead of the canvas's layout size. */
+  private fixed?: { width: number; height: number };
+
+  constructor(canvas: HTMLCanvasElement, meta: [FighterMeta, FighterMeta], fixed?: { width: number; height: number }) {
+    this.canvas = canvas;
+    this.meta = meta;
+    this.fixed = fixed;
     this.ctx = canvas.getContext('2d')!;
     this.resize();
   }

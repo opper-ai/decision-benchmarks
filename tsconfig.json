@@ -1,17 +1,18 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "strict": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "isolatedModules": true,
     "types": ["node", "vite/client"]
   },
   "include": ["packages", "games", "server", "scripts", "vite.config.ts", "vitest.config.ts"],
-  "exclude": ["node_modules", "dist", "games/fighter/src"]
+  "exclude": ["node_modules", "dist"]
 }

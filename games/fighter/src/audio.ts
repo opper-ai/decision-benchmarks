@@ -1,3 +1,4 @@
+import { appPath } from '../../../packages/kit/client/paths.ts';
 import type { GameEvent, GameState } from '../shared/engine/engine.ts';
 import type { MoveId } from '../shared/engine/moves.ts';
 
@@ -129,7 +130,7 @@ export async function loadBuffers(ctx: BaseAudioContext, names: readonly string[
   await Promise.all(
     names.map(async (n) => {
       try {
-        const res = await fetch(`/audio/${n}.mp3`);
+        const res = await fetch(appPath(`audio/${n}.mp3`));
         out.set(n, await ctx.decodeAudioData(await res.arrayBuffer()));
       } catch {
         // a missing sound just stays silent

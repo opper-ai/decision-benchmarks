@@ -67,10 +67,13 @@ export class PoseSpring {
   private x: Pose | null = null;
   private v: Record<string, number> = {};
 
-  constructor(
-    private omega = 34,
-    private zeta = 0.7,
-  ) {}
+  private omega: number;
+  private zeta: number;
+
+  constructor(omega = 34, zeta = 0.7) {
+    this.omega = omega;
+    this.zeta = zeta;
+  }
 
   snap(p: Pose): void {
     this.x = { ...p };
