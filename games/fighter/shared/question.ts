@@ -387,7 +387,8 @@ export function buildQuestion(s: GameState, i: Side, opts: QuestionOpts = {}): Q
   return { fighter: i, track, tick: s.tick, instructions, context, options, ...(columns ? { columns } : {}), ...(usual ? { usual } : {}) };
 }
 
-function rawFacts(id: MoveId): string {
+/** A raw-track option: the move's own description. */
+export function rawFacts(id: MoveId): string {
   const d = MOVES[id];
   if (d.kind === 'attack') {
     const extra = [
@@ -404,21 +405,6 @@ function rawFacts(id: MoveId): string {
   if (id === 'backdash') return 'back 1.0, untouchable 6f';
   if (id === 'dash_forward') return 'forward 0.8 in 9f';
   return id === 'walk_forward' ? 'forward 0.4 in 12f' : 'back 0.4 in 12f, guards high';
-}
-
-/** The System One request body for a question. */
-export function toSystemOne(q: Question, model: string) {
-  return {
-    model,
-    state: Object.fromEntries(Object.entries(q.context).filter(([, v]) => v)),
-    questions: {
-      move: {
-        type: 'choice',
-        instructions: q.instructions,
-        criteria: Object.fromEntries(q.options.map((o) => [o.id, o.facts])),
-      },
-    },
-  };
 }
 
 /** A plain-text rendering of the question, for chat models and the decision cards. */

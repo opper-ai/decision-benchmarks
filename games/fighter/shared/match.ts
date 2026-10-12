@@ -102,7 +102,10 @@ export class Match {
   /** For human players: wall time the fighter became free to act (their reaction time starts then). */
   private freeSince: [number | null, number | null] = [null, null];
 
-  constructor(readonly opts: MatchOptions) {
+  readonly opts: MatchOptions;
+
+  constructor(opts: MatchOptions) {
+    this.opts = opts;
     this.state = newGame(opts.seed, opts.rules ?? DEFAULT_RULES);
     this.clock = opts.clock ?? realClock;
   }

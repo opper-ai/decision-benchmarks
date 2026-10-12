@@ -6,7 +6,17 @@ import { FakeClock, fakeAdapter } from './support/fake.ts';
 
 const meta = (model: string) => ({ model, label: model, kind: 'systemone', color: '#000' });
 
-async function playMatch(mode: 'realtime' | 'paused', seed = 5) {
+/**
+ * Each mode's match is played once and shared by the tests that read it (a match takes seconds): the tests only read
+ * it, and the one that tampers with it works on a copy.
+ */
+const played = new Map<string, ReturnType<typeof play>>();
+const playMatch = (mode: 'realtime' | 'paused') => {
+  if (!played.has(mode)) played.set(mode, play(mode));
+  return played.get(mode)!;
+};
+
+async function play(mode: 'realtime' | 'paused', seed = 5) {
   const clock = new FakeClock();
   const m = new Match({
     seed,
@@ -38,7 +48,7 @@ describe('match', () => {
   }, 60_000);
 
   it('the faster model waits less in realtime mode', async () => {
-    const { replay } = await playMatch('realtime', 9);
+    const { replay } = await playMatch('realtime');
     const [a, b] = matchStats(replay);
     expect(a.waitTicks / a.decisions).toBeLessThan(b.waitTicks / b.decisions);
     expect(a.calibration.n).toBeGreaterThan(0);
@@ -53,14 +63,14 @@ describe('match', () => {
   }, 60_000);
 
   it('round-trips through gzip', async () => {
-    const { replay } = await playMatch('paused', 11);
+    const { replay } = await playMatch('paused');
     const bytes = await encodeReplay(replay);
     expect(bytes.length).toBeLessThan(JSON.stringify(replay).length / 3);
     expect(await decodeReplay(bytes)).toEqual(replay);
   }, 60_000);
 
   it('detects a tampered replay', async () => {
-    const { replay } = await playMatch('paused', 13);
+    const replay = structuredClone((await playMatch('paused')).replay);
     const d = replay.decisions.find((x) => x.move !== 'backdash')!;
     d.move = 'backdash';
     expect(new ReplayPlayer(replay).diverged).not.toBeNull();
@@ -82,7 +92,7 @@ describe('ratings', () => {
   });
 
   it('builds leaderboard rows', async () => {
-    const { replay } = await playMatch('paused', 17);
+    const { replay } = await playMatch('paused');
     const lb = leaderboard([{ id: 'x', mode: 'paused', left: 'fast', right: 'slow', winner: replay.result.winner, createdAt: replay.createdAt, stats: matchStats(replay) }]);
     expect(lb.rows).toHaveLength(2);
     expect(lb.rows[0].matches).toBe(1);

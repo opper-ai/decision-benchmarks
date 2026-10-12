@@ -39,6 +39,15 @@ export interface Decision {
   taken?: number;
 }
 
+/** What a benchmark match was (shared/gauntlet.ts): the bench's seed, the model's side and the gauntlet baseline it met. */
+export interface BenchInfo {
+  version: number;
+  seed: number;
+  side: Side;
+  opponent: string;
+  model: string;
+}
+
 export interface Replay {
   format: 1;
   engineVersion: string;
@@ -57,6 +66,8 @@ export interface Replay {
   cancellations: { fighter: Side; askedTick: number; cancelledTick: number }[];
   checkpoints: { tick: number; hash: number }[];
   result: { winner: Side | null; rounds: RoundResult[] };
+  /** Benchmark matches only. */
+  bench?: BenchInfo;
 }
 
 /** What each decision led to, from the events between it and the same fighter's next decision. */
@@ -143,7 +154,10 @@ export class ReplayPlayer {
   readonly endTick: number;
   private readonly inputs: Map<number, Inputs>;
 
-  constructor(readonly replay: Replay) {
+  readonly replay: Replay;
+
+  constructor(replay: Replay) {
+    this.replay = replay;
     if (!COMPATIBLE_VERSIONS.includes(replay.engineVersion)) throw new Error(`replay needs engine v${replay.engineVersion}, this is v${ENGINE_VERSION}`);
     this.inputs = inputsByTick(replay);
     const checks = new Map(replay.checkpoints.map((c) => [c.tick, c.hash]));

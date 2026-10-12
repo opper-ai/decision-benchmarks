@@ -12,6 +12,9 @@ export const BASELINES = ['baseline/random', 'baseline/guard', 'baseline/greedy'
 export type BaselineId = (typeof BASELINES)[number];
 export const isBaseline = (id: string): id is BaselineId => (BASELINES as readonly string[]).includes(id);
 
+/** E.g. "Greedy baseline". */
+export const baselineName = (id: BaselineId): string => `${id[9]!.toUpperCase()}${id.slice(10)} baseline`;
+
 export const BASELINE_INFO: Record<BaselineId, string> = {
   'baseline/random': 'Picks uniformly among the offered moves.',
   'baseline/guard': 'Always blocks high.',
@@ -65,6 +68,36 @@ function nearness(q: Question, view: GameState | undefined, id: MoveId): number 
   return -Math.abs(g - 1000) / 100000;
 }
 
+/**
+ * A baseline's move for a question: what `id` picks, with its probabilities. Synchronous and deterministic: the bench
+ * plays the gauntlet with it and the verifier recomputes every baseline move with it. `view` is the state the
+ * question describes.
+ */
+export function baselineAnswer(id: BaselineId, q: Question, view?: GameState): { move: MoveId; probabilities: Partial<Record<MoveId, number>> } {
+  const ids = q.options.map((o) => o.id);
+  if (id === 'baseline/random') {
+    const [r] = rand(((view?.seed ?? 1) ^ Math.imul(q.tick + 7, 2246822519) ^ (q.fighter ? 0x51ed : 0)) >>> 0);
+    return { move: ids[Math.floor(r * ids.length)], probabilities: Object.fromEntries(ids.map((m) => [m, 1 / ids.length])) };
+  }
+  if (id === 'baseline/guard') {
+    const move = ids.includes('block_high') ? 'block_high' : ids[0];
+    return { move, probabilities: oneHot(q, move) };
+  }
+  const score = (m: MoveId) => {
+    const p = payoffRow(q, view, m);
+    const stand = p.stand ?? 0;
+    const worst = p.worst ?? stand;
+    const usual = p.usual;
+    let v: number;
+    if (id === 'baseline/greedy') v = Math.max(stand, usual ?? stand);
+    else if (id === 'baseline/maximin') v = worst + stand / 100;
+    else v = p.avg ?? (stand + worst) / 2;
+    return v + nearness(q, view, m);
+  };
+  const move = [...ids].sort().reduce((a, b) => (score(b) > score(a) ? b : a));
+  return { move, probabilities: oneHot(q, move) };
+}
+
 /** A baseline player. `latencyMs` simulates thinking time (use 0 in paused mode). */
 export function baselineAdapter(id: BaselineId, latencyMs = 0): Adapter {
   return {
@@ -73,32 +106,7 @@ export function baselineAdapter(id: BaselineId, latencyMs = 0): Adapter {
     async warmUp() {},
     async decide(q: Question, signal: AbortSignal, view?: GameState): Promise<Answer> {
       await sleep(latencyMs, signal);
-      const ids = q.options.map((o) => o.id);
-      let move: MoveId;
-      let probabilities: Partial<Record<MoveId, number>> | null;
-      if (id === 'baseline/random') {
-        const [r] = rand(((view?.seed ?? 1) ^ Math.imul(q.tick + 7, 2246822519) ^ (q.fighter ? 0x51ed : 0)) >>> 0);
-        move = ids[Math.floor(r * ids.length)];
-        probabilities = Object.fromEntries(ids.map((m) => [m, 1 / ids.length]));
-      } else if (id === 'baseline/guard') {
-        move = ids.includes('block_high') ? 'block_high' : ids[0];
-        probabilities = oneHot(q, move);
-      } else {
-        const score = (m: MoveId) => {
-          const p = payoffRow(q, view, m);
-          const stand = p.stand ?? 0;
-          const worst = p.worst ?? stand;
-          const usual = p.usual;
-          let v: number;
-          if (id === 'baseline/greedy') v = Math.max(stand, usual ?? stand);
-          else if (id === 'baseline/maximin') v = worst + stand / 100;
-          else v = p.avg ?? (stand + worst) / 2;
-          return v + nearness(q, view, m);
-        };
-        move = [...ids].sort().reduce((a, b) => (score(b) > score(a) ? b : a));
-        probabilities = oneHot(q, move);
-      }
-      return { move, probabilities, latencyMs, costUsd: 0 };
+      return { ...baselineAnswer(id, q, view), latencyMs, costUsd: 0 };
     },
   };
 }

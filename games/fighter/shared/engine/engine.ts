@@ -194,7 +194,21 @@ export function newGame(seed: number, rules: Rules = {}): GameState {
   return s;
 }
 
-export const clone = (s: GameState): GameState => structuredClone(s);
+/**
+ * A deep copy of the state. Hand-written rather than structuredClone (several times faster, and the assisted questions
+ * clone the state hundreds of times each): every field is a number, a string, a boolean or one of the nested plain
+ * objects below, and spreading keeps their key order, so hashState reads a copy exactly as the original. A new nested
+ * object in GameState must be copied here too.
+ */
+export const clone = (s: GameState): GameState => ({
+  ...s,
+  rules: { ...s.rules },
+  fighters: [{ ...s.fighters[0] }, { ...s.fighters[1] }],
+  round: { ...s.round },
+  wins: [s.wins[0], s.wins[1]],
+  results: s.results.map((r) => ({ ...r, hp: [r.hp[0], r.hp[1]] })),
+  history: s.history.map((e) => ({ ...e })),
+});
 
 /** Fighter 0 always faces right (+1), fighter 1 left (-1). They never cross. */
 export const facing = (i: Side): 1 | -1 => (i === 0 ? 1 : -1);
