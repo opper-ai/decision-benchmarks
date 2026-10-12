@@ -26,6 +26,10 @@ function makeDist(): string {
     writeFileSync(join(dir, 'assets', 'index-abc123.js'), 'console.log(1)');
     mkdirSync(join(dir, 'demo'));
     writeFileSync(join(dir, 'demo', 'jev-demo.json'), '{"version":1}');
+    writeFileSync(join(dir, '.secret.txt'), 'hidden');
+    writeFileSync(join(dir, '.env'), 'hidden');
+    mkdirSync(join(dir, '.git'));
+    writeFileSync(join(dir, '.git', 'config.json'), 'hidden');
   }
   return root;
 }
@@ -110,6 +114,8 @@ describe('production server', () => {
     expect(await rawStatus(url, '/coin/%2e%2e/dice/only-dice.json')).toBe(404);
     expect(await rawStatus(url, '/coin/..%2f..%2fdice%2fonly-dice.json')).toBe(404);
     expect(await rawStatus(url, '/coin/../dice/only-dice.json')).toBe(404);
+    // Hidden files, with or without an extension, and anything in a hidden folder.
+    for (const path of ['/coin/.secret.txt', '/coin/.env', '/coin/.git/config.json', '/coin/%2esecret.txt']) expect([path, await rawStatus(url, path)]).toEqual([path, 404]);
     expect((await fetch(`${url}/coin/`, { method: 'POST' })).status).toBe(405);
   });
 

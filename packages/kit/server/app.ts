@@ -112,6 +112,8 @@ export function createApp(opts: AppOptions): App {
     } catch {
       return notFound(res);
     }
+    // Hidden files and folders (.env, .git, .secret.txt) are never served.
+    if (path.split('/').some((seg) => seg.startsWith('.'))) return notFound(res);
     if (path.endsWith('/')) path += 'index.html';
     else if (!extname(path)) path += '.html'; // clean URLs: /leaderboard serves leaderboard.html
     const file = resolve(join(root, path));
