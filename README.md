@@ -17,7 +17,7 @@ games/registry.ts    the games the service serves and the build builds
 games/<slug>/        one game: game.ts (bench and replay), game.server.ts (service), src/, index.html, public/
                      (game.json, poster.png, leaderboard.json, community.json), submissions/, tests/
 games/pacman/        jevman on the kit: the kit's real-time test fixture, not served (jevman stays live in its own repo)
-games/fighter/       jev-fighter, being ported (it keeps its own setup for now)
+games/fighter/       Jev Fighter (jev-fighter, by Jose Sabater), on the kit: served at <APP_BASE_PATH>/fighter/
 server/main.ts       the service: every registry game at <APP_BASE_PATH>/<slug>/
 scripts/             bench, submissions, build, check-contract
 ```

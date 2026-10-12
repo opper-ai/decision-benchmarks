@@ -152,5 +152,14 @@ Where building the kit changed or filled in the design above, and why:
   `@import "../../../packages/kit/client/opper-chrome.css"` at the top of its stylesheet.
 - **CI.** `.github/workflows/ci.yml`: typecheck, tests, every game's submissions replayed, the contract checked, the
   image built and smoke-tested. The deploy job comes with the infrastructure (step 0).
-- **games/fighter** stays outside the root typecheck and tests until it is ported (its video export needs
-  mediabunny, which is not a root dependency).
+
+## Implementation notes (phase 2, the fighter on the kit)
+
+- **games/fighter** is in the registry, the root typecheck and the root tests. Its port is recorded, with the choices
+  the code forced, in `games/fighter/docs/specs/2026-10-12-port-to-kit.md`.
+- **A game's own players.** `GameDefinition.players` lists players a game plays itself, with no model (the fighter's
+  baselines). The bench takes their ids in `--model`/`--models` with no key and no warm-up, and never writes them into
+  the official `leaderboard.json` (`--out` is required); `public/baselines.json` holds the fighter's.
+- **Shared settings.** The root `tsconfig.json` takes the fighter's ES2023 target and `verbatimModuleSyntax`, which the
+  whole repository passes. mediabunny (clip export in the browser) is the first runtime dependency, pinned exactly; it
+  ships in the fighter's page bundle only, never in the service.

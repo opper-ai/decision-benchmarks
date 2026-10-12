@@ -10,8 +10,14 @@ export interface RegisteredGame {
   definition(): Promise<GameDefinition<unknown, GameResult>>;
 }
 
-/** Served at <APP_BASE_PATH>/<slug>/. Empty until the first game (snake) is ported onto the kit. */
-export const REGISTRY: readonly RegisteredGame[] = [];
+/** Served at <APP_BASE_PATH>/<slug>/. */
+export const REGISTRY: readonly RegisteredGame[] = [
+  {
+    slug: 'fighter',
+    server: () => import('./fighter/game.server.ts').then((m) => m.default),
+    definition: () => import('./fighter/game.ts').then((m) => m.default as unknown as GameDefinition<unknown, GameResult>),
+  },
+];
 
 /**
  * Games the kit knows but does not serve: Pac-Man (jevman) is the kit's real-time test fixture, live in its own repo

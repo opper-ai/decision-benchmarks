@@ -9,9 +9,7 @@
 !server/
 !scripts/
 !Dockerfile
-# Not served: the Pac-Man fixture lives on at opper.ai/jevman-benchmark, and the fighter is not on the kit yet. Remove a
-# line here when its game joins games/registry.ts.
+# Not served: the Pac-Man fixture lives on at opper.ai/jevman-benchmark. Every game in games/registry.ts is copied.
 games/pacman/
-games/fighter/
 **/tests/
 **/node_modules/
