@@ -3,9 +3,8 @@
 // goes to dist/<slug> and is served at <APP_BASE_PATH>/<slug>/, where the dev server also mounts the game's routes.
 import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
-import { findGame } from './games/registry.ts';
 import { gamePlugin } from './packages/kit/server/plugin.ts';
 import { normalizeBasePath } from './packages/kit/shared/base-path.ts';
 
@@ -14,9 +13,12 @@ const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const DEFAULT_PUBLIC_URL = 'https://opper.ai';
 const DEFAULT_BASE_PATH = '/decision-benchmarks';
 
-export default defineConfig(async ({ mode }) => {
+export default defineConfig(async ({ command, mode }) => {
   const slug = process.env.GAME;
-  const entry = slug ? findGame(slug) : undefined;
+  // Loaded by Node at run time, not bundled with this config: Vite's config bundler would otherwise resolve every
+  // game's lazy import in the registry, including the Pac-Man fixture, which the image leaves out.
+  const registry: typeof import('./games/registry.ts') = await import(pathToFileURL(resolve(ROOT, 'games/registry.ts')).href);
+  const entry = slug ? registry.findGame(slug) : undefined;
   if (!slug || !entry) throw new Error('Set GAME to the game to serve or build, e.g. GAME=pacman npm run dev');
   const env = loadEnv(mode, ROOT, ['OPPER_', 'SESSION_', 'TYPESAFE_', 'APP_', 'PUBLIC_', 'TRUSTED_', 'HIGHSCORES_', 'ALLOW_']);
   // APP_BASE_PATH (e.g. /decision-benchmarks) serves every game below that prefix; empty serves them at /<slug>/.
@@ -35,7 +37,8 @@ export default defineConfig(async ({ mode }) => {
       /** The game's public address with a trailing slash, e.g. https://opper.ai/decision-benchmarks/snake/. */
       'import.meta.env.VITE_APP_URL': JSON.stringify(`${publicUrl}${basePath || DEFAULT_BASE_PATH}/${slug}/`),
     },
-    plugins: [gamePlugin(env, await entry.server(), { pages: pages.filter((p) => p !== 'index.html').map((p) => p.replace(/\.html$/, '')) })],
+    // The game's API routes, for the dev server only: a build needs no server code.
+    plugins: command === 'serve' ? [gamePlugin(env, await entry.server(), { pages: pages.filter((p) => p !== 'index.html').map((p) => p.replace(/\.html$/, '')) })] : [],
     // The kit lives outside the game's root.
     server: { fs: { allow: [ROOT] } },
     build: {
