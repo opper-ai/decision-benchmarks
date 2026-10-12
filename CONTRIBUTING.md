@@ -48,9 +48,17 @@ An answer that comes later than the game allows is replaced by the game's own si
 
 ```bash
 npm ci --ignore-scripts
-node games/snake/example-endpoint.ts    # or start your own endpoint
+node games/snake/example-endpoint.ts    # or start your own endpoint; leave it running
+```
+
+Then, in a second terminal:
+
+```bash
 npm run bench -- --game snake --endpoint http://localhost:8787 --games 2
 ```
+
+The bench prints each model's mean with a margin of two standard errors (`±`): about the range the mean would land
+in on another run. The leaderboard files store one standard error, and the pages show the same two-error margin.
 
 ### 3. Record the submission
 
@@ -59,7 +67,8 @@ npm run bench -- --game <slug> --endpoint http://localhost:8787 --submit games/<
   --name "My Model" --by your-github-handle --url https://example.com/my-model
 ```
 
-This plays the game's minimum number of games for a submission (100 to match our runs: add `--games 100`), on the
+This plays the game's minimum number of games for a submission (24 for snake and fighter; 100 to match our runs: add
+`--games 100`), on the
 game's fixed seeds, so every model faces the same games. It writes `games/<slug>/submissions/my-model/`, holding
 `submission.json` and one `game-NN.json.gz` per game. The folder name is your model's id: lowercase letters, digits
 and dashes.

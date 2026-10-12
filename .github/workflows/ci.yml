@@ -49,8 +49,9 @@ jobs:
           for game in $games; do
             npm run submissions -- --game "$game"
           done
-      # The image builds the registry's games only (none yet, and .dockerignore leaves the fixture out), so a real game
-      # is built here: the Pac-Man fixture, through the same build script (submissions, Vite, game.json's updatedAt).
+      # The image builds the registry's games (snake, fighter) and the smoke test below loads them; .dockerignore leaves
+      # the Pac-Man fixture out, so it is built here, through the same build script (submissions, Vite, game.json's
+      # updatedAt).
       - name: Build the Pac-Man fixture
         run: |
           set -euo pipefail
