@@ -1,0 +1,73 @@
+name: Suggest a game
+description: A game you would like to see decision models play on opper.ai/decision-benchmarks
+title: "Suggest a game: "
+labels: ["game suggestion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We port the games we host onto our own harness and review them like any of our code, so nothing from the
+        original repository runs on opper.ai as it is. We ask the author before porting, and credit them on the
+        game's card, in its CREDITS.md and in the launch post. We answer every suggestion here within a week: yes,
+        not now, or no, with the reason.
+  - type: input
+    id: repo
+    attributes:
+      label: Repository
+      description: Where the game's source lives.
+      placeholder: https://github.com/someone/some-game
+    validations:
+      required: true
+  - type: dropdown
+    id: license
+    attributes:
+      label: License
+      description: A repository without a license can only be ported once its author adds one.
+      options:
+        - MIT
+        - Apache-2.0
+        - GPL or AGPL
+        - Another open source license
+        - No license yet
+        - I don't know
+    validations:
+      required: true
+  - type: textarea
+    id: measures
+    attributes:
+      label: What it measures
+      description: What a decision model has to be good at to score well, and what the score is.
+      placeholder: Planning a few moves ahead under time pressure. Score = lines cleared before the stack tops out.
+    validations:
+      required: true
+  - type: dropdown
+    id: timing
+    attributes:
+      label: Real time or turn-based
+      options:
+        - Real time (the game keeps moving while the model thinks)
+        - Turn-based (the game waits for each answer)
+        - Either would work
+    validations:
+      required: true
+  - type: dropdown
+    id: versus
+    attributes:
+      label: Can a person play against the AI?
+      options:
+        - "Yes"
+        - "No, models play on their own"
+        - Not yet, but it could
+    validations:
+      required: true
+  - type: checkboxes
+    id: author
+    attributes:
+      label: Who you are
+      options:
+        - label: I am the game's author (or one of them)
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Links to posts, videos or results, and anything that would help us judge it.
