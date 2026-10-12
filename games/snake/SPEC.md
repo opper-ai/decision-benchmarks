@@ -59,3 +59,31 @@ claimed result. Fingerprint = hash of seed + choices. Official seeds: `seedFor(i
 (paid). Commit leaderboard.json with no entries (valid contract shape) and the baselines' results in a separate
 public/baselines.json (same entry shape) that only the game page reads: the hub's model leaderboard must never show
 a baseline as a model.
+
+## As built (where the kit or the build changed this spec, and why)
+
+- **Seed endpoint.** The seed comes from `GET <game>/api/seed` (`/decision-benchmarks/snake/api/seed`), not
+  `/api/snake/seed`: every game is already mounted below its slug, so the kit gained one generic, opt-in route
+  (`highScores.seeded: true`) instead of a route per game. It answers `{ seed, token }`; the token is
+  `<seed>.<issued at>.<HMAC>` with a key per game (`HMAC(SESSION_SECRET, "decision-benchmarks:seeds:" + slug)`),
+  stateless and good for an hour. The high-score check gets a verifier for it.
+- **Player recording.** `{ format: 1, game: 'snake', seedToken, moves }`, `moves` one letter a step (`L`, `S`, `R`).
+  The server replays them from the token's seed only; it also refuses a game sent sooner after the seed was issued
+  than 80% of its steps take at 8 steps a second, so a game can't be computed and sent at once.
+- **Benchmark recording.** As specified, plus `costUsd` per step (the leaderboard's cost column needs it) and
+  `result: { score, steps, end }` (`end`: `wall`, `body`, `starved`, `steps` or `full`). A late answer's latency and
+  cost are kept on its step, as the kit's scheduler reports them. The fingerprint is the SHA-256 of the seed and the
+  moves.
+- **Seeds and sizes.** `seedFor(i)` is `Math.imul(i + 1, 0x9e3779b1) >>> 1` (golden-ratio steps, 31 bits). A
+  submission needs at least 24 games (100 to match ours), as on jevman.
+- **Baselines.** The kit gained `GameDefinition.baselines`: the bench plays `--model baseline/<name>` without a key
+  and refuses to put a baseline on the official leaderboard or in a submission. `public/baselines.json` is written
+  with `npm run bench -- --game snake --models baseline/random,baseline/greedy,baseline/flood --leaderboard --out
+  games/snake/public/baselines.json`. The random baseline draws from a hash of the board, so it replays too.
+- **Request check.** The service reads the board back from the request's state, rebuilds the request with our own
+  wording, and refuses any body that differs from it in any way (fields, questions, text, key).
+- **Page.** The page follows opper.ai's theme (light or dark, as jevman does); the arcade cabinets are black in both.
+  Until the official run, Watch plays the baselines' recordings (the top one first), and the leaderboard shows the
+  baselines in a group of their own below an empty ranking. `community.json` is built from `submissions/` at build
+  time, so the page copes with it missing. Play shows every decision model; signed out with no free credits, they are
+  greyed out with a note to sign in, and the baselines (run in the browser, free) can still be raced.
