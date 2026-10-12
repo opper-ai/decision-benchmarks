@@ -113,6 +113,31 @@ describe('runBench', () => {
     expect(calls.slice(0, 2)).toEqual(['opper/kev-4b:warmup', 'opper/kev-4b:coin']);
   });
 
+  it("plays the game's own players with no key, no warm-up and no model call, and keeps them out of the official board", async () => {
+    const f = vi.fn();
+    vi.stubGlobal('fetch', f);
+    const played: string[] = [];
+    const game = coinDefinition({
+      players: [{ id: 'baseline/heads', name: 'Always heads' }],
+      async play({ model, seed }) {
+        played.push(model);
+        return { result: { score: 1, heads: 1, calls: 0, decisions: 1, fallbacks: 0, latencyMsSum: 0, cost: 0 }, recording: { seed, calls: ['heads'] } };
+      },
+    });
+    const p = paths();
+    const out = join(p.publicDir, 'baselines.json');
+    await runBench(game, ['--game', 'coin', '--models', 'baseline/heads', '--leaderboard', '--out', out, '--games', '3'], {}, p, quiet);
+    const board = JSON.parse(readFileSync(out, 'utf8'));
+    expect(validateLeaderboard(board, 'coin')).toEqual([]);
+    expect(board.entries).toMatchObject([{ model: 'baseline/heads', name: 'Always heads', games: 3, metric: { mean: 1 } }]);
+    expect(played).toEqual(['baseline/heads', 'baseline/heads', 'baseline/heads']);
+    expect(f).not.toHaveBeenCalled();
+    // Without --out they would land in the official leaderboard.json; a model next to them still needs a key.
+    await expect(runBench(game, ['--models', 'baseline/heads', '--leaderboard'], {}, p, quiet)).rejects.toThrow(/--out/);
+    await expect(runBench(game, ['--models', 'baseline/heads,opper/kev-4b'], {}, p, quiet)).rejects.toThrow(/OPPER_API_KEY/);
+    await expect(runBench(game, ['--model', 'baseline/tails'], {}, p, quiet)).rejects.toThrow(/Unknown model baseline\/tails; .*baseline\/heads/);
+  });
+
   it('refuses what it cannot do, before calling anything', async () => {
     const f = vi.fn();
     vi.stubGlobal('fetch', f);

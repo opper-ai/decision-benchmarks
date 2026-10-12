@@ -50,6 +50,12 @@ export interface GameDefinition<Rec = unknown, R extends GameResult = GameResult
     maxRecordingBytes: number;
   };
   metric: Metric;
+  /**
+   * Players the game plays itself, with no model (e.g. baselines). The bench takes their ids in --model and --models
+   * with no key and no warm-up, and `play` gets the id as `model` (their transport is never called). They are a
+   * reference for the game's own page, so the bench never writes them into the official leaderboard.json.
+   */
+  players?: readonly { id: string; name: string }[];
   /** Plays one game through `transport` (already bound to the model) and returns its result and recording. */
   play(o: { transport: Transport; seed: number; signal: AbortSignal; model: string }): Promise<{ result: R; recording: Rec }>;
   /** Replays a recording with our code and recomputes its result; anything it cannot replay exactly is refused. */

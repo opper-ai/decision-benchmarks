@@ -2,7 +2,8 @@
 // Entry point: scripts/bench.ts (npm run bench -- --game <slug> ...), which picks the game from games/registry.ts.
 //
 //   --model <id> | --models all|<id>,<id>    listed models (packages/kit/shared/models.ts) through Opper (OPPER_API_KEY)
-//                                            or, for Jev, TypeSafe (TYPESAFE_API_KEY)
+//                                            or, for Jev, TypeSafe (TYPESAFE_API_KEY), or the game's own players
+//                                            (its `players`, e.g. baselines: no key, free)
 //   --endpoint <url> [--format systemone|chat] [--chat-model <name>]
 //                                            your own model: System One ({ state, questions } in) or OpenAI chat
 //                                            completions through the chat adapter; BENCH_ENDPOINT_TOKEN is sent as a
@@ -40,7 +41,16 @@ interface Contender {
   name: string;
   via: Entry['via'];
   transport: Transport;
+  /** One of the game's own players (`players`): the game plays it, with no model. */
+  own?: boolean;
 }
+
+/** The transport of a player the game plays itself: never called, since `play` plays that player without a model. */
+const ownPlayer =
+  (id: string): Transport =>
+  async () => {
+    throw new Error(`${id} is played by the game itself, not through a model`);
+  };
 
 export interface BenchPaths {
   /** games/<slug>/public: where --leaderboard writes leaderboard.json. */
@@ -117,13 +127,20 @@ export async function runBench(game: GameDefinition<unknown, GameResult>, argv: 
       transport: values.format === 'chat' ? chatTransport({ ...common, model: values['chat-model']! }) : endpointTransport(common),
     });
   } else {
-    const target = devTargetFromEnv(env);
-    if (!target) fail('set OPPER_API_KEY (or TYPESAFE_API_KEY for Jev) to play the listed models');
     const ids = values.models === 'all' || values.models === '' ? DECISION_MODELS.map((m) => m.id as string) : values.models !== undefined ? values.models.split(',') : [values.model ?? DEFAULT_MODEL];
+    const own = new Map((game.players ?? []).map((p) => [p.id, p]));
+    const unknown = ids.find((id) => !isModelId(id) && !own.has(id));
+    if (unknown !== undefined) fail(`Unknown model ${unknown}; one of: ${[...DECISION_MODELS.map((m) => m.id), ...own.keys()].join(', ')}`);
+    // The game's own players need no key: a run of baselines alone is free.
+    const allOwn = ids.every((id) => own.has(id));
+    const target = allOwn ? undefined : devTargetFromEnv(env);
+    if (!allOwn && !target) fail('set OPPER_API_KEY (or TYPESAFE_API_KEY for Jev) to play the listed models');
     for (const id of ids) {
-      if (!isModelId(id)) fail(`Unknown model ${id}; one of: ${DECISION_MODELS.map((m) => m.id).join(', ')}`);
-      contenders.push({ model: id, name: modelName(id), via: 'systemone', transport: systemOneTransport(id, target, timeoutMs, `decision-benchmarks-bench-${game.slug}`) });
+      const player = own.get(id);
+      if (player) contenders.push({ model: id, name: player.name, via: 'systemone', transport: ownPlayer(id), own: true });
+      else contenders.push({ model: id, name: modelName(id), via: 'systemone', transport: systemOneTransport(id, target, timeoutMs, `decision-benchmarks-bench-${game.slug}`) });
     }
+    if (leaderboard && values.out === undefined && contenders.some((c) => c.own)) fail(`${game.slug}'s own players are no official results: write them elsewhere with --out`);
   }
 
   const out = values.out ?? join(paths.publicDir, 'leaderboard.json');
@@ -138,8 +155,8 @@ export async function runBench(game: GameDefinition<unknown, GameResult>, argv: 
 
   for (const c of contenders) {
     log(`\n${c.name} (${c.model})`);
-    // Warm first: a cold model's first answers would come too late and count as fallbacks.
-    const problem = await warmUp(c.transport, { fastMs: timeoutMs * 0.9, log });
+    // Warm first: a cold model's first answers would come too late and count as fallbacks. The game's own players are no model.
+    const problem = c.own ? null : await warmUp(c.transport, { fastMs: timeoutMs * 0.9, log });
     if (problem) {
       if (!leaderboard) fail(`${c.name}: ${problem}`);
       // One unavailable model must not cost the others' results.
