@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { checkSubmission, checkSubmissions } from '../bench/submissions';
+import { checkSubmission, checkSubmissions, updatedAt } from '../bench/submissions';
 import { validateCommunity } from '../shared/contract';
 import { coinDefinition } from './support/test-game';
 
@@ -26,7 +26,7 @@ function folder(opts: { manifest?: Record<string, unknown>; files?: Record<strin
   mkdirSync(dir);
   const files = opts.files ?? { 'game-01.json.gz': { seed: seedOf(1), calls: ['heads', 'tails'] }, 'game-02.json.gz': { seed: seedOf(2), calls: ['heads', 'heads'] } };
   for (const [name, rec] of Object.entries(files)) writeFileSync(join(dir, name), typeof rec === 'string' ? rec : gzipSync(JSON.stringify(rec)));
-  writeFileSync(join(dir, 'submission.json'), JSON.stringify({ name: 'Acme Coin', by: 'acme', benchVersion: game.benchVersion, games: Object.keys(files).length, ...opts.manifest }));
+  writeFileSync(join(dir, 'submission.json'), JSON.stringify({ name: 'Acme Coin', by: 'acme', benchVersion: game.benchVersion, games: Object.keys(files).length, recordedAt: '2026-10-08T21:30:44.247Z', ...opts.manifest }));
   return dir;
 }
 
@@ -48,6 +48,10 @@ describe("the kit's submissions check", () => {
         url: 'https://acme.example',
         selfReported: true,
       },
+      fingerprints: new Map([
+        ['heads,tails', 'game-01.json.gz'],
+        ['heads,heads', 'game-02.json.gz'],
+      ]),
     });
   });
 
@@ -95,5 +99,53 @@ describe("the kit's submissions check", () => {
     expect(validateCommunity(JSON.parse(JSON.stringify(community)), 'coin')).toEqual([]);
     expect(lines.join('\n')).toMatch(/same-name: REFUSED/);
     expect(readFileSync(join(root, 'acme-coin', 'submission.json'), 'utf8')).toContain('Acme Coin');
+  });
+
+  it("refuses a name or id on the game's own official leaderboard, the kit's models, or the game's baselines", () => {
+    const root = mkdtempSync(join(tmpdir(), 'db-game-'));
+    mkdirSync(join(root, 'public'));
+    mkdirSync(join(root, 'submissions'));
+    // The game's board names a model its own way (not the kit's "GPT-6 Luna Decisions").
+    writeFileSync(join(root, 'public', 'leaderboard.json'), JSON.stringify({ entries: [{ model: 'acme/coin-pro', name: 'GPT-6 Luna' }] }));
+    const subs = join(root, 'submissions');
+    expect(checkSubmission(game, folder({ root: subs, id: 'luna', manifest: { name: 'gpt-6 luna' } }), 'luna')).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
+    expect(checkSubmission(game, folder({ root: subs, id: 'coin-pro', manifest: { name: 'ACME/COIN-PRO' } }), 'coin-pro')).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
+    expect(checkSubmission(game, folder({ manifest: { name: 'GPT-6 Luna Decisions' } }), 'acme-coin')).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
+    expect(checkSubmission(game, folder({ manifest: { name: 'opper/kev-4b' } }), 'acme-coin')).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
+    const withBaselines = { ...game, baselines: ['Greedy'] };
+    expect(checkSubmission(withBaselines, folder({ manifest: { name: 'greedy' } }), 'acme-coin')).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
+    expect(checkSubmission(withBaselines, folder({ id: 'greedy' }), 'greedy')).toMatchObject({ error: 'greedy is on the official leaderboard already' });
+  });
+
+  it('refuses a copy of another submission under a new name, naming the earlier one', () => {
+    const root = mkdtempSync(join(tmpdir(), 'db-subs-'));
+    folder({ root, id: 'acme-coin' });
+    folder({ root, id: 'copy-coin', manifest: { name: 'Copy Coin' } });
+    const partial = { 'game-01.json.gz': { seed: seedOf(1), calls: ['tails'] }, 'game-02.json.gz': { seed: seedOf(2), calls: ['heads', 'heads'] } };
+    folder({ root, id: 'part-coin', manifest: { name: 'Part Coin' }, files: partial });
+    const { community, refused } = checkSubmissions(game, root, () => {});
+    expect(community.entries.map((e) => e.model)).toEqual(['acme-coin']);
+    expect(refused).toEqual([
+      { id: 'copy-coin', error: 'game-01.json.gz is the same game as acme-coin/game-01.json.gz' },
+      { id: 'part-coin', error: 'game-02.json.gz is the same game as acme-coin/game-02.json.gz' },
+    ]);
+  });
+
+  it('checks recordedAt: an ISO date, at most a day ahead of the clock', () => {
+    for (const recordedAt of [undefined, 'yesterday', 1760000000000, '2026-13-40T00:00:00Z']) expect(checkSubmission(game, folder({ manifest: { recordedAt } }), 'acme-coin')).toMatchObject({ error: expect.stringMatching(/recordedAt must be an ISO date/) });
+    expect(checkSubmission(game, folder({ manifest: { recordedAt: '2099-01-01T00:00:00.000Z' } }), 'acme-coin')).toMatchObject({ error: expect.stringMatching(/in the future/) });
+    const skewed = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    expect(checkSubmission(game, folder({ manifest: { recordedAt: skewed } }), 'acme-coin')).toHaveProperty('entry');
+  });
+
+  it("dates game.json from the official run and accepted submissions only, never a refused one's recordedAt", () => {
+    const root = mkdtempSync(join(tmpdir(), 'db-subs-'));
+    folder({ root, id: 'acme-coin', manifest: { recordedAt: '2026-10-09T00:00:00.000Z' } });
+    folder({ root, id: 'late-coin', manifest: { name: 'Late Coin', recordedAt: '2099-01-01T00:00:00.000Z' } });
+    const { community, refused } = checkSubmissions(game, root, () => {});
+    expect(refused.map((r) => r.id)).toEqual(['late-coin']);
+    expect(updatedAt({ generatedAt: '2026-10-01T00:00:00.000Z' }, community, root)).toBe('2026-10-09T00:00:00.000Z');
+    expect(updatedAt({ generatedAt: '2026-10-10T00:00:00.000Z' }, community, root)).toBe('2026-10-10T00:00:00.000Z');
+    expect(updatedAt(null, { entries: [] }, root)).toBeUndefined();
   });
 });

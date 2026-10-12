@@ -1,12 +1,13 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import type { Recording } from '../src/replay';
 import { recordGame } from './record-game';
 import { createGame, step } from '../src/sim';
-import { checkSubmission as kitCheckSubmission } from '../../../packages/kit/bench/submissions';
+import { checkSubmission as kitCheckSubmission, reservedNames } from '../../../packages/kit/bench/submissions';
 import { verifyGame } from '../bench/verify';
 import pacman from '../game';
 import { BENCH_VERSION, type SubmissionRules } from '../shared/leaderboard';
@@ -15,7 +16,9 @@ import { BENCH_VERSION, type SubmissionRules } from '../shared/leaderboard';
 const RULES: SubmissionRules = { minGames: 3, maxSeconds: 20, maxStep: 0.05 };
 /** Pac-Man as the kit's submissions check sees it, with those rules. */
 const game = { ...pacman, rules: { ...pacman.rules, minGames: RULES.minGames }, verify: (rec: unknown) => verifyGame(rec as Recording, RULES) };
-const checkSubmission = (dir: string, id: string, _rules: SubmissionRules) => kitCheckSubmission(game, dir, id);
+/** The names Pac-Man's own official board holds (its "GPT-6 Luna" is the kit's "GPT-6 Luna Decisions"). */
+const reserved = reservedNames(game, fileURLToPath(new URL('../public/leaderboard.json', import.meta.url)));
+const checkSubmission = (dir: string, id: string, _rules: SubmissionRules) => kitCheckSubmission(game, dir, id, reserved);
 
 // Different step timings make different games, as real-time runs do.
 /** The step that ends the opening "ready" pause. */
@@ -39,7 +42,7 @@ function folder(opts: { manifest?: Record<string, unknown> | null; games?: numbe
     if (i === 3) opts.tamper?.(rec);
     writeFileSync(join(dir, `game-${String(i).padStart(2, '0')}.json.gz`), gzipSync(JSON.stringify(rec)));
   }
-  const manifest = opts.manifest === null ? null : { name: 'Acme Pac', by: 'acme', url: 'https://acme.example', benchVersion: BENCH_VERSION, games, ...opts.manifest };
+  const manifest = opts.manifest === null ? null : { name: 'Acme Pac', by: 'acme', url: 'https://acme.example', benchVersion: BENCH_VERSION, games, recordedAt: '2026-10-09T01:00:44.243Z', ...opts.manifest };
   writeFileSync(join(dir, 'submission.json'), JSON.stringify(manifest));
   return dir;
 }
@@ -93,6 +96,9 @@ describe('checkSubmission', () => {
 
   it('refuses a submission posing as a model we benchmark, and checks who and where', () => {
     expect(checkSubmission(folder({ manifest: { name: 'jev 1.13' } }), 'acme-pac', RULES)).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
+    // Pac-Man's board names it "GPT-6 Luna", not the kit's "GPT-6 Luna Decisions".
+    expect(checkSubmission(folder({ manifest: { name: 'GPT-6 Luna' } }), 'acme-pac', RULES)).toMatchObject({ error: 'GPT-6 Luna is on the official leaderboard already' });
+    expect(checkSubmission(folder({ manifest: { name: 'gpt-6 luna' } }), 'acme-pac', RULES)).toMatchObject({ error: expect.stringMatching(/official leaderboard/) });
     expect(checkSubmission(folder({ manifest: { by: 'not a handle!' } }), 'acme-pac', RULES)).toMatchObject({ error: expect.stringMatching(/GitHub handle/) });
     expect(checkSubmission(folder({ manifest: { url: 'javascript:alert(1)' } }), 'acme-pac', RULES)).toMatchObject({ error: expect.stringMatching(/https/) });
   });
