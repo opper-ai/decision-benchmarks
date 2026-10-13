@@ -3,7 +3,7 @@ import { answerKey } from '../server/answers';
 import { handleMe, SESSION_COOKIE, type AuthConfig, type HttpRequest } from '../server/auth';
 import { handleDecideRequest as kitHandleDecideRequest, poolLimitRequest, rejectDecideRequest, resolveKey, type DecideRequestDeps, type PoolAccess } from '../server/decide';
 import type { Target as JevTarget } from '../server/systemone';
-import { clientIp, MAX_POOL_BODY_BYTES, MAX_QUESTIONS, Pool, statusFromMe, trustedProxiesFromEnv, visitorKey, VisitorLimits } from '../server/pool';
+import { clientIp, globalLimitsFromEnv, MAX_POOL_BODY_BYTES, MAX_QUESTIONS, networkKey, Pool, poolFromEnv, statusFromMe, trustedProxiesFromEnv, visitorKey, VisitorLimits } from '../server/pool';
 import { sealSession } from '../server/session';
 import { coinBody, coinServer } from './support/test-game';
 
@@ -97,6 +97,64 @@ describe('Pool', () => {
   });
 });
 
+describe('the hourly budget', () => {
+  it('closes the pool once the last hour spent the budget, logging once, and opens it as that spend ages out', async () => {
+    let now = 0;
+    const log = vi.fn();
+    const pool = new Pool({ apiKey: 'op-pool', opperUrl: 'https://api.opper.ai', fetch: meResponse({ blocked: false, balance: { balance_cents: 10_000 } }), now: () => now, log, refreshMs: Number.POSITIVE_INFINITY, budgetUsdPerHour: 1 });
+    await pool.refresh();
+    pool.spent(0.6);
+    now = 30 * 60_000;
+    pool.spent(0.3);
+    expect(pool.current().open).toBe(true);
+    pool.spent(0.2);
+    for (let i = 0; i < 5; i++) expect(pool.current()).toEqual({ open: false, remainingUsd: 98.9 });
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log.mock.calls[0][0]).toContain('hourly budget');
+    // An hour after the first call, its $0.60 no longer counts.
+    now = 60 * 60_000;
+    expect(pool.current().open).toBe(true);
+    expect(pool.spentLastHour()).toBeCloseTo(0.5);
+    expect(log).toHaveBeenCalledTimes(2);
+  });
+
+  it('counts spend even when Opper does not show the balance', async () => {
+    const pool = await poolWith({ blocked: false });
+    const capped = new Pool({ apiKey: 'op-pool', opperUrl: 'https://api.opper.ai', fetch: meResponse({ blocked: false }), now: () => 0, refreshMs: Number.POSITIVE_INFINITY, budgetUsdPerHour: 0.5 });
+    await capped.refresh();
+    capped.spent(0.5);
+    expect(capped.current()).toEqual({ open: false, remainingUsd: null });
+    pool.spent(5);
+    expect(pool.current().open).toBe(true); // no budget, no cap
+  });
+
+  it('defaults to $20 an hour, from POOL_BUDGET_USD_PER_HOUR when it is a positive number', () => {
+    const budgetOf = (env: Record<string, string>) => {
+      const warn = vi.fn();
+      const pool = poolFromEnv({ OPPER_POOL_API_KEY: 'op-pool', ...env }, 'http://127.0.0.1:9', warn)!;
+      pool.spent(19.99);
+      const before = pool.current().open;
+      pool.spent(0.01);
+      return { before, after: pool.current().open, warned: warn.mock.calls.some(([m]) => String(m).includes('POOL_BUDGET_USD_PER_HOUR')) };
+    };
+    expect(budgetOf({})).toEqual({ before: true, after: false, warned: false });
+    expect(budgetOf({ POOL_BUDGET_USD_PER_HOUR: '50' })).toMatchObject({ before: true, after: true });
+    expect(budgetOf({ POOL_BUDGET_USD_PER_HOUR: 'lots' })).toEqual({ before: true, after: false, warned: true });
+  });
+
+  it('asks signed-out visitors to sign in (402 poolEmpty) while over budget; a signed-in player still plays', async () => {
+    const pool = new Pool({ apiKey: 'op-pool', opperUrl: 'https://api.opper.ai', fetch: meResponse({ blocked: false, balance: { balance_cents: 1000 } }), now: () => 0, refreshMs: Number.POSITIVE_INFINITY, budgetUsdPerHour: 0.001 });
+    await pool.refresh();
+    const r = await handleDecideRequest(post(), JSON.stringify(body), cfg, undefined, { fetch: decideOk('0.002'), now: () => 0 }, {}, access(pool));
+    expect(r.status).toBe(200);
+    const refused = rejectDecideRequest(post(), cfg, undefined, access(pool));
+    expect(refused?.status).toBe(402);
+    expect(JSON.parse(refused!.body)).toMatchObject({ poolEmpty: true, signedOut: true });
+    expect(rejectDecideRequest(post({ cookie: playerCookie() }), cfg, undefined, access(pool))).toBeNull();
+    expect(JSON.parse(handleMe(post(), cfg, undefined, pool.current()).body)).toMatchObject({ mode: 'none', pool: { open: false } });
+  });
+});
+
 describe('VisitorLimits', () => {
   it('allows a burst, then the sustained rate', () => {
     let now = 0;
@@ -107,6 +165,62 @@ describe('VisitorLimits', () => {
     now += 500;
     expect(limits.take('a')).toBe('ok');
     expect(limits.take('a')).toBe('rate');
+  });
+});
+
+describe('the global and /48 limits', () => {
+  it('shares one global allowance between every visitor, logging once per trip, and refuses with poolEmpty', async () => {
+    let now = 0;
+    const log = vi.fn();
+    const limits = new VisitorLimits({ ratePerSec: 8, burst: 40 }, () => now, { ratePerSec: 2, burst: 3 }, log);
+    expect(['1.0.0.1', '1.0.0.2', '1.0.0.3'].map((ip) => limits.take(ip))).toEqual(['ok', 'ok', 'ok']);
+    expect(limits.take('1.0.0.4')).toBe('busy');
+    expect(limits.take('1.0.0.5')).toBe('busy');
+    expect(log).toHaveBeenCalledTimes(1);
+    now += 500;
+    expect(limits.take('1.0.0.6')).toBe('ok');
+    expect(log).toHaveBeenCalledTimes(2); // back under it
+    expect(limits.take('1.0.0.7')).toBe('busy');
+    expect(log).toHaveBeenCalledTimes(3); // a new trip
+
+    const pool = await poolWith({ blocked: false, balance: { balance_cents: 1000 } });
+    const a = access(pool, new VisitorLimits({ ratePerSec: 8, burst: 40 }, () => 0, { ratePerSec: 1, burst: 1 }));
+    expect(poolLimitRequest(post({}, '10.0.0.1'), cfg, undefined, a)).toBeNull();
+    const busy = poolLimitRequest(post({}, '10.0.0.2'), cfg, undefined, a);
+    expect(busy?.status).toBe(429);
+    expect(JSON.parse(busy!.body)).toMatchObject({ poolEmpty: true, signedOut: true });
+    // Signed-in players pay themselves: no pool limit applies.
+    expect(poolLimitRequest(post({ cookie: playerCookie() }, '10.0.0.3'), cfg, undefined, a)).toBeNull();
+  });
+
+  it("does not spend the global allowance on a visitor's refused requests", () => {
+    const limits = new VisitorLimits({ ratePerSec: 1, burst: 1 }, () => 0, { ratePerSec: 1, burst: 2 });
+    expect(limits.take('1.0.0.1')).toBe('ok');
+    for (let i = 0; i < 10; i++) expect(limits.take('1.0.0.1')).toBe('rate');
+    expect(limits.take('1.0.0.2')).toBe('ok');
+  });
+
+  it('gives an IPv6 /48 four visitors worth, however many /64s it spreads over', () => {
+    const limits = new VisitorLimits({ ratePerSec: 1, burst: 1 }, () => 0, { ratePerSec: 100, burst: 100 });
+    const verdicts = Array.from({ length: 6 }, (_, i) => limits.take(`2001:db8:1:${i + 1}::1`));
+    expect(verdicts).toEqual(['ok', 'ok', 'ok', 'ok', 'rate', 'rate']);
+    expect(limits.take('2001:db8:2:1::1')).toBe('ok'); // another /48
+  });
+
+  it('names the /48 of an IPv6 address, and none for IPv4', () => {
+    expect(networkKey('2001:db8:1:2:aaaa::1')).toBe('2001:db8:1::/48');
+    expect(networkKey('2001:0db8:0001:ffff::')).toBe('2001:db8:1::/48');
+    expect(networkKey('::ffff:203.0.113.7')).toBeNull();
+    expect(networkKey('203.0.113.7')).toBeNull();
+  });
+
+  it('reads the global limits from POOL_GLOBAL_RATE_PER_SEC and POOL_GLOBAL_BURST, else 40 and 120', () => {
+    const warn = vi.fn();
+    expect(globalLimitsFromEnv({}, warn)).toEqual({ ratePerSec: 400, burst: 1200 });
+    expect(globalLimitsFromEnv({ POOL_GLOBAL_RATE_PER_SEC: '10', POOL_GLOBAL_BURST: '30' }, warn)).toEqual({ ratePerSec: 10, burst: 30 });
+    expect(warn).not.toHaveBeenCalled();
+    expect(globalLimitsFromEnv({ POOL_GLOBAL_RATE_PER_SEC: '-1' }, warn)).toEqual({ ratePerSec: 400, burst: 1200 });
+    expect(warn).toHaveBeenCalledOnce();
   });
 });
 
