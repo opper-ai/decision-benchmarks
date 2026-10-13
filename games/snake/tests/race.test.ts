@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DecideResponse, SystemOneRequest, Transport } from '../../../packages/kit/shared/systemone';
 import { seedFor } from '../game';
 import { baselineTransport } from '../shared/baselines';
-import { createGame, step, turn, type Heading, type Move } from '../shared/engine';
-import { fallbackMove, allFacts, viewOf } from '../shared/questions';
+import { createGame, step, turn, type Move } from '../shared/engine';
+import { fallbackMove, allFacts, parseState, viewOf } from '../shared/questions';
 import { RealtimeSnake, SPEED_STEP_MS, startClock } from '../shared/race';
 
 const answer = (choice: unknown, extra: Partial<DecideResponse> = {}): DecideResponse => ({ answers: { snake: { type: 'choice', choice } }, usage: { input_tokens: 400, output_tokens: 2 }, latencyMs: 30, costUsd: 0.0001, traceId: null, ...extra });
@@ -24,7 +24,7 @@ function slowModel(delay: (n: number) => number, choice: (n: number) => Move = (
       const timer = setTimeout(() => {
         t.inFlight -= 1;
         t.answeredAt[n] = Date.now();
-        res(answer(turn((body.state as { heading: Heading }).heading, choice(n)), { signatures: { snake: `sig${n}` }, signedAs: 'm', latencyMs: delay(n) }));
+        res(answer(turn(parseState(body.state)!.heading, choice(n)), { signatures: { snake: `sig${n}` }, signedAs: 'm', latencyMs: delay(n) }));
       }, delay(n));
       opts?.signal?.addEventListener('abort', () => {
         clearTimeout(timer);

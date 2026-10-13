@@ -22,11 +22,13 @@ absolute direction (`up`, `right`, `down`, `left`), without the reverse: always 
   move is ever played for the model. The answer's direction maps back to the engine's relative move with
   `moveToward(heading, direction)`, so recordings, verify, submissions and the player check keep `left`, `straight`,
   `right`.
-- `state`: the board as rows of text (`#` wall, `H` head, `o` body, `t` tail, `A` apple, `.` empty) with the
-  heading (the service reads the board back with it), length, steps since the last apple, the step, and the apple's
-  position in board directions ("3 up and 2 left of the head").
-- Instructions explain the rules once and say "Pick the direction the head moves next (it cannot reverse)." No
-  relative wording (turn left, keep heading, ahead) anywhere.
+- `state`: the board as rows of text (`#` wall, `H` head, `n` neck, the body cell joined to the head, `o` body, `t`
+  tail, `A` apple, `.` empty) with the length, steps since the last apple, the step, and the apple's position in board
+  directions ("3 up and 2 left of the head"). No heading field: with one in the state, models leaned on it and kept
+  answering the current heading (straight on into the wall). The heading is the way from the neck to the head, which
+  is how the service's request check reads it back.
+- Instructions explain the rules once, with the board's legend, and say "Pick the direction the head moves next (it
+  cannot reverse)." No relative wording (turn left, keep heading, ahead) anywhere.
 - Option criteria state facts, never the answer, jevman style: `Go up: Next cell: empty. Distance to the apple after
   the move: 5. Cells reachable from there: 40 (the snake is 4 long after the move).` A deadly move says plainly that it
   ends the game: `Go left: Next cell: the wall. The game ends.` No option is labelled "safe" or "best".

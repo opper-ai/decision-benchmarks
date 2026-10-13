@@ -15,9 +15,11 @@ describe('the question', () => {
     const v = viewOf(at([[2, 1], [1, 1], [0, 1]], 'right', [5, 3], { sinceApple: 4, steps: 9 }));
     const state = stateFor(v);
     expect((state.board as string[])[0]).toBe('#'.repeat(18));
-    expect((state.board as string[])[2]).toBe('#toH.............#');
+    expect((state.board as string[])[2]).toBe('#tnH.............#');
     expect((state.board as string[])[4]).toBe('#.....A..........#');
-    expect(state).toMatchObject({ heading: 'right', length: 3, apple: '2 down and 3 right of the head', stepsSinceApple: 4, step: 9 });
+    // No heading word: the neck (n) behind the head shows the way it goes.
+    expect(state).not.toHaveProperty('heading');
+    expect(state).toMatchObject({ length: 3, apple: '2 down and 3 right of the head', stepsSinceApple: 4, step: 9 });
   });
 
   it('offers every direction but the reverse, keyed by direction, deadly ones too, and never names one safe or best', () => {
@@ -31,7 +33,7 @@ describe('the question', () => {
     const text = JSON.stringify(requestFor(v));
     expect(text).not.toMatch(/\b(safe|best|recommended|should)\b/i);
     // No relative wording left: no turns, no "ahead" or "behind".
-    expect(text).not.toMatch(/\b(turn left|turn right|keep heading|ahead|behind|straight)\b/i);
+    expect(text).not.toMatch(/\b(turn left|turn right|keep heading|heading|ahead|behind|straight)\b/i);
   });
 
   it('maps an answered direction back to the move it makes', () => {
@@ -108,6 +110,21 @@ describe('reading a request back', () => {
     expect(edit((st) => (st.stepsSinceApple = 150))).toBeNull();
     expect(edit((st) => ((st.board as string[])[3] = '#hello, model....#'))).toBeNull();
     expect(edit((st) => ((st.board as string[])[0] = '.'.repeat(18)))).toBeNull();
+    expect(edit((st) => (st.heading = 'up'))).toBeNull();
     expect(parseState(null)).toBeNull();
+  });
+
+  it('reads the heading from the neck, and refuses a board whose neck is missing, doubled or not by the head', () => {
+    // Heading up, four long: head (5,5), neck (5,6), body (5,7), tail (5,8).
+    const s = at([[5, 5], [5, 6], [5, 7], [5, 8]], 'up', [1, 1]);
+    expect(parseState(stateFor(viewOf(s)))!.heading).toBe('up');
+    expect(parseState(stateFor(viewOf(at([[5, 5], [4, 5], [3, 5], [3, 6]], 'right', [1, 1]))))!.heading).toBe('right');
+    const board = stateFor(viewOf(s)).board as string[];
+    const swap = (from: string, to: string) => parseState({ ...stateFor(viewOf(s)), board: board.map((r) => r.replace(from, to)) });
+    expect(swap('n', 'o')).toBeNull();
+    expect(swap('o', 'n')).toBeNull();
+    // A neck away from the head: the first empty cell becomes the neck and the real one plain body.
+    const moved = board.map((r) => r.replace('n', '.')).map((r, y) => (y === 7 ? r.replace('#.....', '#....n') : r));
+    expect(parseState({ ...stateFor(viewOf(s)), board: moved })).toBeNull();
   });
 });

@@ -29,8 +29,8 @@ Full rules, and the reasons behind them: [SPEC.md](SPEC.md).
 Every step the game asks one System One `choice` question, named `snake`, whose options are the three directions the
 head can move (`up`, `right`, `down`, `left`, without the reverse), in an order shuffled every step. Every one is
 offered, a move into the wall or the body too: the model always has the full choice. The state is the board as text
-rows (`#` wall, `H` head, `o` body, `t` tail, `A` apple, `.` empty), the heading, the length, the steps since the last
-apple, the step number, and where the apple is from the head ("3 up and 2 left of the head"). Each option states facts
+rows (`#` wall, `H` head, `n` neck, the body cell joined to the head, `o` body, `t` tail, `A` apple, `.` empty), the
+length, the steps since the last apple, the step number, and where the apple is from the head ("3 up and 2 left of the head"). Each option states facts
 only: what is in the next cell, the distance to the apple after the move, and how many cells the snake could still
 reach from there ("Go up: Next cell: empty. Distance to the apple after the move: 5. ..."); a deadly one says so
 ("Go left: Next cell: the wall. The game ends."). None is labelled safe or best. The answer's direction is played as

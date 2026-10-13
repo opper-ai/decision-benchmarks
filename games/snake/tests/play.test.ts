@@ -3,7 +3,8 @@ import type { DecideResponse, SystemOneRequest } from '../../../packages/kit/sha
 import { verifyGame } from '../bench/verify';
 import game, { seedFor } from '../game';
 import { baselineTransport } from '../shared/baselines';
-import { turn, type Heading } from '../shared/engine';
+import { turn } from '../shared/engine';
+import { parseState } from '../shared/questions';
 import { playSnake, STEP_MS } from '../shared/play';
 
 const answer = (choice: unknown, extra: Partial<DecideResponse> = {}): DecideResponse => ({ answers: { snake: { type: 'choice', choice } }, usage: { input_tokens: 400, output_tokens: 2 }, latencyMs: 30, costUsd: 0.0001, traceId: null, ...extra });
@@ -29,7 +30,7 @@ describe('playSnake', () => {
       transport: async (body) => {
         bodies.push(body);
         // Straight on: the direction it is heading.
-        return answer((body.state as { heading: string }).heading, { signatures: { snake: 'sig' }, signedAs: 'sference/clef' });
+        return answer(parseState(body.state)!.heading, { signatures: { snake: 'sig' }, signedAs: 'sference/clef' });
       },
       seed: seedFor(2),
       model: 'sference/clef',
@@ -65,7 +66,7 @@ describe('playSnake', () => {
         done = true;
       };
       opts?.signal?.addEventListener('abort', () => (cancelled += 1, end()));
-      return later(slow ? 700 : 50, answer(turn((body.state as { heading: Heading }).heading, 'left'), { latencyMs: slow ? 700 : 50, costUsd: 0.0002 }), opts?.signal).finally(end);
+      return later(slow ? 700 : 50, answer(turn(parseState(body.state)!.heading, 'left'), { latencyMs: slow ? 700 : 50, costUsd: 0.0002 }), opts?.signal).finally(end);
     };
     const started = Date.now();
     const played = playSnake({ transport, seed: seedFor(7), model: 'm', timeoutMs: 2000 });

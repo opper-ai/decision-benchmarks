@@ -12,7 +12,8 @@ export const BASELINE_NAMES: readonly BaselineName[] = ['random', 'greedy', 'flo
 /** A number from the board, so the random baseline plays the same game every time on the same seed. */
 function boardHash(v: View): number {
   let h = 2166136261;
-  for (const ch of `${v.rows.join('')}|${v.heading}|${v.step}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  // The neck counts as body here, as it did before the board showed it, so the random baseline plays the same games.
+  for (const ch of `${v.rows.join('').replaceAll('n', 'o')}|${v.heading}|${v.step}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   return h | 0;
 }
 
