@@ -1,7 +1,7 @@
 // One game of Snake played by a model in real time, on a fixed clock: a step every STEP_MS (250 ms), the benchmark's
 // one speed for every model. The model is asked about the board as soon as its last step is applied, one request at
-// a time; an answer that is in by the tick moves the snake, and one that isn't is too late, so the game's fallback
-// moves it instead (stale answers are ignored). The score is decision quality and speed together. The bench plays it
+// a time, so every step gives it a fresh, full 250 ms. An answer that is in by the tick moves the snake; if the tick
+// comes first, the request is cancelled and the game's fallback moves the snake instead. The score is decision quality and speed together. The bench plays it
 // headless with real timers (playSnake); the page's race steps a RealtimeSnake on its own clock next to your board.
 // Isomorphic.
 import { askPaused, type BaseDecision, type SchedulerGame } from '../../../packages/kit/client/scheduler.ts';
@@ -50,39 +50,47 @@ export interface RealtimeSnakeOptions {
   seed: number;
   /** The model a request names (the page's; the bench's transports and a baseline's need none). */
   requestModel?: string;
-  /** How long one request may take before askPaused gives up on it (a late answer falls back at the tick anyway). */
+  /** How long one request may take before askPaused gives up on it (the tick cancels it long before). */
   timeoutMs: number;
   now?: () => number;
 }
 
-/** An open question: the step it is for, and its decision once the answer (or askPaused's fallback) is in. */
+/** An open question: the step it is for, its request, and its decision once the answer (or askPaused's fallback) is in. */
 interface Pending {
   key: string;
   decision: SnakeDecision | null;
+  /** Cancels the request when its step passes without an answer. */
+  abort: AbortController;
+  sentAt: number;
   latencyMs?: number;
   costUsd?: number;
-  /** The step played for this question, once its tick came: a late call's latency and cost are kept on it. */
+  /** The step the fallback played for it, once the request was cancelled. */
   step?: Step;
 }
 
-/** A model's side of a real-time game. The caller's clock calls tick(); the answers come in between ticks. */
+/**
+ * A model's side of a real-time game. The caller's clock calls tick(); the answers come in between ticks. Every step
+ * gives the model a fresh, full step's time: the question is asked as soon as the previous step is applied, and if the
+ * tick comes first, the request is cancelled and the fallback moves the snake. One request is in flight at a time.
+ */
 export class RealtimeSnake {
   state: GameState;
   readonly steps: Step[] = [];
-  /** Every call's cost, the stale ones' too. */
+  /** Every answered call's cost (a cancelled call's cost is unknown; see estimateCancelledCosts). */
   costUsd = 0;
-  /** Requests sent so far. */
+  /** Requests sent so far, and how many of them were cancelled at the tick. */
   requests = 0;
+  cancelled = 0;
   private pending: Pending | null = null;
-  /** The request in flight (at most one). */
-  private busy: Promise<unknown> | null = null;
-  /** A question is waiting for the request in flight to come back. */
-  private waiting = false;
+  /** The steps the fallback played for a cancelled request. */
+  private readonly cancelledSteps = new Set<Step>();
   private stopped = false;
   private readonly o: RealtimeSnakeOptions;
+  private readonly now: () => number;
 
   constructor(o: RealtimeSnakeOptions) {
     this.o = o;
+    this.now = o.now ?? (() => performance.now());
     this.state = createGame(o.seed);
     this.ask();
   }
@@ -91,58 +99,39 @@ export class RealtimeSnake {
     return this.state.over !== null;
   }
 
-  /** Resolves once no request is in flight (a late call's cost and latency are then on its step). */
-  async settled(): Promise<void> {
-    while (this.busy) await this.busy.then(
-      () => {},
-      () => {},
-    );
-  }
-
-  /** Asks about the board as it is now, or once the request in flight comes back. */
+  /** Asks about the board as it is now. */
   private ask(): void {
     if (this.stopped || this.over) return;
-    if (this.busy) {
-      this.waiting = true;
-      return;
-    }
-    const slot: Pending = { key: stepKey(this.state), decision: null };
+    const slot: Pending = { key: stepKey(this.state), decision: null, abort: new AbortController(), sentAt: this.now() };
     this.pending = slot;
     this.requests += 1;
-    const settle = () => {
-      this.busy = null;
-      if (this.waiting) {
-        this.waiting = false;
-        this.ask();
-      }
-    };
-    const transport: Transport = (body) => {
-      const p = this.o.transport(body);
-      this.busy = p;
-      void p.then(settle, settle);
-      return p;
-    };
+    const transport: Transport = (body) => this.o.transport(body, { signal: slot.abort.signal });
     void askPaused(SNAKE_SCHEDULER, this.state, [{ key: slot.key, actor: 'snake' } satisfies SnakePoint], {
       transport,
-      now: this.o.now ?? (() => performance.now()),
+      now: this.now,
       timeoutMs: this.o.timeoutMs,
       ...(this.o.requestModel ? { model: this.o.requestModel } : {}),
       onEvent: (e) => {
         if (e.type !== 'call') return;
-        slot.latencyMs = Math.max(0, Math.round(e.latencyMs));
-        if (typeof e.costUsd === 'number' && Number.isFinite(e.costUsd) && e.costUsd > 0) {
-          slot.costUsd = e.costUsd;
-          this.costUsd += e.costUsd;
+        const cost = typeof e.costUsd === 'number' && Number.isFinite(e.costUsd) && e.costUsd > 0 ? e.costUsd : undefined;
+        if (cost !== undefined) this.costUsd += cost;
+        // A transport that couldn't cancel answered after all: its step has passed, but its cost is known now.
+        if (slot.step) {
+          if (cost !== undefined) slot.step.costUsd = cost;
+          return;
         }
-        // Too late for its step, which the fallback played: the call still took this long and cost this much.
-        if (slot.step) callOn(slot.step, slot);
+        slot.latencyMs = Math.max(0, Math.round(e.latencyMs));
+        if (cost !== undefined) slot.costUsd = cost;
       },
     }).then(([d]) => {
       slot.decision = d!;
     });
   }
 
-  /** One step on the clock: the answer for this board if it is in, else the fallback. Null once the game is over. */
+  /**
+   * One step on the clock: the answer for this board if it is in, else the request is cancelled and the fallback
+   * moves the snake. Then the next question goes out at once. Null once the game is over.
+   */
   tick(): Step | null {
     if (this.stopped || this.over) return null;
     const key = stepKey(this.state);
@@ -152,7 +141,8 @@ export class RealtimeSnake {
     if (slot?.decision) {
       const d = slot.decision;
       rec = { choice: d.choice, source: d.source };
-      callOn(rec, slot);
+      if (slot.latencyMs !== undefined) rec.latencyMs = slot.latencyMs;
+      if (slot.costUsd !== undefined) rec.costUsd = slot.costUsd;
       if (d.source === 'model') {
         if (d.probabilities) rec.probabilities = d.probabilities;
         if (d.sig) rec.sig = d.sig;
@@ -160,12 +150,30 @@ export class RealtimeSnake {
     } else {
       const point: SnakePoint = { key, actor: 'snake' };
       rec = { choice: SNAKE_SCHEDULER.fallback(this.state, SNAKE_SCHEDULER.prepare(this.state, point), 'late').choice, source: 'fallback' };
-      if (slot) slot.step = rec;
+      if (slot) {
+        // Too late: the call is cancelled and no longer counts as in flight. It took the whole step.
+        rec.latencyMs = Math.max(0, Math.round(this.now() - slot.sentAt));
+        slot.step = rec;
+        slot.abort.abort();
+        this.cancelled += 1;
+        this.cancelledSteps.add(rec);
+      }
     }
     this.state = step(this.state, rec.choice);
     this.steps.push(rec);
     this.ask();
     return rec;
+  }
+
+  /**
+   * A cancelled call's cost is unknown (no answer came back to say it), though the provider may still bill it: each
+   * one is counted at the mean cost of this game's answered calls. With no answered call to go by, it stays unknown.
+   */
+  estimateCancelledCosts(): void {
+    const known = this.steps.filter((s) => !this.cancelledSteps.has(s) && s.costUsd !== undefined);
+    if (!known.length) return;
+    const mean = known.reduce((a, s) => a + s.costUsd!, 0) / known.length;
+    for (const s of this.cancelledSteps) if (s.costUsd === undefined) s.costUsd = mean;
   }
 
   /** Steps that used the fallback (late, failed or unusable answers). */
@@ -177,17 +185,12 @@ export class RealtimeSnake {
     return resultOf(this.state, this.steps);
   }
 
-  /** No more questions; answers still out are ignored. */
+  /** No more questions; the request still out is cancelled. */
   stop(): void {
     this.stopped = true;
+    this.pending?.abort.abort();
     this.pending = null;
   }
-}
-
-/** Puts a call's latency and cost on the step it was for. */
-function callOn(rec: Step, slot: Pending): void {
-  if (slot.latencyMs !== undefined) rec.latencyMs = slot.latencyMs;
-  if (slot.costUsd !== undefined) rec.costUsd = slot.costUsd;
 }
 
 /**
@@ -208,7 +211,7 @@ export interface PlayOptions {
   model: string;
   /** The model a request names (the page's; the bench's transports are bound to their model already). */
   requestModel?: string;
-  /** How long one call may take before it is given up on (its step has long fallen back by then). */
+  /** How long one call may take before it is given up on (the tick cancels it long before). */
   timeoutMs: number;
   /** Milliseconds between steps: STEP_MS for the benchmark; tests pass less. */
   stepMs?: number;
@@ -239,8 +242,9 @@ export async function playSnake(o: PlayOptions): Promise<{ result: SnakeResult; 
     });
     o.signal?.addEventListener('abort', abort, { once: true });
   });
-  // The game ends only once the late calls are in: their cost and latency still count.
-  await ai.settled();
+  // Nothing is left in flight: the game over leaves no question to ask.
+  ai.stop();
+  ai.estimateCancelledCosts();
   const state = ai.state;
   const recording: Recording = { format: 1, game: 'snake', benchVersion: BENCH_VERSION, seed: o.seed, model: o.model, steps: ai.steps, result: { score: state.apples, steps: state.steps, end: state.over! } };
   return { result: ai.result(), recording };

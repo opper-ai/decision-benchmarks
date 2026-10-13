@@ -16,8 +16,9 @@ const game: GameDefinition<Recording, SnakeResult> = {
   slug: 'snake',
   benchVersion: BENCH_VERSION,
   mode: 'realtime',
-  // A question is asked as soon as the previous step is applied and must be answered by the next tick. A call that
-  // misses it may run on for up to 2 s (one request in flight at a time), while the fallback moves the snake.
+  // A question is asked as soon as the previous step is applied and must be answered by the next tick; a call the
+  // tick beats is cancelled and the fallback moves the snake. callTimeoutMs only bounds the warm-up and a transport
+  // that can't cancel.
   timing: { decisionTimeoutMs: STEP_MS, callTimeoutMs: 2000, maxInFlight: 1 },
   rules: {
     minGames: 24,

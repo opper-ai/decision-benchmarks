@@ -1,6 +1,6 @@
 import { handleDecide } from '../server/decide.ts';
 import type { Target } from '../server/systemone.ts';
-import type { ChoiceQuestion, DecideResponse, SystemOneRequest, Transport } from '../shared/systemone.ts';
+import { withSignal, type ChoiceQuestion, type DecideResponse, type SystemOneRequest, type Transport } from '../shared/systemone.ts';
 
 /**
  * How the bench reaches a model: Opper's (or TypeSafe's) System One API with a key, or the submitter's own endpoint,
@@ -10,8 +10,8 @@ import type { ChoiceQuestion, DecideResponse, SystemOneRequest, Transport } from
 
 /** A listed decision model through Opper (or jev through TypeSafe), with the key from the environment. */
 export function systemOneTransport(model: string, target: Target | undefined, timeoutMs: number, callName = 'decision-benchmarks-bench'): Transport {
-  return async (body) => {
-    const r = await handleDecide({ ...body, model }, { apiKey: target?.apiKey, baseUrl: target?.baseUrl ?? '', provider: target?.provider, fetch, now: () => performance.now(), timeoutMs, callName });
+  return async (body, opts) => {
+    const r = await handleDecide({ ...body, model }, { apiKey: target?.apiKey, baseUrl: target?.baseUrl ?? '', provider: target?.provider, fetch, now: () => performance.now(), timeoutMs, callName, ...(opts?.signal ? { signal: opts.signal } : {}) });
     if (r.status !== 200) throw new Error((r.body as { error?: string }).error ?? `HTTP ${r.status}`);
     return r.body as DecideResponse;
   };
@@ -38,9 +38,9 @@ const authHeaders = (token?: string): Record<string, string> => ({ 'content-type
 export function endpointTransport(o: EndpointOptions): Transport {
   const f = o.fetch ?? fetch;
   const now = o.now ?? (() => performance.now());
-  return async (body) => {
+  return async (body, opts) => {
     const t0 = now();
-    const res = await f(o.url, { method: 'POST', headers: authHeaders(o.token), body: JSON.stringify({ state: body.state, questions: body.questions }), signal: AbortSignal.timeout(o.timeoutMs) });
+    const res = await f(o.url, { method: 'POST', headers: authHeaders(o.token), body: JSON.stringify({ state: body.state, questions: body.questions }), signal: withSignal(o.timeoutMs, opts?.signal) });
     if (!res.ok) throw new Error(`endpoint answered ${res.status}`);
     const out = (await res.json()) as { answers?: unknown; usage?: DecideResponse['usage']; costUsd?: number };
     if (!out.answers || typeof out.answers !== 'object') throw new Error('endpoint answer has no answers object');
@@ -135,9 +135,9 @@ export function chatTransport(o: ChatOptions): Transport {
     }
     return { answer, usage: { input_tokens: data.usage?.prompt_tokens ?? 0, output_tokens: data.usage?.completion_tokens ?? 0 }, cost: cost === null ? null : Number(cost) };
   };
-  return async (body: SystemOneRequest) => {
+  return async (body: SystemOneRequest, opts?: { signal?: AbortSignal }) => {
     const t0 = now();
-    const signal = AbortSignal.timeout(o.timeoutMs);
+    const signal = withSignal(o.timeoutMs, opts?.signal);
     const names = Object.keys(body.questions);
     const results = await Promise.all(names.map((n) => ask(body.state, body.questions[n]!, signal)));
     const known = results.filter((r) => r.cost !== null && Number.isFinite(r.cost));

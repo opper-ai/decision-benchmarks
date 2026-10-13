@@ -24,9 +24,10 @@ One System One `choice` question per step, named `snake`, options `left`, `strai
   WITHOUT labelling any option "safe" or "best". Instructions explain the rules once.
 - Keep a question under about 600 tokens. Order of options fixed (left, straight, right).
 - Clock: the game steps every 250 ms (`STEP_MS`), the same speed for every model (the race's Normal speed). The
-  model is asked about the board as soon as its last step is applied; one request is in flight at a time, so while a
-  late one is still out the next question waits for it. An answer that is in by the tick moves the snake; a late one
-  is ignored (never used for a later step). A call may run for up to 2 s before it is given up on.
+  model is asked about the board as soon as its last step is applied, so every step gives it a fresh, full 250 ms. An
+  answer that is in by the tick moves the snake. If the tick comes first, the request is cancelled (AbortController)
+  and the fallback moves the snake; the next question goes out at once, so lateness never carries over to the next
+  step. One request is in flight at a time (a cancelled one no longer counts).
 - Fallback (answer not in by the tick, error, invalid answer): `straight` if the next cell is not deadly, else the
   first non-deadly of left/right, else straight. It never steers toward the apple: the harness does not play well on
   the model's behalf. The score therefore reflects decision quality and speed together; the leaderboard shows the
@@ -88,8 +89,10 @@ a baseline as a model.
   Fast step as its floor, so a game played at a slower speed always passes it. Normal is the benchmark's clock: the
   AI's side of the race is the benchmark's own real-time player (`RealtimeSnake`, `shared/play.ts`).
 - **Benchmark recording.** As specified, plus `costUsd` per step (the leaderboard's cost column needs it) and
-  `result: { score, steps, end }` (`end`: `wall`, `body`, `starved`, `steps` or `full`). A late answer's latency and
-  cost are kept on the step the fallback played for it. The fingerprint is the SHA-256 of the seed and the
+  `result: { score, steps, end }` (`end`: `wall`, `body`, `starved`, `steps` or `full`). A cancelled call's step
+  records the time it had (the whole step, about 250 ms), so mean latency counts a late step at 250 ms, a lower
+  bound of the model's real time. Its cost is unknown (no answer came back to report it, though the provider may
+  still bill it), so the bench counts it at the mean cost of that game's answered calls. The fingerprint is the SHA-256 of the seed and the
   moves.
 - **Seeds and sizes.** `seedFor(i)` is `Math.imul(i + 1, 0x9e3779b1) >>> 1` (golden-ratio steps, 31 bits). A
   submission needs at least 24 games (100 to match ours), as on jevman.

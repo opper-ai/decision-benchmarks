@@ -33,10 +33,11 @@ the heading, the length, the steps since the last apple, the step number, and wh
 to the apple after the move, and how many cells the snake could still reach from there. None is labelled safe or best.
 
 The game runs in real time on a fixed clock: the snake steps every 250 ms, the same speed for every model. The model
-is asked about the board as soon as its last step is applied, one request at a time, and its answer must be in by the
-next tick. A late answer, an error or an answer that isn't an option makes a late step: the fallback moves straight
-unless that is deadly, else the first of left and right that isn't, else straight. It never steers toward the apple.
-A late answer is not used for a later step. So the score reflects decision quality and speed together; the
+is asked about the board as soon as its last step is applied, one request at a time, so every step gives it a fresh,
+full 250 ms. If the tick comes before the answer, the request is cancelled and the step is late; an error or an answer
+that isn't an option makes a late step too. On a late step the fallback moves straight unless that is deadly, else the
+first of left and right that isn't, else straight. It never steers toward the apple. Being late on one step never
+delays the next question. So the score reflects decision quality and speed together; the
 leaderboard also shows each model's share of late steps and its mean latency.
 
 ## Benchmark your model

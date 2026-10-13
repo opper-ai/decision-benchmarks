@@ -82,6 +82,21 @@ describe('handleDecide', () => {
     expect(log).toHaveBeenCalled();
   });
 
+  it("cancels the upstream call when the caller's signal aborts (a real-time step that has passed)", async () => {
+    const ctl = new AbortController();
+    const fetchMock = vi.fn<typeof fetch>(
+      (_url, init) =>
+        new Promise((_res, rej) => {
+          init!.signal!.addEventListener('abort', () => rej(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+        }),
+    );
+    const pending = handleDecide(body, deps(fetchMock, { signal: ctl.signal }));
+    ctl.abort();
+    const res = await pending;
+    expect(res.status).toBe(504);
+    expect((res.body as { error: string }).error).toBe('Jev 1.13 was cancelled: its step had passed');
+  });
+
   it('reports timeouts as 504', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => {
       throw Object.assign(new Error('aborted'), { name: 'TimeoutError' });

@@ -6,7 +6,12 @@ import { baselineTransport } from '../shared/baselines';
 import { playSnake, STEP_MS } from '../shared/play';
 
 const answer = (choice: unknown, extra: Partial<DecideResponse> = {}): DecideResponse => ({ answers: { snake: { type: 'choice', choice } }, usage: { input_tokens: 400, output_tokens: 2 }, latencyMs: 30, costUsd: 0.0001, traceId: null, ...extra });
-const later = <T>(ms: number, v: T) => new Promise<T>((res) => setTimeout(() => res(v), ms));
+/** Resolves with `v` after `ms`, unless `signal` cancels it first. */
+const later = <T>(ms: number, v: T, signal?: AbortSignal) =>
+  new Promise<T>((res, rej) => {
+    const timer = setTimeout(() => res(v), ms);
+    signal?.addEventListener('abort', () => (clearTimeout(timer), rej(new Error('cancelled'))));
+  });
 
 describe('playSnake', () => {
   afterEach(() => vi.useRealTimers());
@@ -41,17 +46,24 @@ describe('playSnake', () => {
     expect(verifyGame(JSON.parse(JSON.stringify(recording)), { seed: seedFor(2) }).ok).toBe(true);
   });
 
-  it('steps on the clock whatever the model does: a step a tick, the late ones played by the fallback', async () => {
+  it('steps on the clock whatever the model does: the tick cancels a late request and the fallback plays its step', async () => {
     vi.useFakeTimers();
-    // Every third answer takes 400 ms, past its tick; the others take 50 ms.
+    // Every third answer would take 400 ms, past its tick; the others take 50 ms.
     let n = 0;
     let inFlight = 0;
     let maxInFlight = 0;
-    const transport = (_body: SystemOneRequest) => {
+    let cancelled = 0;
+    const transport = (_body: SystemOneRequest, opts?: { signal?: AbortSignal }) => {
       const slow = n++ % 3 === 2;
       inFlight += 1;
       maxInFlight = Math.max(maxInFlight, inFlight);
-      return later(slow ? 400 : 50, answer('left', { latencyMs: slow ? 400 : 50 })).finally(() => (inFlight -= 1));
+      let done = false;
+      const end = () => {
+        if (!done) inFlight -= 1;
+        done = true;
+      };
+      opts?.signal?.addEventListener('abort', () => (cancelled += 1, end()));
+      return later(slow ? 400 : 50, answer('left', { latencyMs: slow ? 400 : 50, costUsd: 0.0002 }), opts?.signal).finally(end);
     };
     const started = Date.now();
     const played = playSnake({ transport, seed: seedFor(7), model: 'm', timeoutMs: 2000 });
@@ -61,12 +73,16 @@ describe('playSnake', () => {
     expect(recording.steps.length).toBe(result.steps);
     expect(Math.round((Date.now() - started) / STEP_MS)).toBeGreaterThanOrEqual(result.steps);
     expect(maxInFlight).toBe(1);
+    // Exactly every third step is late: lateness never carries over to the next step.
+    expect(recording.steps.map((s) => s.source)).toEqual(recording.steps.map((_, i) => (i % 3 === 2 ? 'fallback' : 'model')));
     const late = recording.steps.filter((s) => s.source === 'fallback');
-    expect(late.length).toBeGreaterThan(0);
+    expect(cancelled).toBe(late.length);
     expect(result.fallbacks).toBe(late.length);
-    // A late call's latency and cost are kept on the step the fallback played.
-    expect(late.every((s) => s.latencyMs === 400 && s.costUsd === 0.0001)).toBe(true);
+    // A cancelled call took the whole step, and its unknown cost is the mean of the game's answered calls.
+    expect(new Set(late.map((s) => s.latencyMs))).toEqual(new Set([STEP_MS]));
+    for (const s of late) expect(s.costUsd).toBeCloseTo(0.0002, 10);
     expect(recording.steps.filter((s) => s.source === 'model').every((s) => s.latencyMs === 50)).toBe(true);
+    expect(result.cost).toBeCloseTo(0.0002 * recording.steps.length);
     expect(verifyGame(JSON.parse(JSON.stringify(recording)), { seed: seedFor(7) }).ok).toBe(true);
   });
 
