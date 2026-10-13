@@ -1,7 +1,8 @@
 // Replays a recorded game of Snake with our engine and recomputes its result (SPEC.md, "Recording and verify"). Every
 // move must be one of the three options; a move marked as the fallback's must be what the fallback rule gives there,
 // so model moves can't pass as fallbacks or the other way round; the game must end exactly where the recording does,
-// and the way it claims.
+// and the way it claims. It can't check timing (which steps the model answered by the tick): that is as recorded,
+// which is why submissions are self-reported.
 import { createHash } from 'node:crypto';
 import type { Verdict } from '../../../packages/kit/shared/game.ts';
 import { createGame, isMove, MAX_STEPS, MOVES, step, type Move } from '../shared/engine.ts';

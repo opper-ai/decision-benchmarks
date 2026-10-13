@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-12T15:26:51.944Z",
+  "generatedAt": "2026-10-13T12:21:28.945Z",
   "game": "snake",
-  "benchVersion": 1,
+  "benchVersion": 3,
   "metric": {
     "name": "Apples",
     "unit": "apples",

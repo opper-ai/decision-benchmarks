@@ -36,7 +36,7 @@ export interface GameState {
   over: End | null;
 }
 
-const HEADINGS: readonly Heading[] = ['up', 'right', 'down', 'left'];
+export const HEADINGS: readonly Heading[] = ['up', 'right', 'down', 'left'];
 const VEC: Record<Heading, Cell> = { up: { x: 0, y: -1 }, right: { x: 1, y: 0 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 } };
 
 export const isMove = (v: unknown): v is Move => v === 'left' || v === 'straight' || v === 'right';

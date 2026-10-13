@@ -1,7 +1,7 @@
 # Snake
 
-Which AI decision model plays Snake best? Every model plays 100 seeded games, one decision per step, and the
-leaderboard ranks them by the apples they eat. Live at
+Which AI decision model plays Snake best? Every model plays 100 seeded games in real time, a step every 275 ms,
+and the leaderboard ranks them by the apples they eat. Live at
 [opper.ai/decision-benchmarks/snake](https://opper.ai/decision-benchmarks/snake/), where you can watch the recorded
 games or race a model on the same board.
 
@@ -26,15 +26,24 @@ Full rules, and the reasons behind them: [SPEC.md](SPEC.md).
 
 ## The question
 
-Every step the game asks one System One `choice` question, named `snake`, with options `left`, `straight` and `right`
-(in that order). The state is the board as text rows (`#` wall, `H` head, `o` body, `t` tail, `A` apple, `.` empty),
-the heading, the length, the steps since the last apple, the step number, and where the apple is from the head
-("3 ahead and 2 to the left"). Each option states facts only: the new heading, what is in the next cell, the distance
-to the apple after the move, and how many cells the snake could still reach from there. None is labelled safe or best.
+Every step the game asks one System One `choice` question, named `snake`, whose options are the three directions the
+head can move (`up`, `right`, `down`, `left`, without the reverse), in an order shuffled every step. Every one is
+offered, a move into the wall or the body too: the model always has the full choice. The state is the board as text
+rows (`#` wall, `H` head, `n` neck, the body cell joined to the head, `o` body, `t` tail, `A` apple, `.` empty), the
+length, the steps since the last apple, the step number, and where the apple is from the head ("3 up and 2 left of the head"). Each option states facts
+only: what is in the next cell, the distance to the apple after the move, and how many cells the snake could still
+reach from there ("Go up: Next cell: empty. Distance to the apple after the move: 5. ..."); a deadly one says so
+("Go left: Next cell: the wall. The game ends."). None is labelled safe or best. The answer's direction is played as
+the turn it makes, so recordings keep left, straight and right.
 
-The game waits up to 2 seconds from sending. After that, after an error, or for an answer that isn't an option, the
-fallback moves straight unless that is deadly, else the first of left and right that isn't, else straight. It never
-steers toward the apple.
+The game runs in real time on a fixed clock: the snake steps every 275 ms (about 3.6 steps a second), the same speed
+for every model. One request is in flight at a time, and the model is asked early: as soon as its answer for the
+coming step is in, the board after that step is known, so the question for the next step goes out at once. Each step
+gives the model 275 ms, plus any time left from the previous step. If the tick comes before the answer, the request is
+cancelled and the step is late, and the next question goes out at that tick; an error or an answer that isn't an
+option makes a late step too. On a late step the fallback moves straight unless that is deadly, else the first of left
+and right that isn't, else straight. It never steers toward the apple. So the score reflects decision quality and
+speed together; the leaderboard also shows each model's share of late steps and its mean latency.
 
 ## Benchmark your model
 
@@ -50,7 +59,9 @@ npm run submissions -- --game snake       # the check CI runs
 ```
 
 Then open a pull request with the `games/snake/submissions/my-model/` folder. CI replays every game from its seed and
-recomputes its score; a move marked as the fallback's must be the move the fallback makes there.
+recomputes its score; a move marked as the fallback's must be the move the fallback makes there. CI can't prove the
+timing of a game you played yourself (which steps your model answered in time), so these rows are marked
+self-reported.
 
 The free baselines play without a key: `npm run bench -- --game snake --model baseline/greedy` (also
 `baseline/random` and `baseline/flood`). Their 100-game results are in `public/baselines.json`, shown on the page for
@@ -60,7 +71,8 @@ reference and never on the leaderboard.
 
 - `game.ts`: the bench and replay side (`GameDefinition`); `game.server.ts`: the service side (request check, high
   scores on seeds the server issues)
-- `shared/`: the engine, the question, the play loop, the baselines, the recording and the high-score check
+- `shared/`: the engine, the question, the real-time play loop (`play.ts`, which the race on the page also uses), the
+  baselines, the recording and the high-score check
 - `bench/verify.ts`: the replay the submissions check runs
 - `src/`, `index.html`: the page
 - `public/`: `game.json`, `poster.png` (rendered by `node games/snake/scripts/poster.ts`), `leaderboard.json` (official

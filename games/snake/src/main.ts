@@ -171,7 +171,7 @@ void fetchHighScores().then((view) => {
 });
 
 // ---------- the leaderboard ----------
-void loadLeaderboard($<HTMLTableElement>('#leaderboard-table'), appPath, { metric: 'Apples (mean ± margin)' });
+void loadLeaderboard($<HTMLTableElement>('#leaderboard-table'), appPath, { metric: 'Apples (mean ± margin)', fallbacks: 'Late steps', latency: 'Mean latency' });
 
 // ---------- Watch: recorded games only ----------
 const demos = new Map<string, Promise<Demo | null>>();
@@ -268,7 +268,12 @@ let speed: RaceSpeed = (() => {
     return DEFAULT_SPEED;
   }
 })();
-const stepsASecond = (sp: RaceSpeed) => String(Math.round((1000 / SPEED_STEP_MS[sp]) * 10) / 10);
+/** Steps a second at a speed: "2.5", "8", or "about 3.6" when it isn't a round number. */
+const stepsASecond = (sp: RaceSpeed) => {
+  const exact = 1000 / SPEED_STEP_MS[sp];
+  const shown = Math.round(exact * 10) / 10;
+  return shown === exact ? String(shown) : `about ${shown}`;
+};
 const opponentName = (id: string) => (isBaselineId(id) ? baselineName(id) : modelName(id));
 
 function showPicker(): void {

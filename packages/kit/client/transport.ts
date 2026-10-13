@@ -1,4 +1,4 @@
-import type { DecideResponse, Transport } from '../shared/systemone.ts';
+import { withSignal, type DecideResponse, type Transport } from '../shared/systemone.ts';
 import { appPath } from './paths.ts';
 
 /** A little over the server's 2 s model timeout, so the server's own answer (a timeout, a fallback) arrives first. */
@@ -12,7 +12,7 @@ export interface TransportHooks {
 }
 
 export function createHttpTransport(hooks: TransportHooks = {}): Transport {
-  return async (body) => {
+  return async (body, opts) => {
     let res: Response;
     let json: Partial<DecideResponse> & { error?: string };
     try {
@@ -20,7 +20,7 @@ export function createHttpTransport(hooks: TransportHooks = {}): Transport {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: withSignal(TIMEOUT_MS, opts?.signal),
       });
       json = (await res.json().catch((err: Error) => {
         if (err?.name === 'TimeoutError' || err?.name === 'AbortError') throw err;
@@ -28,6 +28,7 @@ export function createHttpTransport(hooks: TransportHooks = {}): Transport {
       })) as typeof json;
     } catch (err) {
       const name = (err as Error)?.name;
+      if (opts?.signal?.aborted) throw new Error('/api/decide was cancelled: its step had passed');
       if (name === 'TimeoutError' || name === 'AbortError') throw new Error(`/api/decide timed out after ${TIMEOUT_MS} ms`);
       throw err;
     }

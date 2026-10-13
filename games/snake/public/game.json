@@ -1,7 +1,7 @@
 {
   "slug": "snake",
   "name": "Snake",
-  "tagline": "Which AI plays Snake best? Decision models steer a snake one step at a time on seeded boards, and you can race them.",
+  "tagline": "Which AI plays Snake best? Decision models steer a snake in real time on seeded boards, and you can race them.",
   "category": "Arcade",
   "author": { "github": "opper-ai" },
   "license": "MIT",
