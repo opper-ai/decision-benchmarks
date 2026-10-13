@@ -15,15 +15,23 @@ fixed-rule baselines, the strongest ones: **greedy** (the biggest swing if the o
 **payoff** (the best average) and **maximin** (the safest move). The score is the model's share of the rounds, a drawn
 round counting half, in percent; a model's result is the mean over its games.
 
-- **Paused mode**: the fight waits for each answer (up to 5 s, then the fallback blocks), so only the quality of the
-  decisions counts, not speed.
-- **Assisted track**: each option shows its payoffs (below), so the test is weighing risk and reading the opponent.
+- **Real time**: the fight runs live at its normal speed (60 frames a second), as when you fight a model on the page,
+  whatever the model does. The model is asked ahead, about the moment its fighter will be free to act (earlier for a
+  slower model), and its answer plays on the first frame the fighter can act after it arrives; until then the fighter
+  stands still. An answer that takes more than 2 s is dropped (its call cancelled) and the fallback blocks. A question
+  goes stale when the model gets hit or the opponent starts an attack, and is asked again if a fresh answer can still
+  come in time. So the score is good decisions made in time.
+- **Raw track**: the question gives the situation and the rules; each option is the move's own description (height,
+  damage, frames, reach). No payoff rows: the model works out what wins.
+- **The baselines** answer at once, on the frame their fighter can act, and see the opponent with the same reaction
+  delay. They read the full state (on the raw track they work the payoff rows out themselves): they are the opponents,
+  not the test.
 - **Fixed seeds, both sides**: game `i` plays seed `i`. `i % 3` picks the baseline, `floor(i / 3) % 2` the side and
   `floor(i / 6)` the fight (its start distance and position). The official 102 games are 17 fights, each against every
   baseline from both sides; a submission plays at least the first 24.
 
 The baselines' own results on the same games are in [public/baselines.json](public/baselines.json) (maximin about 71%,
-greedy 54%, payoff 25%, guard 7%, random 0%). A model below payoff is doing worse than reading its own options.
+greedy 54%, payoff 25%, guard 7%, random 0%; a baseline answers at once, so the clock costs it nothing). A model below payoff does worse than a script that picks each move's best average outcome.
 
 ## The rules
 
@@ -59,23 +67,27 @@ Moves (frames at 60 per second: startup / active / recovery, damage, reach in bo
 ## The question
 
 Each decision is one System One `choice` question named `move`: the rules as instructions, the situation as `state`,
-and every sensible move as an option, shuffled per question. On the assisted track each option has a payoff row worked
-out by the engine: the HP swing over the exchange averaged over everything the opponent could do (`avg`), if it plays
-its best answer (`worst`, named) and if it repeats its usual attack (`usual`), plus `adv`, the frames you can act before
-(+) or after (-) the opponent when it ends.
+and every sensible move as an option, shuffled per question. On the raw track (the benchmark's) each option is the
+move's static description: height, damage, startup and recovery frames, reach, and what else it does.
 
 ```json
 {
-  "state": { "you": "100 HP, meter 0, standing, free to act, 4.0 from your wall", "opponent": "...", "distance": "1.1",
-             "time": "round 1, 52 s left, rounds won 0-0", "recent": "none yet" },
+  "state": { "you": "100 HP, meter 39, blocking high, 5.9 from your wall", "opponent": "61 HP, meter 18, getting up (cannot be hit), 2.1 from their wall",
+             "distance": "1.0", "time": "round 1, 56 s left, rounds won 0-0", "recent": "you hit sweep (9); your low_kick_sweep missed" },
   "questions": { "move": { "type": "choice", "instructions": "You control one fighter in a 2D fighting game. ...",
-    "criteria": { "sweep": "avg +2.3, worst -15 (if low_kick_sweep); adv +34f", "block_low": "avg -0.4, worst -12 (if high_kick); adv -10f" } } }
+    "criteria": { "throw": "unblockable, 12 dmg, startup 5f, recovery 20f, reach 0.8, knocks down", "block_low": "stops lows",
+                  "jump_kick": "overhead, 10 dmg, startup 13f, recovery 14f, reach 2.0, jumps in, must be blocked high" } } }
 }
 ```
 
+The assisted track (an option when you fight on the page) adds a payoff row to each option, worked out by the
+engine: the HP swing over the exchange averaged over everything the opponent could do (`avg`), if it plays its best
+answer (`worst`, named) and if it repeats its usual attack (`usual`), plus `adv`, the frames you can act before (+) or
+after (-) the opponent when it ends.
+
 Answer with one of the criteria keys (`{ "answers": { "move": { "type": "choice", "choice": "sweep" } } }`). A late,
 missing or unusable answer, or a move that is no longer legal, makes the fighter block: the game never plays well on a
-model's behalf. Decision models with a short context (Laya) get compact instructions and fewer columns.
+model's behalf. Decision models with a short context (Laya) get compact instructions.
 
 ## Benchmark your model
 
@@ -83,16 +95,23 @@ From the repository root (see [CONTRIBUTING.md](../../CONTRIBUTING.md)):
 
 ```bash
 node games/fighter/example-endpoint.ts                                        # a model to copy, on :8787
-npm run bench -- --game fighter --endpoint http://localhost:8787 --games 6    # try it
-npm run bench -- --game fighter --endpoint http://localhost:8787 --submit games/fighter/submissions/my-model \
-  --name "My Model" --by your-github-handle                                   # 24 games (--games 102 to match ours)
+npm run bench -- --game fighter --endpoint http://localhost:8787 --games 3 --parallel 1   # try it
+npm run bench -- --game fighter --endpoint http://localhost:8787 --parallel 1 \
+  --submit games/fighter/submissions/my-model --name "My Model" --by your-github-handle    # 24 games (--games 102 to match ours)
 npm run submissions -- --game fighter                                         # check it the way CI will
 npm run bench -- --game fighter --model baseline/maximin --games 6            # a baseline as the player: free
 ```
 
-CI replays every submitted game with our code: it rebuilds the match from its seed, recomputes every baseline move,
-checks that every one of your moves was legal and offered when your fighter could act, that every fallback is the
-fallback rule's and every answer came within the deadline, and that the checkpoint hashes and rounds match.
+A match plays in real time, so a game takes as long as the fight lasts (half a minute to five minutes). Play one game
+at a time (`--parallel 1`): games played together share one process, and their baselines' thinking and your model's
+calls slow each other down.
+
+CI replays every submitted game with our code, frame by frame: it rebuilds the match from its seed, plays each of your
+moves on the frame it was applied, recomputes every baseline move, and checks that every one of your moves was legal
+there and one of the options it was asked about, that your fighter could act on that frame and on none since your
+answer arrived, that every fallback is the fallback rule's, and that the checkpoint hashes and rounds match. What it
+can't check is the timing: when each answer arrived and how long it took are as your bench recorded them. That is why
+a submission is self-reported, as on Snake and jevman.
 
 ## Playing it
 
@@ -101,7 +120,8 @@ sign in), or any two fighters, baselines included, in real time or paused. Keys:
 double-tap to dash), W jump, S block low, U I O punches, J K L kicks, H throw, Y jump kick, Space special. A match you
 play stays in your browser: watch it with its stats, export a clip, or download it.
 
-**Watch**: recorded matches (public/demo/: Jev against each baseline, and GPT-6 Luna against Jev), with every
+**Watch**: recorded matches (public/demo/: GPT-6 Luna against Jev, and Jev against each baseline, all played live on
+the benchmark's settings, recorded with scripts/record-demo.ts), with every
 decision, the question it answered, a timeline and per-fighter stats. Click the stage, then Space plays and pauses,
 arrows step, `[` `]` jump between decisions.
 

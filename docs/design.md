@@ -166,7 +166,7 @@ to main runs the same CI and then deploys (`deploy.yml`), when deploys are enabl
 |---|---|---|---|---|
 | jevman | real time | Score (points) | 100 | AGPL-3.0-or-later |
 | snake | real time (275 ms a step) | Apples | 100 | MIT |
-| fighter | paused | Rounds won vs bots (%) | 102 | MIT |
+| fighter | real time (live speed, 2 s deadline) | Rounds won vs bots (%) | 102 | MIT |
 
 - **jevman** (Pac-Man, Arcade): the game the kit was extracted from. A model steers Pac-Man in real time against the
   scripted ghosts until game over or 300 s; the score is the game's points. Players play Pac-Man against ghosts
@@ -177,10 +177,13 @@ to main runs the same CI and then deploys (`deploy.yml`), when deploys are enabl
   played by a fallback that never steers toward the apple, so the score is decision quality and speed together.
   Score = apples eaten, until death, 150 steps without an apple or 1000 steps. Players race a model on the same server-issued seed,
   and their game is replayed on the server for the high-score board. Rules: `games/snake/SPEC.md`.
-- **fighter** (Jev Fighter, Fighting): a deterministic 2D fighting game. One benchmark game is one paused match on the
-  assisted track against one of three baselines (greedy, payoff, maximin), from one side, on fixed seeds; the score
-  is the model's share of the rounds (a draw counts half). The verifier recomputes the baselines' moves and checks
-  every model move's legality, timing and the checkpoint hashes. Its five baselines (`random`, `guard`, `greedy`,
+- **fighter** (Jev Fighter, Fighting): a deterministic 2D fighting game. One benchmark game is one live match (real
+  time at the game's normal speed, raw track: the situation and the rules, no payoff rows) against one of three
+  baselines (greedy, payoff, maximin), from one side, on fixed seeds; the score is the model's share of the rounds (a
+  draw counts half). The model is asked ahead, its answer plays when it arrives, and an answer later than 2 s is
+  played by a fallback that blocks. The verifier replays the match tick by tick from the recorded ticks each answer
+  was applied on, recomputes the baselines' moves and checks every model move's legality where it was applied, the
+  fallback rule and the checkpoint hashes; when each answer arrived is as recorded (self-reported in a submission). Its five baselines (`random`, `guard`, `greedy`,
   `payoff`, `maximin`) are on its page, from `public/baselines.json`. Question design:
   `games/fighter/docs/specs/2026-10-06-v2-harness.md`.
 

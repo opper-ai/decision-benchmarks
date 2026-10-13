@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-12T15:46:52.323Z",
+  "generatedAt": "2026-10-13T14:37:30.020Z",
   "game": "fighter",
-  "benchVersion": 1,
+  "benchVersion": 2,
   "metric": {
     "name": "Rounds won vs bots",
     "unit": "%",

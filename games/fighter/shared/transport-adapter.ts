@@ -21,9 +21,10 @@ export function transportAdapter(model: string, transport: Transport, o: Transpo
     id: model,
     kind: 'systemone',
     warmUp: o.warmUp ?? (async () => {}),
-    async decide(q: Question): Promise<Answer> {
+    async decide(q: Question, signal: AbortSignal): Promise<Answer> {
       const started = now();
-      const res = await transport(toSystemOne(q, model));
+      // The match aborts a question it no longer wants (late, or stale): the call is cancelled, not left running.
+      const res = await transport(toSystemOne(q, model), { signal });
       const offered = q.options.map((o) => o.id);
       const parsed = parseChoice(res.answers[QUESTION_NAME], offered);
       if (!parsed) throw new InvalidAnswer(`${model} did not pick one of the offered moves`);

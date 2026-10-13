@@ -76,6 +76,27 @@ interface Pending {
   arrivedTick?: number;
 }
 
+/**
+ * An instant player's move on this tick (Adapter.instant), or null when its fighter cannot act: asked about what it
+ * sees (`view`, read only when it can act), played the same tick, the fallback's move when its answer is not legal.
+ * The live match and the benchmark's verifier (shared/gauntlet.ts) both play instant players with this.
+ */
+export function instantDecision(s: GameState, i: Side, view: () => GameState, decide: NonNullable<Adapter['instant']>, o: { track: Track; maxTokens?: number }): Decision | null {
+  if (!isActionable(s, i)) return null;
+  const seen = view();
+  const question = buildQuestion(seen, i, { track: o.track, maxTokens: o.maxTokens });
+  if (!question.options.length) return null;
+  const answer = decide(question, seen);
+  let move: MoveId | null = answer.move;
+  let fallback: FallbackReason | null = null;
+  if (!legalMoves(s, i).includes(move)) {
+    fallback = 'illegal';
+    move = fallbackMove(s, i);
+  }
+  if (!move) return null;
+  return { fighter: i, askedTick: s.tick, questionTick: seen.tick, appliedTick: s.tick, move, question, answer, fallback, latencyMs: answer.latencyMs, arrivedTick: s.tick };
+}
+
 const legalHumanMove = (s: GameState, i: Side, w: { move: MoveId } | null): boolean => w !== null && legalMoves(s, i).includes(w.move);
 
 export type MatchListener = (s: GameState, events: GameEvent[]) => void;
@@ -150,10 +171,13 @@ export class Match {
     const p: Pending = { question, askedTick: this.state.tick, askedAt: this.clock.now(), early, controller };
     this.pending[i] = p;
     const adapter = this.opts.adapters[i];
+    const late = (answerMs = 0) => Math.max(answerMs, this.clock.now() - p.askedAt) > this.opts.deadlineMs;
+    const timedOut = () => ({ reason: 'timeout' as const, error: `no answer within ${this.opts.deadlineMs} ms`, latencyMs: Math.round(this.clock.now() - p.askedAt) });
     adapter.decide(question, controller.signal, from).then(
       (answer) => {
         if (this.pending[i] === p && !p.settled) {
-          p.settled = { answer };
+          // An answer that comes after the deadline is as late as none (the deadline check runs once a tick).
+          p.settled = late(answer.latencyMs) ? timedOut() : { answer };
           p.arrivedTick = this.state.tick;
         }
         this.latency[i] = this.latency[i] ? this.latency[i] * 0.8 + answer.latencyMs * 0.2 : answer.latencyMs;
@@ -162,7 +186,7 @@ export class Match {
         if (this.pending[i] !== p || p.settled) return;
         const aborted = controller.signal.aborted;
         const reason: FallbackReason = aborted ? 'timeout' : err?.name === 'InvalidAnswer' ? 'invalid' : 'error';
-        p.settled = { reason, error: err?.message ?? String(err), latencyMs: Math.round(this.clock.now() - p.askedAt) };
+        p.settled = !aborted && late() ? timedOut() : { reason, error: err?.message ?? String(err), latencyMs: Math.round(this.clock.now() - p.askedAt) };
         p.arrivedTick = this.state.tick;
       },
     );
@@ -187,8 +211,8 @@ export class Match {
   private manageQuestions(lastEvents: GameEvent[]): void {
     const s = this.state;
     for (const i of [0, 1] as const) {
-      // Humans are never asked: they press keys.
-      if (this.opts.adapters[i].human) continue;
+      // Humans are never asked: they press keys. Instant players are asked when they can act (takeInputs).
+      if (this.opts.adapters[i].human || this.opts.adapters[i].instant) continue;
       const j = (1 - i) as Side;
       const p = this.pending[i];
       // Paused mode asks only about the exact current state, so nothing goes stale.
@@ -234,6 +258,16 @@ export class Match {
       const human = this.opts.adapters[i].human;
       if (human) {
         inputs[i] = this.takeHuman(i, human);
+        continue;
+      }
+      const instant = this.opts.adapters[i].instant;
+      if (instant) {
+        const d = instantDecision(s, i, () => this.view(i), instant, { track: this.track, maxTokens: this.opts.maxTokens?.[i] });
+        if (!d) continue;
+        inputs[i] = d.move;
+        this.decisions.push(d);
+        this.open[i] = d;
+        for (const l of this.decisionListeners) l(d);
         continue;
       }
       const p = this.pending[i];

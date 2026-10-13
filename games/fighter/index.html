@@ -97,7 +97,7 @@
         <div class="oc"><h2 id="leaderboard-title" class="font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Leaderboard</h2></div>
         <p id="leaderboard-sub" class="sub">102 matches per model against three fixed-rule baselines: the share of rounds it wins.</p>
         <div class="tablecard"><div class="table-scroll"><table class="lbt" id="leaderboard-table"></table></div></div>
-        <p class="foot">=1 means tied: those means are within each other's margin of error (two standard errors). The vs columns are the share of rounds won against each baseline. Run by @opper-ai means we played the games through Opper. Self-reported models were benchmarked by whoever submitted them, named under Run by: CI replayed every game they sent in to check its score, and the latency and cost are as they reported. Baselines are simple scripts, shown for reference and never ranked.</p>
+        <p class="foot">=1 means tied: those means are within each other's margin of error (two standard errors). The vs columns are the share of rounds won against each baseline. Late moves are the share of the model's moves the fallback made, because its answer took over 2 s (or was unusable), so its fighter blocked. Run by @opper-ai means we played the games through Opper. Self-reported models were benchmarked by whoever submitted them, named under Run by: CI replayed every game they sent in to check its score, and the timing (late moves, latency) and cost are as they reported. Baselines are simple scripts, shown for reference and never ranked.</p>
       </section>
 
       <section id="add-model" class="section" aria-labelledby="add-model-title">
@@ -112,7 +112,7 @@
           <li class="step">
             <span class="n">02</span>
             <h3>Run the benchmark</h3>
-            <p>One command plays the matches under the leaderboard's rules: the same fixed seeds, paused, on the assisted track, against all three baselines from both sides.</p>
+            <p>One command plays the matches under the leaderboard's rules: the same fixed seeds, live in real time, on the raw track, against all three baselines from both sides.</p>
           </li>
           <li class="step">
             <span class="n">03</span>
@@ -130,9 +130,9 @@
         <div class="oc"><h2 id="method-title" class="font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Method</h2></div>
         <dl class="spec">
           <div><dt>The fight</dt><dd>Two stick figures, best of 3 rounds of 60 seconds. A knockout wins a round, otherwise the fighter with more health when time runs out. Strikes beat throws, throws beat blocks, blocks beat strikes.</dd></div>
-          <div><dt>Decisions</dt><dd>Every time its fighter is free to act, the model gets the situation, seen as it was a moment ago (about human reaction time), and its legal moves in shuffled order, and picks one. A late, missing or unusable answer makes the fighter block: the game never plays well on a model's behalf.</dd></div>
-          <div><dt>Opponents</dt><dd>Three fixed-rule baselines, the strongest we have. Greedy takes the biggest swing if the opponent stands still or repeats itself, payoff picks the move with the best average, and maximin the safest one.</dd></div>
-          <div><dt>Paused, assisted</dt><dd>The fight waits for each answer, so only the quality of the decisions counts, not speed. Each option shows what it tends to win or lose against the opponent's likely answers, so the test is weighing risk and reading the opponent.</dd></div>
+          <div><dt>Decisions</dt><dd>Every time its fighter is about to be free to act, the model gets the situation, seen as it was a moment ago (about human reaction time), and its legal moves in shuffled order, and picks one. A late, missing or unusable answer makes the fighter block: the game never plays well on a model's behalf.</dd></div>
+          <div><dt>Opponents</dt><dd>Three fixed-rule baselines, the strongest we have. Greedy takes the biggest swing if the opponent stands still or repeats itself, payoff picks the move with the best average, and maximin the safest one. They answer at once and work out each move's payoffs from the fight itself.</dd></div>
+          <div><dt>Live, raw</dt><dd>The fight runs in real time at its normal speed, as when you fight a model here, and never waits. The model is asked ahead, its answer plays as soon as it arrives and its fighter can act, and an answer that takes over 2 s is dropped: its fighter blocks. Each option is just the move's own description (damage, speed, reach), so the model has to work out what wins, in time.</dd></div>
           <div><dt>Games</dt><dd>102 matches on fixed seeds: 17 fights, each against all three baselines and from both sides. Every match is recorded and replays exactly, so any result can be checked.</dd></div>
           <div><dt>Score</dt><dd>The share of rounds the model wins, a drawn round counting half: the mean over its 102 matches, with a 95% margin of error (two standard errors). Models within each other's margin are tied.</dd></div>
         </dl>

@@ -20,6 +20,12 @@ export interface Adapter {
   decide(q: Question, signal: AbortSignal, view?: GameState): Promise<Answer>;
   /** A human player: no questions, the match reads this whenever the fighter is free to act. */
   human?: HumanInput;
+  /**
+   * A player that answers at once (the benchmark's baselines): never asked ahead, the match asks it on the tick its
+   * fighter can act, about what it sees then, and plays the answer that same tick. Deterministic, so a recording's
+   * moves for it can be recomputed.
+   */
+  instant?: (q: Question, view: GameState) => Answer;
 }
 
 export interface HumanInput {
