@@ -1,5 +1,5 @@
 // What the service needs from Pac-Man: its request check and its high-score check. Node-safe, erasable TypeScript
-// only (the service runs it as is). Pac-Man is the kit's real-time test fixture: it is not in games/registry.ts.
+// only (the service runs it as is). Served at <APP_BASE_PATH>/jevman/.
 import type { GameServer } from '../../packages/kit/shared/game.ts';
 import type { SystemOneRequest } from '../../packages/kit/shared/systemone.ts';
 import { checkPlayerGame } from './src/player-check.ts';
@@ -8,7 +8,7 @@ import { DECISION_MODELS, DEFAULT_MODEL, isModelId, opperIdOf } from './shared/m
 import { acceptsRequest } from './shared/questions.ts';
 
 const server: GameServer = {
-  slug: 'pacman',
+  slug: 'jevman',
   /**
    * Only the game's own questions (shared/questions.ts) go to a model. The page names models by the game's ids
    * (jevman's); the request carries the Opper id, and the answers are signed as the game's id, which the high-score

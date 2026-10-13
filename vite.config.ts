@@ -15,11 +15,11 @@ const DEFAULT_BASE_PATH = '/decision-benchmarks';
 
 export default defineConfig(async ({ command, mode }) => {
   const slug = process.env.GAME;
-  // Loaded by Node at run time, not bundled with this config: Vite's config bundler would otherwise resolve every
-  // game's lazy import in the registry, including the Pac-Man fixture, which the image leaves out.
+  // Loaded by Node at run time, not bundled with this config: Vite's config bundler would otherwise resolve and bundle
+  // every game's lazy import in the registry, when a run needs only GAME's.
   const registry: typeof import('./games/registry.ts') = await import(pathToFileURL(resolve(ROOT, 'games/registry.ts')).href);
   const entry = slug ? registry.findGame(slug) : undefined;
-  if (!slug || !entry) throw new Error('Set GAME to the game to serve or build, e.g. GAME=pacman npm run dev');
+  if (!slug || !entry) throw new Error('Set GAME to the game to serve or build, e.g. GAME=jevman npm run dev');
   const env = loadEnv(mode, ROOT, ['OPPER_', 'SESSION_', 'TYPESAFE_', 'APP_', 'PUBLIC_', 'TRUSTED_', 'HIGHSCORES_', 'ALLOW_']);
   // APP_BASE_PATH (e.g. /decision-benchmarks) serves every game below that prefix; empty serves them at /<slug>/.
   const basePath = normalizeBasePath(env.APP_BASE_PATH);

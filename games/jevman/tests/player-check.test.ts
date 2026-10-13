@@ -3,7 +3,7 @@ import { answerKey, answerVerifier } from '../../../packages/kit/server/answers'
 import { checkPlayerGame } from '../src/player-check';
 import { playAndRecord, TEST_SECRET } from './support/player-game';
 
-const verify = answerVerifier(answerKey(TEST_SECRET, 'pacman'));
+const verify = answerVerifier(answerKey(TEST_SECRET, 'jevman'));
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 describe('checkPlayerGame (the high-score check)', () => {
@@ -26,7 +26,7 @@ describe('checkPlayerGame (the high-score check)', () => {
     const forged = clone(recording);
     forged.decisions[3]![3] = `${forged.decisions[3]![3]!.split('~')[0]}~AAAAAAAAAAAAAAAAAAAAAA`;
     expect(checkPlayerGame(forged, verify).ok).toBe(false);
-    expect(checkPlayerGame(clone(recording), answerVerifier(answerKey('another secret, another server'.repeat(3), 'pacman'))).ok).toBe(false);
+    expect(checkPlayerGame(clone(recording), answerVerifier(answerKey('another secret, another server'.repeat(3), 'jevman'))).ok).toBe(false);
     expect(checkPlayerGame({ ...clone(recording), setup: { ...recording.setup!, lineup: { blinky: 'opper/clef', pinky: 'opper/clef', inky: 'opper/clef', clyde: 'opper/clef' } } }, verify).ok).toBe(false);
   });
 

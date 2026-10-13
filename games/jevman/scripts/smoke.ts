@@ -1,5 +1,5 @@
 // One real batched call to the default decision model, built from a real game state (a paid call: run it by hand).
-// Run: node --env-file-if-exists=.env games/pacman/scripts/smoke.ts
+// Run: node --env-file-if-exists=.env games/jevman/scripts/smoke.ts
 import { buildRequest, parseAnswer, type DecideResponse } from '../src/brain.ts';
 import { optionFeatures } from '../src/features.ts';
 import { createGame, nextDecisionPoint } from '../src/sim.ts';

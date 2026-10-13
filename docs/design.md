@@ -20,15 +20,14 @@ packages/kit/
   bench/       node: the bench CLI (--game --model(s) --endpoint --format systemone|chat --games --seed --submit
                --name --by), official runs -> leaderboard.json, submissions -> community.json
 games/
-  registry.ts           the games the service, bench and build serve (pacman is NOT in it)
+  registry.ts           the games the service, bench and build serve: jevman, snake, fighter
   <slug>/
     game.ts             GameDefinition: bench and verify side
     game.server.ts      GameServer: what the service needs (Node-safe imports only)
     src/  index.html  tests/  LICENSE  CREDITS.md
     public/             game.json, poster.png, demo/, leaderboard.json, community.json
     submissions/<id>/   submission.json + game-NN.json.gz
-  pacman/               jevman's game ported onto the kit: the kit's real-time test fixture, not served,
-                        deleted once snake and fighter run on the kit
+  jevman/               jevman's game (Pac-Man) ported onto the kit, served at <APP_BASE_PATH>/jevman/
 server/main.ts          the service with every registry game
 scripts/                bench.ts, submissions.ts, build.ts, check-contract.ts (thin entry points)
 ```
@@ -103,6 +102,9 @@ Cookies HttpOnly, `Path=/decision-benchmarks/<slug>/`: players sign in per game.
 
 ## Games
 
+**jevman** (Pac-Man, AGPL, Arcade), the game the kit comes from, is served here too (see "jevman, served here"
+below). The games ported onto the kit:
+
 1. **snake** (ours, MIT, Arcade): a decision model steers a snake on a seeded board, one `choice` per step (left,
    straight, right), paused: the game waits for the answer (2 s, then a fallback that never plays well on the
    model's behalf). Score = apples eaten, ended by death or a step cap. Play = you and a model on the same seeded
@@ -143,14 +145,14 @@ Where building the kit changed or filled in the design above, and why:
   `OPPER_REDIRECT_URI` and `OPPER_OAUTH_REDIRECT_URI` are gone, as is `JEV_MODEL` (a request without a model plays
   Jev). High scores: `HIGHSCORES_BUCKET` (each game at `[HIGHSCORES_PREFIX/]<slug>/highscores.json`) or
   `HIGHSCORES_DIR`. `ALLOW_HTTP=1` replaces `JEVMAN_ALLOW_HTTP`. `GAMES=<slug>,...` makes the service serve those
-  games instead of the registry, fixtures included (`GAMES=pacman` locally). Cookies are `db_session` (path
+  games of the registry only (`GAMES=snake` locally). Cookies are `db_session` (path
   `<base>/<slug>/`) and `db_oauth_state` (path `<base>/<slug>/auth`).
 - **Routes.** `/revision` answers below the base path and lists the games served. `POST /api/highscores` answers with
   `order` too. A production image refuses to start without an https `PUBLIC_BASE_URL` even with no games mounted.
 - **Pac-Man.** Its `leaderboard.json` and the `community.json` the kit builds are in the contract shape (Opper ids;
-  its numbers in `extra`); `shared/leaderboard.ts` turns them back into jevman's shape for its page. It has a
-  `game.json` but no poster (not live), and `check-contract` checks it without one. Its bench-only flags (ghosts
-  played by models, `--pacman greedy`) are gone with the old bench script; `--record` remains, for demos.
+  its numbers in `extra`); `shared/leaderboard.ts` turns them back into jevman's shape for its page. Its bench-only
+  flags (ghosts played by models, `--pacman greedy`) are gone with the old bench script; `--record` remains, for
+  demos. It started here as the kit's real-time test fixture (not served); see "jevman, served here" below.
 - **Build and tooling.** `vitest.config.ts` is separate from `vite.config.ts` (which needs `GAME`). `community.json`
   is not committed: `npm run submissions` writes it, and `npm run build` runs it for each game. Scripts run under
   plain Node (no tsx). A game's page takes the shared opper.ai chrome with
@@ -182,3 +184,25 @@ Where building the kit changed or filled in the design above, and why:
 - **Shared settings.** The root `tsconfig.json` takes the fighter's ES2023 target and `verbatimModuleSyntax`, which the
   whole repository passes. mediabunny (clip export in the browser) is the first runtime dependency, pinned exactly; it
   ships in the fighter's page bundle only, never in the service.
+
+## Implementation notes (jevman, served here)
+
+- **The decision.** The brief kept jevman in its own repository and left moving it in as an option. The owner chose to
+  move it: `games/jevman` (slug `jevman`) is served at `opper.ai/decision-benchmarks/jevman/` like snake and fighter,
+  and it is first in the registry. The old address, `opper.ai/jevman-benchmark`, keeps running from
+  opper-ai/jevman-benchmark until a redirect is decided.
+- **What changed.** Only the slug, from `pacman` to `jevman`: the folder, `game.ts`, `game.server.ts`, the `game`
+  field of its results files and `game.json`. The in-game actor is still `pacman`, and the recording and replay
+  formats are unchanged, so every submission and demo recording replays as before (nothing in a submission names the
+  slug). Answer signatures are keyed per slug (`answerKey(secret, slug)`), so a player's game started on the old
+  slug cannot post a high score on the new one; recordings never carry those signatures into submissions.
+- **Fixtures.** There are none left, so the registry has no fixture list: `GAMES` picks from the registry,
+  `check-contract` requires every game's poster, the image copies every game, and CI's separate fixture build is
+  gone. The image build covers it, and the container smoke test checks each served game's `game.json` (its
+  `updatedAt` included) and `poster.png`.
+- **Hub files.** `public/poster.png` is jevman-benchmark's (branch `hub-contract`); `game.json` names the author as
+  that repository's does (`joch`, `https://github.com/joch/jevman`). The page's "Add your model" links point at this
+  repository, where its submissions are now checked.
+- **High scores** start empty: the service reads `<bucket>/[HIGHSCORES_PREFIX/]jevman/highscores.json`, which does not
+  exist until a player posts one, unless jevman's live board is copied from its own bucket first (an ops step, not
+  done).

@@ -1,6 +1,6 @@
 // A minimal model endpoint for bench --endpoint, to copy and put your own model behind.
-// Run: node games/pacman/example-endpoint.ts [port]   (default 8787)
-// Then: npm run bench -- --game pacman --endpoint http://localhost:8787 --games 2
+// Run: node games/jevman/example-endpoint.ts [port]   (default 8787)
+// Then: npm run bench -- --game jevman --endpoint http://localhost:8787 --games 2
 //
 // It gets the request jevman sends System One: {state, questions}. Each question is
 // {type: 'choice', instructions, criteria: {<direction>: <what that route looks like>}}. Answer every question with

@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-10-10T07:49:48.287Z",
-  "game": "pacman",
+  "game": "jevman",
   "benchVersion": 1,
   "metric": {
     "name": "Score",

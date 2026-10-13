@@ -18,7 +18,7 @@ const outLink = (href: string, text: string, cls?: string) => Object.assign(el('
 const runBy = (by: string) => (/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(by) ? tag(outLink(`https://github.com/${by}`, `@${by}`), 'click_github', { source: 'leaderboard_run_by' }) : el('span', by));
 
 /** Our own runs: run by this repo's benchmark. */
-const ranByUs = () => tag(Object.assign(el('a', '@opper-ai'), { href: 'https://github.com/opper-ai/jevman-benchmark', target: '_blank', rel: 'noopener' }), 'click_github', { source: 'leaderboard_run_by' });
+const ranByUs = () => tag(Object.assign(el('a', '@opper-ai'), { href: 'https://github.com/opper-ai/decision-benchmarks/tree/main/games/jevman', target: '_blank', rel: 'noopener' }), 'click_github', { source: 'leaderboard_run_by' });
 
 /**
  * A model's mark (or, without one, its initial, so every name lines up). When the name links somewhere, the mark links
@@ -60,7 +60,7 @@ export function renderLeaderboard(table: HTMLTableElement, list: HTMLElement, su
   const top = Math.max(1, ...all.map((r) => r.e.meanScore));
   const date = new Date(board.generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const lead = `${board.settings.gamesPerModel} games per model against the classic ghosts, last run on ${date}`;
-  sub.replaceChildren(community?.entries.length ? `${lead}, ranked together with models the community ran. ` : `${lead}. `, tag(Object.assign(el('a', 'Add your model'), { href: 'https://github.com/opper-ai/jevman-benchmark/blob/main/CONTRIBUTING.md#benchmark-your-own-model', target: '_blank', rel: 'noopener' }), 'click_add_model', { source: 'leaderboard' }));
+  sub.replaceChildren(community?.entries.length ? `${lead}, ranked together with models the community ran. ` : `${lead}. `, tag(Object.assign(el('a', 'Add your model'), { href: 'https://github.com/opper-ai/decision-benchmarks/blob/main/CONTRIBUTING.md#benchmark-your-own-model', target: '_blank', rel: 'noopener' }), 'click_add_model', { source: 'leaderboard' }));
 
   const head = el('thead');
   const hr = el('tr');

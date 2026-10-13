@@ -1,4 +1,4 @@
-// npm run build [-- <slug> ...]: builds every game in games/registry.ts (or the slugs named, fixtures included) into
+// npm run build [-- <slug> ...]: builds every game in games/registry.ts (or the slugs named) into
 // dist/<slug>: replays its submissions into community.json, runs Vite with GAME=<slug>, then sets game.json's
 // updatedAt from the newest results: the official run's generatedAt, or a newer accepted submission's recordedAt.
 import { spawnSync } from 'node:child_process';

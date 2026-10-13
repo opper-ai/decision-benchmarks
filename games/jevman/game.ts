@@ -1,6 +1,6 @@
 // Pac-Man on the kit (jevman's benchmark): a model plays Pac-Man in real time against the scripted ghosts, until game
-// over or 300 s; the metric is the score. The kit's bench plays it (npm run bench -- --game pacman) and the
-// submissions check replays its recordings (npm run submissions -- --game pacman).
+// over or 300 s; the metric is the score. The kit's bench plays it (npm run bench -- --game jevman) and the
+// submissions check replays its recordings (npm run submissions -- --game jevman).
 import type { GameDefinition } from '../../packages/kit/shared/game.ts';
 import { playGame } from './bench/play.ts';
 import { verifyGame } from './bench/verify.ts';
@@ -8,7 +8,7 @@ import type { Recording } from './src/replay.ts';
 import { BENCH_VERSION, extraFor, SUBMISSION_RULES, type GameResult } from './shared/leaderboard.ts';
 
 const game: GameDefinition<Recording, GameResult> = {
-  slug: 'pacman',
+  slug: 'jevman',
   benchVersion: BENCH_VERSION,
   mode: 'realtime',
   timing: { decisionTimeoutMs: 2000, callTimeoutMs: 2000, maxInFlight: 3 },

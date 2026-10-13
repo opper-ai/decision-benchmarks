@@ -22,7 +22,7 @@ export function playAndRecord(seed: number, maxSteps = 6000, lineup: Record<stri
       const dir = greedyChoice(s, point, optionFeatures(s, point));
       if (dir === null) return null;
       const model = lineup[point.actor]!;
-      rec.decisions.push([frame, point.key, dir, `${model}~${signAnswer(answerKey(secret, 'pacman'), answerMessage(point.key, questionName(point), dir, model))}`]);
+      rec.decisions.push([frame, point.key, dir, `${model}~${signAnswer(answerKey(secret, 'jevman'), answerMessage(point.key, questionName(point), dir, model))}`]);
       return dir;
     },
   };

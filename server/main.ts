@@ -1,6 +1,6 @@
 // Production entry point: `node server/main.ts` (Node >= 22.18 runs the TypeScript directly). Serves every game in
-// games/registry.ts at <APP_BASE_PATH>/<slug>/ from its build in dist/<slug>; GAMES=<slug>,<slug> serves those instead
-// (e.g. GAMES=pacman for the fixture, after GAME=pacman npx vite build).
+// games/registry.ts at <APP_BASE_PATH>/<slug>/ from its build in dist/<slug>; GAMES=<slug>,<slug> serves only those
+// (e.g. GAMES=snake after npm run build -- snake).
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../packages/kit/server/app.ts';
 import { gamesToServe } from '../games/registry.ts';

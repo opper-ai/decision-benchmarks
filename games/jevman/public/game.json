@@ -1,9 +1,9 @@
 {
-  "slug": "pacman",
+  "slug": "jevman",
   "name": "jevman",
   "tagline": "Which AI plays Pac-Man best? Decision models steer Pac-Man in real time, and you play against them as ghosts.",
   "category": "Arcade",
-  "author": { "github": "opper-ai", "originalRepo": "https://github.com/opper-ai/jevman-benchmark" },
+  "author": { "github": "joch", "originalRepo": "https://github.com/joch/jevman" },
   "license": "AGPL-3.0-or-later",
   "metric": { "name": "Score", "unit": "points", "higherIsBetter": true },
   "updatedAt": "2026-10-10T07:49:48.287Z"

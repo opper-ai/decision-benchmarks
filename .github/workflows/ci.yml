@@ -39,25 +39,16 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run typecheck
       - run: npm test
-      # Every submitted run of every game, replayed with our code (the registry's games and the Pac-Man fixture).
+      # Every submitted run of every game in the registry, replayed with our code.
       # The slugs are listed first: a failing list fails the step instead of looping over nothing.
       - name: Replay every submission
         run: |
           set -euo pipefail
-          games=$(node --input-type=module -e "const r = await import('./games/registry.ts'); console.log([...r.REGISTRY, ...r.FIXTURES].map((g) => g.slug).join(' '))")
+          games=$(node --input-type=module -e "const r = await import('./games/registry.ts'); console.log(r.REGISTRY.map((g) => g.slug).join(' '))")
           if [ -z "$games" ]; then echo "no games listed in games/registry.ts" >&2; exit 1; fi
           for game in $games; do
             npm run submissions -- --game "$game"
           done
-      # The image builds the registry's games (snake, fighter) and the smoke test below loads them; .dockerignore leaves
-      # the Pac-Man fixture out, so it is built here, through the same build script (submissions, Vite, game.json's
-      # updatedAt).
-      - name: Build the Pac-Man fixture
-        run: |
-          set -euo pipefail
-          npm run build -- pacman
-          test -s dist/pacman/index.html
-          node -e "const g = JSON.parse(require('node:fs').readFileSync('dist/pacman/game.json', 'utf8')); if (Number.isNaN(Date.parse(g.updatedAt))) throw new Error('game.json has no updatedAt')"
       - run: npm run check-contract
       - name: Log in to GHCR (for the loadsecrets layer)
         if: env.NO_LOADSECRETS != 'true'
@@ -74,4 +65,6 @@ jobs:
             --build-arg APP_BASE_PATH="$APP_BASE_PATH" \
             --build-arg VITE_PUBLIC_URL="$VITE_PUBLIC_URL" \
             --build-arg SOURCE_COMMIT="$GITHUB_SHA" .
+      # The image builds every registry game (scripts/build.ts: submissions, Vite, game.json's updatedAt); the smoke test
+      # loads each one's page, hub files and API.
       - run: python3 scripts/smoke-image.py decision-benchmarks:ci

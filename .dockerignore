@@ -9,7 +9,5 @@
 !server/
 !scripts/
 !Dockerfile
-# Not served: the Pac-Man fixture lives on at opper.ai/jevman-benchmark. Every game in games/registry.ts is copied.
-games/pacman/
 **/tests/
 **/node_modules/

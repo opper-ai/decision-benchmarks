@@ -1,14 +1,14 @@
 // npm run check-contract [-- --game <slug>]: validates the files each game serves to the hub (docs/design.md, "The
 // contract with the hub") against packages/kit/shared/contract.ts: game.json, leaderboard.json, community.json and
-// poster.png, plus the game's high-score boards. Checks every game in games/registry.ts and its fixtures (Pac-Man);
-// a fixture needs no poster, since it is not live. Run `npm run submissions -- --game <slug>` first for community.json.
+// poster.png, plus the game's high-score boards. Checks every game in games/registry.ts; each is live, so each needs
+// its poster. Run `npm run submissions -- --game <slug>` first for community.json.
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { FIXTURES, REGISTRY, type RegisteredGame } from '../games/registry.ts';
+import { REGISTRY, type RegisteredGame } from '../games/registry.ts';
 import { validateCommunity, validateGameInfo, validateLeaderboard, validatePoster, type Metric } from '../packages/kit/shared/contract.ts';
 
-export async function checkGame(g: RegisteredGame, dir: string, opts: { requirePoster: boolean }): Promise<string[]> {
+export async function checkGame(g: RegisteredGame, dir: string): Promise<string[]> {
   const problems: string[] = [];
   const read = (file: string): unknown => {
     try {
@@ -32,7 +32,7 @@ export async function checkGame(g: RegisteredGame, dir: string, opts: { requireP
     if (metric && JSON.stringify((board as { metric?: unknown }).metric) !== JSON.stringify(metric)) problems.push(`${file}: its metric differs from game.json's`);
   }
   if (existsSync(`${dir}/poster.png`)) problems.push(...validatePoster(readFileSync(`${dir}/poster.png`)));
-  else if (opts.requirePoster) problems.push('poster.png is missing');
+  else problems.push('poster.png is missing');
   const server = await g.server();
   if (server.slug !== g.slug) problems.push(`game.server.ts says slug ${server.slug}`);
   const boards = server.highScores?.boards ?? [];
@@ -43,15 +43,14 @@ export async function checkGame(g: RegisteredGame, dir: string, opts: { requireP
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isMain) {
   const { values } = parseArgs({ options: { game: { type: 'string', multiple: true } } });
-  const all = [...REGISTRY.map((g) => ({ g, live: true })), ...FIXTURES.map((g) => ({ g, live: false }))];
-  const picked = values.game?.length ? all.filter(({ g }) => values.game!.includes(g.slug)) : all;
+  const picked = values.game?.length ? REGISTRY.filter((g) => values.game!.includes(g.slug)) : REGISTRY;
   if (values.game?.length && picked.length !== values.game.length) {
-    console.error(`unknown game; one of: ${all.map(({ g }) => g.slug).join(', ')}`);
+    console.error(`unknown game; one of: ${REGISTRY.map((g) => g.slug).join(', ')}`);
     process.exit(1);
   }
   let failed = false;
-  for (const { g, live } of picked) {
-    const problems = await checkGame(g, fileURLToPath(new URL(`../games/${g.slug}/public`, import.meta.url)), { requirePoster: live });
+  for (const g of picked) {
+    const problems = await checkGame(g, fileURLToPath(new URL(`../games/${g.slug}/public`, import.meta.url)));
     if (problems.length) {
       failed = true;
       console.error(`${g.slug}: ${problems.length} problem${problems.length === 1 ? '' : 's'}`);

@@ -9,6 +9,7 @@ import secrets
 import subprocess
 import sys
 import time
+from datetime import datetime
 import urllib.error
 import urllib.request
 
@@ -72,7 +73,11 @@ try:
         assert '%VITE_' not in page, game + ': a %VITE_...% placeholder was left in index.html'
         assert f'src="{base}/{game}/assets/' in page, game + ': index.html was built for another path'
         with urllib.request.urlopen(at + '/game.json', timeout=2) as response:
-            assert json.load(response)['slug'] == game, game
+            info = json.load(response)
+        assert info['slug'] == game, game
+        datetime.fromisoformat(info['updatedAt'])  # the build sets it from the newest results
+        with urllib.request.urlopen(at + '/poster.png', timeout=2) as response:
+            assert response.headers['Content-Type'] == 'image/png', (game, response.headers['Content-Type'])
         with urllib.request.urlopen(at + '/api/me', timeout=2) as response:
             me = json.load(response)
         assert me['mode'] == 'none', me  # no server key in the image

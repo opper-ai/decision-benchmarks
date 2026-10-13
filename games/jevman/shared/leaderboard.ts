@@ -8,7 +8,7 @@ import { fromOpperId, modelName } from './models.ts';
  * shape (packages/kit/shared/contract.ts), which `fromContract` turns into this.
  */
 
-/** One benchmark game, as the bench plays it (games/pacman/bench/play.ts). */
+/** One benchmark game, as the bench plays it (games/jevman/bench/play.ts). */
 export interface GameResult extends KitGameResult {
   survived: number;
   pellets: number;
@@ -98,7 +98,7 @@ export const jointLeaders = (entries: LeaderboardEntry[]): LeaderboardEntry[] =>
 
 export const rank = (entries: LeaderboardEntry[]): LeaderboardEntry[] => [...entries].sort((a, b) => b.meanScore - a.meanScore);
 
-/** A model its makers benchmarked themselves and submitted by pull request (games/pacman/submissions/<id>/). */
+/** A model its makers benchmarked themselves and submitted by pull request (games/jevman/submissions/<id>/). */
 export interface CommunityEntry extends LeaderboardEntry {
   /** Who submitted it (GitHub handle or organisation). */
   by: string;
