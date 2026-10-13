@@ -36,7 +36,7 @@
 .board-banner { position: absolute; inset: 0; margin: 0; display: grid; place-items: center; padding: 12px; text-align: center; font: 14px/1.6 var(--j-pixel); color: var(--j-arc-yellow); text-transform: uppercase; text-shadow: 0 2px 0 #000; background: rgba(0, 0, 0, 0.45); pointer-events: none; }
 .board-banner.over { color: #ff3b3b; }
 /* Cards over the AI's board (the picker, the result): the arcade's attract screen. */
-.overlay { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; padding: 12px; line-height: 1.45; overflow: auto; background: rgba(0, 0, 0, 0.6); }
+.overlay { position: absolute; inset: 0; z-index: 4; display: grid; place-items: safe center; padding: 12px; line-height: 1.45; overflow: auto; background: rgba(0, 0, 0, 0.6); }
 .arena.racing .overlay { position: fixed; z-index: 70; display: flex; flex-direction: column; padding: 16px; background: rgba(0, 0, 0, 0.82); overscroll-behavior: contain; }
 .arena.racing .overlay > .card { margin: auto; }
 @media (max-width: 520px) {
@@ -70,6 +70,11 @@
 .roster button[aria-disabled='true'] { color: #4b5368; cursor: not-allowed; }
 .roster .lead { height: 2px; background: radial-gradient(circle, #6c7a96 1px, transparent 1.5px) 0 50% / 8px 2px repeat-x; }
 .roster .tagline { color: var(--j-arc-dim); }
+.arc .speeds { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; }
+.arc .speeds-h { margin-right: 4px; font: 8px/1 var(--j-pixel); color: #8f97ff; letter-spacing: 0.04em; }
+.arc .speeds button { border: 2px solid var(--j-maze); border-radius: 3px; background: none; padding: 7px 9px; font: 9px/1 var(--j-pixel); color: #fff; text-transform: uppercase; }
+.arc .speeds button:hover, .arc .speeds button:focus-visible { background: rgba(33, 33, 222, 0.28); }
+.arc .speeds button[aria-checked='true'] { border-color: var(--j-arc-yellow); color: var(--j-arc-yellow); }
 .arc .tap { margin: 0; font: 8px/1.7 var(--j-pixel); color: var(--j-arc-dim); text-transform: none; }
 .arc .tap.warn { color: #ff8a65; }
 .arc .tap button { border: 0; background: none; padding: 0; font: inherit; color: var(--j-arc-yellow); text-decoration: underline; text-underline-offset: 3px; }

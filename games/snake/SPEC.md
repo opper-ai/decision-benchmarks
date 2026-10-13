@@ -70,6 +70,12 @@ a baseline as a model.
 - **Player recording.** `{ format: 1, game: 'snake', seedToken, moves }`, `moves` one letter a step (`L`, `S`, `R`).
   The server replays them from the token's seed only; it also refuses a game sent sooner after the seed was issued
   than 80% of its steps take at 8 steps a second, so a game can't be computed and sent at once.
+- **Race speed.** The page races you and the AI in real time on one clock, at a speed the visitor picks: Relaxed
+  (a step every 400 ms), Normal (250 ms, the default) or Fast (125 ms). The AI is asked about each board as soon as
+  its last step is applied, one request at a time; an answer that isn't in by the tick is too late, and the
+  benchmark's fallback moves the snake instead. All speeds share one high-score board, and the check above uses the
+  Fast step as its floor, so a game played at a slower speed always passes it. The benchmark is unchanged: paused,
+  one step per answer.
 - **Benchmark recording.** As specified, plus `costUsd` per step (the leaderboard's cost column needs it) and
   `result: { score, steps, end }` (`end`: `wall`, `body`, `starved`, `steps` or `full`). A late answer's latency and
   cost are kept on its step, as the kit's scheduler reports them. The fingerprint is the SHA-256 of the seed and the
