@@ -35,8 +35,14 @@ export interface DecideResponse {
   traceId: string | null;
 }
 
-/** Sends one request and resolves with the answers, or rejects (the scheduler then uses its fallback). */
-export type Transport = (body: SystemOneRequest) => Promise<DecideResponse>;
+/**
+ * Sends one request and resolves with the answers, or rejects (the scheduler then uses its fallback). `signal` lets a
+ * real-time game give up on a request whose step has passed; a transport that can't cancel may ignore it.
+ */
+export type Transport = (body: SystemOneRequest, opts?: { signal?: AbortSignal }) => Promise<DecideResponse>;
+
+/** A request's own timeout, and the caller's signal when it has one: whichever ends it first. */
+export const withSignal = (timeoutMs: number, signal?: AbortSignal): AbortSignal => (signal ? AbortSignal.any([AbortSignal.timeout(timeoutMs), signal]) : AbortSignal.timeout(timeoutMs));
 
 /** A parsed answer: one of the offered options, and whatever probabilities and confidence came with it. */
 export interface ParsedChoice<O extends string = string> {

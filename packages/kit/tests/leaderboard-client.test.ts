@@ -32,6 +32,8 @@ describe("the game pages' shared leaderboard", () => {
   it("shows Snake's columns by default and a game's own columns when it names them", () => {
     const { ranked, baselines } = leaderboardRows({ entries: [entry('sference/clef', 30, 1, { extra: { vsGreedy: 61.25 } })] }, null, { entries: [entry('baseline/a', 9, 1)] });
     expect(tableHeadings({ metric: 'Apples (mean ± margin)' }).map(([l]) => l)).toEqual(['Rank', 'Model', 'Apples (mean ± margin)', 'Best', 'Games', 'Fallbacks', 'Latency', 'Cost / game', 'Run by']);
+    // A real-time game names the fallback share for what it is: the steps the model was too late for.
+    expect(tableHeadings({ metric: 'Apples (mean ± margin)', fallbacks: 'Late steps', latency: 'Mean latency' }).map(([l]) => l)).toEqual(['Rank', 'Model', 'Apples (mean ± margin)', 'Best', 'Games', 'Late steps', 'Mean latency', 'Cost / game', 'Run by']);
     expect(numberCells(ranked[0]!)).toEqual(['60', '100', '1%', '300 ms', '$0.0123']);
     expect(numberCells(baselines[0]!)).toEqual(['60', '100', '1%', '-', '$0.0123']);
     const fighter = { metric: 'Round-win share', best: false, format: (n: number) => `${fmt(n)}%`, extra: [{ label: 'vs greedy', key: 'vsGreedy', format: (v: number | string) => `${fmt(Number(v))}%` }, { label: 'vs payoff', key: 'vsPayoff' }] };

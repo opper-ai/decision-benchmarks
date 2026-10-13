@@ -3,7 +3,7 @@
 Our own game (MIT, author opper-ai, category Arcade). The smallest game that proves every part of the kit: bench,
 submissions, CI replay, play, watch, high scores, deploy.
 
-## Rules (SNAKE_RULES, part of benchVersion 1)
+## Rules (SNAKE_RULES, part of benchVersion 2)
 
 - Board 16 x 16, walls around it (leaving the board = death), no inner walls in v1.
 - Snake starts length 3 in the middle, heading right; one apple on the board at a time. Apple positions come from a
@@ -14,18 +14,45 @@ submissions, CI replay, play, watch, high scores, deploy.
   without an apple (so a looping model cannot stall forever).
 - The game ends at death or after 1000 steps. Score = apples eaten.
 
-## Questions (paused mode)
+## Questions (real-time mode, benchVersion 3)
 
-One System One `choice` question per step, named `snake`, options `left`, `straight`, `right`.
-- `state`: the board as rows of text (`#` wall, `H` head, `o` body, `t` tail, `A` apple, `.` empty) with the
-  heading, length, steps since the last apple, and the apple's position relative to the head.
-- Option criteria state facts, never the answer: what is in the next cell (empty, apple, wall, body), the Manhattan
-  distance to the apple after the move, and how many cells the snake could still reach from there (flood fill),
-  WITHOUT labelling any option "safe" or "best". Instructions explain the rules once.
-- Keep a question under about 600 tokens. Order of options fixed (left, straight, right).
-- Fallback (timeout 2 s from send, error, invalid answer): `straight` if the next cell is not deadly, else the first
-  non-deadly of left/right, else straight. It never steers toward the apple: the harness does not play well on the
-  model's behalf.
+One System One `choice` question per step, named `snake`. Its options are the directions the head can move, keyed by
+absolute direction (`up`, `right`, `down`, `left`), without the reverse: always three.
+- Full choice: every non-reverse direction is offered every step, including one into the wall or the body, and no
+  move is ever played for the model. The answer's direction maps back to the engine's relative move with
+  `moveToward(heading, direction)`, so recordings, verify, submissions and the player check keep `left`, `straight`,
+  `right`.
+- `state`: the board as rows of text (`#` wall, `H` head, `n` neck, the body cell joined to the head, `o` body, `t`
+  tail, `A` apple, `.` empty) with the length, steps since the last apple, the step, and the apple's position in board
+  directions ("3 up and 2 left of the head"). No heading field: with one in the state, models leaned on it and kept
+  answering the current heading (straight on into the wall). The heading is the way from the neck to the head, which
+  is how the service's request check reads it back.
+- Instructions explain the rules once, with the board's legend, and say "Pick the direction the head moves next (it
+  cannot reverse)." No relative wording (turn left, keep heading, ahead) anywhere.
+- Option criteria state facts, never the answer, jevman style: `Go up: Next cell: empty. Distance to the apple after
+  the move: 5. Cells reachable from there: 40 (the snake is 4 long after the move).` A deadly move says plainly that it
+  ends the game: `Go left: Next cell: the wall. The game ends.` No option is labelled "safe" or "best".
+- The options' order is shuffled every step, deterministically from what the request shows (the step, the head and
+  the apple, whose place comes from the seed), so the bench, the page's race and the service's request check
+  (`game.server.ts`, which rebuilds the request and compares it exactly) build the same question. The seed itself is
+  not in the request, so the service could not use it.
+- Keep a question under about 600 tokens.
+- benchVersion 2 asked for `left`/`straight`/`right` in a fixed order with the apple placed relative to the heading;
+  weaker models misread it (one answered `left` on almost every step, others walked straight into walls). Version 3
+  changes only the wording and the clock.
+- Clock: the game steps every 275 ms (`STEP_MS`, about 3.6 steps a second), the same speed for every model (the
+  race's Normal speed). Each step gives the model 275 ms, plus any time left from the previous step: it is asked
+  early, as soon as its answer for the coming step is in (the board after that step is then known), never more than
+  one step ahead. An answer that is in by its step's tick moves the snake. If the tick comes first, the request is
+  cancelled (AbortController), the fallback moves the snake, and the next question goes out at that tick. One request
+  is in flight at a time (a cancelled one no longer counts), one question per step.
+- Fallback (answer not in by the tick, error, invalid answer): `straight` if the next cell is not deadly, else the
+  first non-deadly of left/right, else straight. It never steers toward the apple: the harness does not play well on
+  the model's behalf. The score therefore reflects decision quality and speed together; the leaderboard shows the
+  share of late steps and the mean latency next to it.
+- Baselines answer at once, so they play on the same clock and never fall back.
+- benchVersion 1 was paused (the game waited up to 2 s for each answer) and 2 stepped every 250 ms with the relative
+  question; their results are not comparable and their submissions are refused.
 
 ## Baselines (free, `--model baseline/<name>`)
 
@@ -41,12 +68,15 @@ step's choice is one of the three options and that a fallback step's choice equa
 (so a submitter cannot dress model moves up as fallbacks or vice versa), recomputes the score, and compares to the
 claimed result. Fingerprint = hash of seed + choices. Official seeds: `seedFor(i)` fixed, 100 games.
 
+A replay proves the moves and the score, not the timing: whether a step was answered in time is as the bench
+recorded it. For our official runs we run the bench; for a submission CI can't prove the timing, which is why
+submissions are labelled self-reported (as on jevman).
+
 ## Page (games/snake/index.html, jevman-style: dark, arcade, Opper chrome from the kit)
 
 - Hero: the board playing the top model's recorded game (Watch = recordings only), model chips to switch recordings.
 - Play: you (arrow keys / swipe) on the left board, a model of your choice on the right board, same seed; both start
-  together; the model board advances whenever its answer arrives (paused per step, a step at most every 120 ms so it
-  is watchable). Your board ticks at 8 steps/s. When both are over, show both scores; enter initials for the board.
+  together on one clock (see "Race speed" below). When both are over, show both scores; enter initials for the board.
   The seed for a high-score game is issued by the server (/api/snake/seed, signed), not chosen by the client.
 - High scores: one board `classic` (your apples). Server replays your inputs from the issued seed.
 - Leaderboard section: official + community rows from leaderboard.json/community.json, Run by column, =1 ties,
@@ -71,14 +101,17 @@ a baseline as a model.
   The server replays them from the token's seed only; it also refuses a game sent sooner after the seed was issued
   than 80% of its steps take at 8 steps a second, so a game can't be computed and sent at once.
 - **Race speed.** The page races you and the AI in real time on one clock, at a speed the visitor picks: Relaxed
-  (a step every 400 ms), Normal (250 ms, the default) or Fast (125 ms). The AI is asked about each board as soon as
-  its last step is applied, one request at a time; an answer that isn't in by the tick is too late, and the
-  benchmark's fallback moves the snake instead. All speeds share one high-score board, and the check above uses the
-  Fast step as its floor, so a game played at a slower speed always passes it. The benchmark is unchanged: paused,
-  one step per answer.
+  (a step every 400 ms), Normal (275 ms, the default) or Fast (125 ms). The AI is asked early, one request at a time,
+  exactly as in the benchmark; an answer that isn't in by its tick is too late, and the benchmark's fallback moves the
+  snake instead. All speeds share one high-score board, and the check above uses the
+  Fast step as its floor, so a game played at a slower speed always passes it. Normal is the benchmark's clock: the
+  AI's side of the race is the benchmark's own real-time player (`RealtimeSnake`, `shared/play.ts`).
 - **Benchmark recording.** As specified, plus `costUsd` per step (the leaderboard's cost column needs it) and
-  `result: { score, steps, end }` (`end`: `wall`, `body`, `starved`, `steps` or `full`). A late answer's latency and
-  cost are kept on its step, as the kit's scheduler reports them. The fingerprint is the SHA-256 of the seed and the
+  `result: { score, steps, end }` (`end`: `wall`, `body`, `starved`, `steps` or `full`). A cancelled call's step
+  records the time it had (from sending to the tick: 275 ms, or more when it was asked early), so mean latency counts
+  a late step at that time, a lower bound of the model's real time. A step's `latencyMs` is always from its question
+  being sent to its answer. Its cost is unknown (no answer came back to report it, though the provider may
+  still bill it), so the bench counts it at the mean cost of that game's answered calls. The fingerprint is the SHA-256 of the seed and the
   moves.
 - **Seeds and sizes.** `seedFor(i)` is `Math.imul(i + 1, 0x9e3779b1) >>> 1` (golden-ratio steps, 31 bits). A
   submission needs at least 24 games (100 to match ours), as on jevman.

@@ -5,7 +5,7 @@ import { clientIp, MAX_QUESTIONS, POOL_BUSY_MESSAGE, POOL_EMPTY_MESSAGE, type Po
 import type { SessionData } from './session.ts';
 import type { GameServer } from '../shared/game.ts';
 import { DEFAULT_MODEL, isModelId, modelName } from '../shared/models.ts';
-import { WARM_UP_REQUEST, type SystemOneRequest } from '../shared/systemone.ts';
+import { WARM_UP_REQUEST, withSignal, type SystemOneRequest } from '../shared/systemone.ts';
 
 /** Whose key pays: a signed-in player's, the free credits' (signed out), or the local one from .env. */
 export type KeyMode = 'player' | 'pool' | 'dev';
@@ -32,6 +32,8 @@ export interface DecideDeps {
   provider?: Provider;
   /** Sent to Opper as X-Opper-Name, so traces show which game called. */
   callName?: string;
+  /** The caller gave up on the call (a real-time game whose step has passed): it is cancelled. */
+  signal?: AbortSignal;
 }
 
 export interface DecideResult {
@@ -86,7 +88,7 @@ export async function handleDecide(input: unknown, deps: DecideDeps): Promise<De
         ...(provider === 'opper' ? { 'X-Opper-Name': deps.callName ?? 'decision-benchmarks' } : {}),
       },
       body: JSON.stringify({ model, state: input.state, questions: input.questions }),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: withSignal(timeoutMs, deps.signal),
     });
     const text = await res.text();
     const latencyMs = Math.round(deps.now() - started);
@@ -127,7 +129,7 @@ export async function handleDecide(input: unknown, deps: DecideDeps): Promise<De
   } catch (err) {
     const e = err as Error;
     const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError';
-    const error = timedOut ? `${label} timed out after ${timeoutMs} ms` : redact(`${label} request failed: ${e?.message ?? String(err)}`);
+    const error = deps.signal?.aborted ? `${label} was cancelled: its step had passed` : timedOut ? `${label} timed out after ${timeoutMs} ms` : redact(`${label} request failed: ${e?.message ?? String(err)}`);
     log(`${tag} ${actors} ${error}`);
     return { status: timedOut ? 504 : 502, body: { error } };
   }

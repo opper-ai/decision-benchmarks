@@ -11,7 +11,8 @@ const server: GameServer = {
   slug: 'snake',
   /**
    * Only Snake's own question reaches a model: the board is read back from the state and the request rebuilt from it,
-   * and the body must be exactly that rebuilt request (no other fields, questions or wording).
+   * and the body must be exactly that rebuilt request (no other fields, questions or wording, and the options in the
+   * order the step shuffles them to).
    */
   decideRequest(body) {
     const refuse = { ok: false as const, error: 'That is not a question this game asks' };

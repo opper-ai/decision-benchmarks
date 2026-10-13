@@ -3,8 +3,8 @@
 // Then: npm run bench -- --game snake --endpoint http://localhost:8787 --games 2
 //
 // It gets the request Snake sends System One: {state, questions}. The state holds the board as text rows; the one
-// question, `snake`, is {type: 'choice', instructions, criteria: {left, straight, right}}, each option stating what
-// that move leads to. Answer with one of the criteria keys. This "model" skips moves into the wall or the body and
+// question, `snake`, is {type: 'choice', instructions, criteria}, keyed by the three directions the head can move (up,
+// right, down, left, never the reverse), each option stating what that move leads to. Answer with one of the keys. This "model" skips moves into the wall or the body and
 // takes the one that ends closest to the apple.
 import { createServer } from 'node:http';
 
@@ -18,7 +18,7 @@ function choose(q: Question): string {
   const options = Object.keys(q.criteria);
   const alive = options.filter((o) => !/Next cell: the (wall|snake's body)/.test(q.criteria[o]));
   const distance = (o: string) => Number(/Distance to the apple after the move: (\d+)/.exec(q.criteria[o])?.[1] ?? Infinity);
-  return alive.sort((a, b) => distance(a) - distance(b))[0] ?? 'straight';
+  return alive.sort((a, b) => distance(a) - distance(b))[0] ?? options[0]!;
 }
 
 const port = Number(process.argv[2] ?? 8787);

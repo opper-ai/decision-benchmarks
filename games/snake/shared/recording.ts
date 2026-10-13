@@ -3,10 +3,16 @@
 import type { GameResult } from '../../../packages/kit/shared/game.ts';
 import type { End, Move } from './engine.ts';
 
-/** Bump when the rules or the question change: older submissions are then refused. */
-export const BENCH_VERSION = 1;
+/**
+ * Bump when the rules, the question or the clock change: older submissions are then refused. 1: paused, up to 2 s per
+ * answer. 2: real time, a step every 250 ms. 3: a step every 275 ms, and the question asks for an absolute direction.
+ */
+export const BENCH_VERSION = 3;
 
-/** One step: the move made, who made it, and the call behind it (when its answer came back, even too late). */
+/**
+ * One step: the move made, who made it (`fallback` when the answer was not in by the tick, failed or was unusable),
+ * and the call behind it (when its answer came back, even too late).
+ */
 export interface Step {
   choice: Move;
   source: 'model' | 'fallback';

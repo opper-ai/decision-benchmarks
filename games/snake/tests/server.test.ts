@@ -30,7 +30,12 @@ describe('decideRequest', () => {
     const extraQuestion = { ...structuredClone(body), questions: { ...body.questions, other: body.questions.snake } };
     const extraField = { ...structuredClone(body), stream: true };
     const badKey = { ...structuredClone(body), keys: { snake: 'x'.repeat(200) } };
-    for (const b of [pacman, poem, reworded, extraQuestion, extraField, badKey, null, 'snake', [], {}]) {
+    // The same options in another order than the step's shuffle, and the old relative keys.
+    const reordered = structuredClone(body);
+    reordered.questions.snake!.criteria = Object.fromEntries(Object.entries(body.questions.snake!.criteria).reverse());
+    const relative = structuredClone(body);
+    relative.questions.snake!.criteria = Object.fromEntries(Object.values(body.questions.snake!.criteria).map((t, i) => [['left', 'straight', 'right'][i]!, t]));
+    for (const b of [pacman, poem, reworded, extraQuestion, extraField, badKey, reordered, relative, null, 'snake', [], {}]) {
       expect(server.decideRequest(b)).toEqual({ ok: false, error: 'That is not a question this game asks' });
     }
     expect(server.decideRequest(pageBody('openai/gpt-5'))).toMatchObject({ ok: false, error: expect.stringMatching(/Unknown decision model/) });

@@ -165,16 +165,17 @@ to main runs the same CI and then deploys (`deploy.yml`), when deploys are enabl
 | Game | Mode | Metric | Official games | License |
 |---|---|---|---|---|
 | jevman | real time | Score (points) | 100 | AGPL-3.0-or-later |
-| snake | paused | Apples | 100 | MIT |
+| snake | real time (275 ms a step) | Apples | 100 | MIT |
 | fighter | paused | Rounds won vs bots (%) | 102 | MIT |
 
 - **jevman** (Pac-Man, Arcade): the game the kit was extracted from. A model steers Pac-Man in real time against the
   scripted ghosts until game over or 300 s; the score is the game's points. Players play Pac-Man against ghosts
   played by models, with a high-score board per ghost lineup. Its results files are in the contract shape, and
   `shared/leaderboard.ts` turns them back into jevman's own shape for its page.
-- **snake** (Arcade, ours): a model steers a snake on a seeded 16 x 16 board, one `choice` per step (left, straight,
-  right), and the game waits for each answer (2 s, then a fallback that never steers toward the apple). Score = apples
-  eaten, until death, 150 steps without an apple or 1000 steps. Players race a model on the same server-issued seed,
+- **snake** (Arcade, ours): a model steers a snake on a seeded 16 x 16 board, one `choice` per step (the direction the
+  head moves next, every direction but the reverse offered, in a shuffled order), in real time: the snake steps every 275 ms for every model, and a step whose answer is not in by the tick is
+  played by a fallback that never steers toward the apple, so the score is decision quality and speed together.
+  Score = apples eaten, until death, 150 steps without an apple or 1000 steps. Players race a model on the same server-issued seed,
   and their game is replayed on the server for the high-score board. Rules: `games/snake/SPEC.md`.
 - **fighter** (Jev Fighter, Fighting): a deterministic 2D fighting game. One benchmark game is one paused match on the
   assisted track against one of three baselines (greedy, payoff, maximin), from one side, on fixed seeds; the score

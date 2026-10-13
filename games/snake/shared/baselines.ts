@@ -12,7 +12,8 @@ export const BASELINE_NAMES: readonly BaselineName[] = ['random', 'greedy', 'flo
 /** A number from the board, so the random baseline plays the same game every time on the same seed. */
 function boardHash(v: View): number {
   let h = 2166136261;
-  for (const ch of `${v.rows.join('')}|${v.heading}|${v.step}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  // The neck counts as body here, as it did before the board showed it, so the random baseline plays the same games.
+  for (const ch of `${v.rows.join('').replaceAll('n', 'o')}|${v.heading}|${v.step}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
   return h | 0;
 }
 
@@ -45,7 +46,10 @@ export function baselineTransport(name: BaselineName): Transport {
   return async (body: SystemOneRequest): Promise<DecideResponse> => {
     const v = parseState(body.state);
     if (!v || !body.questions?.[QUESTION]) throw new Error(`baseline/${name} only answers Snake's question`);
-    const choice = PICK[name](allFacts(v), v);
+    // The baseline picks a move; the question asks for the direction it goes.
+    const facts = allFacts(v);
+    const move = PICK[name](facts, v);
+    const choice = facts.find((f) => f.move === move)!.heading;
     return { model: `baseline/${name}`, answers: { [QUESTION]: { type: 'choice', choice } }, usage: { input_tokens: 0, output_tokens: 0 }, latencyMs: 0, costUsd: null, traceId: null };
   };
 }
