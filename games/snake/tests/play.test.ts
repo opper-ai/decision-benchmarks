@@ -3,6 +3,7 @@ import type { DecideResponse, SystemOneRequest } from '../../../packages/kit/sha
 import { verifyGame } from '../bench/verify';
 import game, { seedFor } from '../game';
 import { baselineTransport } from '../shared/baselines';
+import { turn, type Heading } from '../shared/engine';
 import { playSnake, STEP_MS } from '../shared/play';
 
 const answer = (choice: unknown, extra: Partial<DecideResponse> = {}): DecideResponse => ({ answers: { snake: { type: 'choice', choice } }, usage: { input_tokens: 400, output_tokens: 2 }, latencyMs: 30, costUsd: 0.0001, traceId: null, ...extra });
@@ -16,10 +17,10 @@ const later = <T>(ms: number, v: T, signal?: AbortSignal) =>
 describe('playSnake', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('is real time on a 250 ms clock, the same for every model', () => {
+  it('is real time on a 275 ms clock, the same for every model', () => {
     expect(game.mode).toBe('realtime');
-    expect(STEP_MS).toBe(250);
-    expect(game.timing).toEqual({ decisionTimeoutMs: 250, callTimeoutMs: 2000, maxInFlight: 1 });
+    expect(STEP_MS).toBe(275);
+    expect(game.timing).toEqual({ decisionTimeoutMs: 275, callTimeoutMs: 2000, maxInFlight: 1 });
   });
 
   it('asks one snake question per step, names the model on the page, and records the answers, costs and signatures', async () => {
@@ -27,7 +28,8 @@ describe('playSnake', () => {
     const { result, recording } = await playSnake({
       transport: async (body) => {
         bodies.push(body);
-        return answer('straight', { signatures: { snake: 'sig' }, signedAs: 'sference/clef' });
+        // Straight on: the direction it is heading.
+        return answer((body.state as { heading: string }).heading, { signatures: { snake: 'sig' }, signedAs: 'sference/clef' });
       },
       seed: seedFor(2),
       model: 'sference/clef',
@@ -48,12 +50,12 @@ describe('playSnake', () => {
 
   it('steps on the clock whatever the model does: the tick cancels a late request and the fallback plays its step', async () => {
     vi.useFakeTimers();
-    // Every third answer would take 400 ms, past its tick; the others take 50 ms.
+    // Every third answer takes 700 ms, past even its extended window (asked a step early); the others take 50 ms.
     let n = 0;
     let inFlight = 0;
     let maxInFlight = 0;
     let cancelled = 0;
-    const transport = (_body: SystemOneRequest, opts?: { signal?: AbortSignal }) => {
+    const transport = (body: SystemOneRequest, opts?: { signal?: AbortSignal }) => {
       const slow = n++ % 3 === 2;
       inFlight += 1;
       maxInFlight = Math.max(maxInFlight, inFlight);
@@ -63,13 +65,13 @@ describe('playSnake', () => {
         done = true;
       };
       opts?.signal?.addEventListener('abort', () => (cancelled += 1, end()));
-      return later(slow ? 400 : 50, answer('left', { latencyMs: slow ? 400 : 50, costUsd: 0.0002 }), opts?.signal).finally(end);
+      return later(slow ? 700 : 50, answer(turn((body.state as { heading: Heading }).heading, 'left'), { latencyMs: slow ? 700 : 50, costUsd: 0.0002 }), opts?.signal).finally(end);
     };
     const started = Date.now();
     const played = playSnake({ transport, seed: seedFor(7), model: 'm', timeoutMs: 2000 });
     await vi.advanceTimersByTimeAsync(1000 * STEP_MS);
     const { result, recording } = await played;
-    // One step a tick: the game took its steps x 250 ms.
+    // One step a tick: the game took its steps x 275 ms.
     expect(recording.steps.length).toBe(result.steps);
     expect(Math.round((Date.now() - started) / STEP_MS)).toBeGreaterThanOrEqual(result.steps);
     expect(maxInFlight).toBe(1);
@@ -78,8 +80,9 @@ describe('playSnake', () => {
     const late = recording.steps.filter((s) => s.source === 'fallback');
     expect(cancelled).toBe(late.length);
     expect(result.fallbacks).toBe(late.length);
-    // A cancelled call took the whole step, and its unknown cost is the mean of the game's answered calls.
-    expect(new Set(late.map((s) => s.latencyMs))).toEqual(new Set([STEP_MS]));
+    // A cancelled call had its step and the one before (it was asked early), and its unknown cost is the mean of the
+    // game's answered calls.
+    expect(new Set(late.map((s) => s.latencyMs))).toEqual(new Set([2 * STEP_MS]));
     for (const s of late) expect(s.costUsd).toBeCloseTo(0.0002, 10);
     expect(recording.steps.filter((s) => s.source === 'model').every((s) => s.latencyMs === 50)).toBe(true);
     expect(result.cost).toBeCloseTo(0.0002 * recording.steps.length);
@@ -91,7 +94,7 @@ describe('playSnake', () => {
     const { result, recording } = await playSnake({
       transport: async () => {
         n += 1;
-        if (n % 2) return answer('up');
+        if (n % 2) return answer('backwards');
         throw new Error('boom');
       },
       seed: seedFor(3),

@@ -1,9 +1,11 @@
-// Snake's question (SPEC.md, "Questions"): one System One `choice` per step, named `snake`, options left, straight and
-// right. The state is the board as text; each option states facts about the move (what is in the next cell, the
-// distance to the apple, the room left from there), never which move is good. Everything is computed from a View, the
+// Snake's question (SPEC.md, "Questions"): one System One `choice` per step, named `snake`, whose options are the three
+// directions the head can move (up, right, down, left without the reverse), in a shuffled order. Every one is offered,
+// a deadly one too. The state is the board as text; each option states facts about the move (what is in the next cell,
+// the distance to the apple, the room left from there), never which move is good. The engine plays relative moves
+// (left, straight, right): an answer's direction maps back with moveToward, so recordings keep L/S/R. Everything is computed from a View, the
 // board as the question shows it, so the page, the bench, the service's request check and the baselines word and read
 // a question the same way. Isomorphic and Node-safe.
-import { add, inside, isHeading, MOVES, SIZE, STARVE_STEPS, MAX_STEPS, turn, type Cell, type GameState, type Heading, type Move } from './engine.ts';
+import { add, inside, isHeading, moveToward, MOVES, SIZE, STARVE_STEPS, MAX_STEPS, turn, type Cell, type GameState, type Heading, type Move } from './engine.ts';
 import type { ChoiceQuestion, SystemOneRequest } from '../../../packages/kit/shared/systemone.ts';
 
 export const QUESTION = 'snake';
@@ -33,7 +35,7 @@ export interface Facts {
 }
 
 export const INSTRUCTIONS =
-  'You steer a snake on a 16 by 16 board, one cell per step: turn left, go straight or turn right, relative to the way it is heading. ' +
+  'You steer a snake on a 16 by 16 board, one cell per step. Pick the direction the head moves next (it cannot reverse). ' +
   'Eating the apple scores 1 and makes the snake one longer. The game ends when the head leaves the board or runs into the snake (the tail cell is free: the tail moves on this step), ' +
   `after ${STARVE_STEPS} steps without an apple, or after ${MAX_STEPS} steps. ` +
   'The board, top row first: # wall, H head, o body, t tail, A apple, . empty. Up is toward the top row. Eat as many apples as you can.';
@@ -97,16 +99,13 @@ export function fallbackMove(facts: readonly Facts[]): Move {
   return (['left', 'right'] as const).find((m) => !of(m).deadly) ?? 'straight';
 }
 
-/** Where the apple is from the head, along the heading: "3 ahead and 2 to the left". */
+/** Where the apple is from the head, in board directions: "3 up and 2 left of the head", "4 right of the head". */
 export function applePosition(v: View): string {
   if (!v.apple) return 'none';
   const dx = v.apple.x - v.head.x;
   const dy = v.apple.y - v.head.y;
-  const ahead = v.heading === 'up' ? -dy : v.heading === 'down' ? dy : v.heading === 'right' ? dx : -dx;
-  const right = v.heading === 'up' ? dx : v.heading === 'down' ? -dx : v.heading === 'right' ? dy : -dy;
-  const along = ahead > 0 ? `${ahead} ahead` : ahead < 0 ? `${-ahead} behind` : 'level with the head';
-  const side = right > 0 ? `${right} to the right` : right < 0 ? `${-right} to the left` : 'straight in line';
-  return `${along} and ${side}`;
+  const parts = [dy < 0 ? `${-dy} up` : dy > 0 ? `${dy} down` : '', dx < 0 ? `${-dx} left` : dx > 0 ? `${dx} right` : ''].filter(Boolean);
+  return `${parts.join(' and ')} of the head`;
 }
 
 const NEXT_TEXT: Record<Facts['next'], string> = {
@@ -117,22 +116,40 @@ const NEXT_TEXT: Record<Facts['next'], string> = {
   body: "the snake's body",
 };
 
-/** One option's text: facts only. */
+/** One option's text: facts only, and plainly that a deadly move ends the game. */
 export function criterion(f: Facts, length: number): string {
-  const turnText = f.move === 'straight' ? `Keep heading ${f.heading}.` : `Turn ${f.move}, heading ${f.heading}.`;
-  const parts = [turnText, `Next cell: ${NEXT_TEXT[f.next]}.`];
-  if (!f.deadly) {
+  const parts = [`Go ${f.heading}: Next cell: ${NEXT_TEXT[f.next]}.`];
+  if (f.deadly) parts.push('The game ends.');
+  else {
     if (f.distance !== null) parts.push(`Distance to the apple after the move: ${f.distance}.`);
     parts.push(`Cells reachable from there: ${f.reachable} (the snake is ${length + (f.next === 'apple' ? 1 : 0)} long after the move).`);
   }
   return parts.join(' ');
 }
 
-/** The question for a View. */
-export function questionFor(v: View): ChoiceQuestion {
-  const facts = allFacts(v);
-  return { type: 'choice', instructions: INSTRUCTIONS, criteria: Object.fromEntries(facts.map((f) => [f.move, criterion(f, v.length)])) };
+/**
+ * The options' order for a View: shuffled per step, so no position (first, middle) means anything. Deterministic from
+ * what the request itself shows (the step, the head and the apple), so the bench, the page and the service's request
+ * check put them in the same order; the apple's place comes from the game's seed.
+ */
+export function optionOrder(v: View): Facts[] {
+  const fs = allFacts(v);
+  let h = Math.imul(v.step + 1, 0x9e3779b1) ^ Math.imul(v.head.y * SIZE + v.head.x + 1, 0x85ebca6b) ^ Math.imul(v.apple ? v.apple.y * SIZE + v.apple.x + 1 : 0, 0xc2b2ae35);
+  for (let i = fs.length - 1; i > 0; i--) {
+    h = (Math.imul(h, 1103515245) + 12345) >>> 0;
+    const j = (h >>> 16) % (i + 1);
+    [fs[i], fs[j]] = [fs[j]!, fs[i]!];
+  }
+  return fs;
 }
+
+/** The question for a View: one option per direction the head can move, keyed by that direction. */
+export function questionFor(v: View): ChoiceQuestion {
+  return { type: 'choice', instructions: INSTRUCTIONS, criteria: Object.fromEntries(optionOrder(v).map((f) => [f.heading, criterion(f, v.length)])) };
+}
+
+/** The move an answered direction makes (null for a direction that isn't an option: the reverse, or no direction). */
+export const moveFor = (v: Pick<View, 'heading'>, direction: unknown): Move | null => (isHeading(direction) ? moveToward(v.heading, direction) : null);
 
 /** The request's state for a View: the board with its walls and the numbers the board does not show. */
 export function stateFor(v: View): Record<string, unknown> {

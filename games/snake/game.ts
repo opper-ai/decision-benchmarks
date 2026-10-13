@@ -1,8 +1,9 @@
-// Snake on the kit: a decision model steers a snake on a seeded 16 x 16 board, one choice per step (left, straight,
-// right), in real time: the snake steps every 250 ms whatever the model does, and a step whose answer is not in by
-// the tick is played by a fallback that never steers toward the apple. Every model plays at this one speed. The metric is the apples eaten, until death or 1000 steps. The kit's bench plays it (npm run bench --
-// --game snake), free baselines included (--model baseline/greedy), and the submissions check replays its recordings
-// (npm run submissions -- --game snake). Rules and question: SPEC.md.
+// Snake on the kit: a decision model steers a snake on a seeded 16 x 16 board, one choice per step (the direction the
+// head moves next: up, right, down or left, never the reverse), in real time: the snake steps every 275 ms whatever the
+// model does, and a step whose answer is not in by the tick is played by a fallback that never steers toward the
+// apple. Every model plays at this one speed. The metric is the apples eaten, until death or 1000 steps. The kit's
+// bench plays it (npm run bench -- --game snake), free baselines included (--model baseline/greedy), and the
+// submissions check replays its recordings (npm run submissions -- --game snake). Rules and question: SPEC.md.
 import type { GameDefinition } from '../../packages/kit/shared/game.ts';
 import { verifyGame } from './bench/verify.ts';
 import { BASELINES } from './shared/baselines.ts';

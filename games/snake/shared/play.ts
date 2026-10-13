@@ -1,12 +1,13 @@
-// One game of Snake played by a model in real time, on a fixed clock: a step every STEP_MS (250 ms), the benchmark's
+// One game of Snake played by a model in real time, on a fixed clock: a step every STEP_MS (275 ms), the benchmark's
 // one speed for every model. The model is asked about the board as soon as its last step is applied, one request at
-// a time, so every step gives it a fresh, full 250 ms. An answer that is in by the tick moves the snake; if the tick
-// comes first, the request is cancelled and the game's fallback moves the snake instead. The score is decision quality and speed together. The bench plays it
+// a time, and early: once its answer for the coming step is in, the question for the step after goes out at once, so
+// every step gives it 275 ms plus any time left from the previous step. An answer that is in by the tick moves the
+// snake; if the tick comes first, the request is cancelled and the game's fallback moves the snake instead. The score is decision quality and speed together. The bench plays it
 // headless with real timers (playSnake); the page's race steps a RealtimeSnake on its own clock next to your board.
 // Isomorphic.
 import { askPaused, type BaseDecision, type SchedulerGame } from '../../../packages/kit/client/scheduler.ts';
 import { parseChoice, type Transport } from '../../../packages/kit/shared/systemone.ts';
-import { createGame, MOVES, step, type GameState, type Move } from './engine.ts';
+import { createGame, step, type GameState, type Heading, type Move } from './engine.ts';
 import { allFacts, fallbackMove, QUESTION, requestFor, viewOf, type Facts } from './questions.ts';
 import { BENCH_VERSION, type Recording, type SnakeResult, type Step } from './recording.ts';
 
@@ -31,10 +32,13 @@ export const SNAKE_SCHEDULER: Pick<SchedulerGame<GameState, SnakePoint, SnakeQue
   prepare: (s, point) => ({ point, facts: allFacts(viewOf(s)) }),
   name: () => QUESTION,
   build: (s) => requestFor(viewOf(s)),
-  parse(answer) {
-    const p = parseChoice(answer, MOVES);
+  // The answer names a direction; the engine plays the relative move it makes, and the probabilities go by move too.
+  parse(answer, q) {
+    const p = parseChoice(answer, q.facts.map((f) => f.heading));
     if (!p) return null;
-    return { choice: p.choice, source: 'model', ...(Object.keys(p.probabilities).length ? { probabilities: p.probabilities } : {}) };
+    const move = (h: Heading): Move => q.facts.find((f) => f.heading === h)!.move;
+    const probabilities = Object.fromEntries(Object.entries(p.probabilities).map(([h, n]) => [move(h as Heading), n])) as Partial<Record<Move, number>>;
+    return { choice: move(p.choice), source: 'model', ...(Object.keys(probabilities).length ? { probabilities } : {}) };
   },
   fallback: (_s, q) => ({ choice: fallbackMove(q.facts), source: 'fallback' }),
 };
@@ -42,8 +46,8 @@ export const SNAKE_SCHEDULER: Pick<SchedulerGame<GameState, SnakePoint, SnakeQue
 /** The question key of a step: what the server signs an answer for. */
 export const stepKey = (s: GameState): string => `s${s.steps}`;
 
-/** The benchmark's clock: a step every 250 ms, for every model (the race's Normal speed). */
-export const STEP_MS = 250;
+/** The benchmark's clock: a step every 275 ms, for every model (the race's Normal speed). */
+export const STEP_MS = 275;
 
 export interface RealtimeSnakeOptions {
   transport: Transport;
@@ -69,9 +73,12 @@ interface Pending {
 }
 
 /**
- * A model's side of a real-time game. The caller's clock calls tick(); the answers come in between ticks. Every step
- * gives the model a fresh, full step's time: the question is asked as soon as the previous step is applied, and if the
- * tick comes first, the request is cancelled and the fallback moves the snake. One request is in flight at a time.
+ * A model's side of a real-time game. The caller's clock calls tick(); the answers come in between ticks. The model is
+ * asked early: once its answer for the coming step is in, the board after that step is known, so the question for the
+ * step after goes out at once instead of at the tick. Each step thus gives the model a full step's time plus whatever
+ * was left of the previous one. If a tick comes before the answer, the request is cancelled, the fallback moves the
+ * snake and the next question goes out at that tick. One request is in flight at a time, one question per step, and
+ * never more than one step ahead.
  */
 export class RealtimeSnake {
   state: GameState;
@@ -81,7 +88,9 @@ export class RealtimeSnake {
   /** Requests sent so far, and how many of them were cancelled at the tick. */
   requests = 0;
   cancelled = 0;
-  private pending: Pending | null = null;
+  /** The question for the step the next tick plays, and the one for the step after it (asked early). */
+  private current: Pending | null = null;
+  private ahead: Pending | null = null;
   /** The steps the fallback played for a cancelled request. */
   private readonly cancelledSteps = new Set<Step>();
   private stopped = false;
@@ -92,21 +101,19 @@ export class RealtimeSnake {
     this.o = o;
     this.now = o.now ?? (() => performance.now());
     this.state = createGame(o.seed);
-    this.ask();
+    this.current = this.ask(this.state);
   }
 
   get over(): boolean {
     return this.state.over !== null;
   }
 
-  /** Asks about the board as it is now. */
-  private ask(): void {
-    if (this.stopped || this.over) return;
-    const slot: Pending = { key: stepKey(this.state), decision: null, abort: new AbortController(), sentAt: this.now() };
-    this.pending = slot;
+  /** Asks about a board: the one the next tick plays from, or (early) the one after it. */
+  private ask(state: GameState): Pending {
+    const slot: Pending = { key: stepKey(state), decision: null, abort: new AbortController(), sentAt: this.now() };
     this.requests += 1;
     const transport: Transport = (body) => this.o.transport(body, { signal: slot.abort.signal });
-    void askPaused(SNAKE_SCHEDULER, this.state, [{ key: slot.key, actor: 'snake' } satisfies SnakePoint], {
+    void askPaused(SNAKE_SCHEDULER, state, [{ key: slot.key, actor: 'snake' } satisfies SnakePoint], {
       transport,
       now: this.now,
       timeoutMs: this.o.timeoutMs,
@@ -125,7 +132,17 @@ export class RealtimeSnake {
       },
     }).then(([d]) => {
       slot.decision = d!;
+      this.askAhead();
     });
+    return slot;
+  }
+
+  /** Once the coming step's decision is in, asks about the board after it (unless that ends the game). */
+  private askAhead(): void {
+    if (this.stopped || this.over || this.ahead || !this.current?.decision || this.current.key !== stepKey(this.state)) return;
+    const next = step(this.state, this.current.decision.choice);
+    if (next.over) return;
+    this.ahead = this.ask(next);
   }
 
   /**
@@ -135,8 +152,8 @@ export class RealtimeSnake {
   tick(): Step | null {
     if (this.stopped || this.over) return null;
     const key = stepKey(this.state);
-    const slot = this.pending?.key === key ? this.pending : null;
-    this.pending = null;
+    const slot = this.current?.key === key ? this.current : null;
+    this.current = null;
     let rec: Step;
     if (slot?.decision) {
       const d = slot.decision;
@@ -161,7 +178,16 @@ export class RealtimeSnake {
     }
     this.state = step(this.state, rec.choice);
     this.steps.push(rec);
-    this.ask();
+    if (!this.over) {
+      // Asked early (its answer may be in already), or asked now: the step was late, or played without an answer.
+      if (this.ahead?.key === stepKey(this.state)) this.current = this.ahead;
+      else {
+        this.ahead?.abort.abort();
+        this.current = this.ask(this.state);
+      }
+      this.ahead = null;
+      this.askAhead();
+    }
     return rec;
   }
 
@@ -185,11 +211,12 @@ export class RealtimeSnake {
     return resultOf(this.state, this.steps);
   }
 
-  /** No more questions; the request still out is cancelled. */
+  /** No more questions; a request still out is cancelled. */
   stop(): void {
     this.stopped = true;
-    this.pending?.abort.abort();
-    this.pending = null;
+    for (const slot of [this.current, this.ahead]) if (slot && !slot.decision) slot.abort.abort();
+    this.current = null;
+    this.ahead = null;
   }
 }
 

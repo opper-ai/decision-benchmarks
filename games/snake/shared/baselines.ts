@@ -45,7 +45,10 @@ export function baselineTransport(name: BaselineName): Transport {
   return async (body: SystemOneRequest): Promise<DecideResponse> => {
     const v = parseState(body.state);
     if (!v || !body.questions?.[QUESTION]) throw new Error(`baseline/${name} only answers Snake's question`);
-    const choice = PICK[name](allFacts(v), v);
+    // The baseline picks a move; the question asks for the direction it goes.
+    const facts = allFacts(v);
+    const move = PICK[name](facts, v);
+    const choice = facts.find((f) => f.move === move)!.heading;
     return { model: `baseline/${name}`, answers: { [QUESTION]: { type: 'choice', choice } }, usage: { input_tokens: 0, output_tokens: 0 }, latencyMs: 0, costUsd: null, traceId: null };
   };
 }

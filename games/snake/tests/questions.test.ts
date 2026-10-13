@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, step, type GameState } from '../shared/engine';
-import { allFacts, applePosition, fallbackMove, parseState, questionFor, requestFor, stateFor, viewOf } from '../shared/questions';
+import { allFacts, applePosition, fallbackMove, moveFor, parseState, questionFor, requestFor, stateFor, viewOf } from '../shared/questions';
 
 const at = (body: [number, number][], heading: GameState['heading'], apple: [number, number] | null, extra: Partial<GameState> = {}): GameState => ({
   ...createGame(1),
@@ -17,18 +17,42 @@ describe('the question', () => {
     expect((state.board as string[])[0]).toBe('#'.repeat(18));
     expect((state.board as string[])[2]).toBe('#toH.............#');
     expect((state.board as string[])[4]).toBe('#.....A..........#');
-    expect(state).toMatchObject({ heading: 'right', length: 3, apple: '3 ahead and 2 to the right', stepsSinceApple: 4, step: 9 });
+    expect(state).toMatchObject({ heading: 'right', length: 3, apple: '2 down and 3 right of the head', stepsSinceApple: 4, step: 9 });
   });
 
-  it('states facts for each option, in a fixed order, and never names a move safe or best', () => {
+  it('offers every direction but the reverse, keyed by direction, deadly ones too, and never names one safe or best', () => {
     const v = viewOf(at([[0, 1], [1, 1], [2, 1]], 'left', [0, 5]));
     const q = questionFor(v);
-    expect(Object.keys(q.criteria)).toEqual(['left', 'straight', 'right']);
-    expect(q.criteria.straight).toBe('Keep heading left. Next cell: the wall.');
-    expect(q.criteria.left).toMatch(/^Turn left, heading down\. Next cell: empty\. Distance to the apple after the move: 3\. Cells reachable from there: \d+ \(the snake is 3 long after the move\)\.$/);
-    expect(q.criteria.right).toMatch(/^Turn right, heading up\. Next cell: empty\. Distance to the apple after the move: 5\./);
+    expect(Object.keys(q.criteria).sort()).toEqual(['down', 'left', 'up']);
+    expect(q.criteria.left).toBe('Go left: Next cell: the wall. The game ends.');
+    expect(q.criteria.down).toMatch(/^Go down: Next cell: empty\. Distance to the apple after the move: 3\. Cells reachable from there: \d+ \(the snake is 3 long after the move\)\.$/);
+    expect(q.criteria.up).toMatch(/^Go up: Next cell: empty\. Distance to the apple after the move: 5\./);
+    expect(q.instructions).toContain('Pick the direction the head moves next (it cannot reverse).');
     const text = JSON.stringify(requestFor(v));
     expect(text).not.toMatch(/\b(safe|best|recommended|should)\b/i);
+    // No relative wording left: no turns, no "ahead" or "behind".
+    expect(text).not.toMatch(/\b(turn left|turn right|keep heading|ahead|behind|straight)\b/i);
+  });
+
+  it('maps an answered direction back to the move it makes', () => {
+    expect(moveFor({ heading: 'left' }, 'left')).toBe('straight');
+    expect(moveFor({ heading: 'left' }, 'down')).toBe('left');
+    expect(moveFor({ heading: 'left' }, 'up')).toBe('right');
+    expect(moveFor({ heading: 'left' }, 'right')).toBeNull();
+    expect(moveFor({ heading: 'left' }, 'straight')).toBeNull();
+  });
+
+  it('shuffles the options per step, the same way for the same board', () => {
+    let s = createGame(3);
+    const orders = new Set<string>();
+    for (let i = 0; i < 12 && !s.over; i++) {
+      const v = viewOf(s);
+      const order = Object.keys(questionFor(v).criteria).map((k) => moveFor(v, k)).join();
+      expect(Object.keys(questionFor(viewOf(s)).criteria).map((k) => moveFor(v, k)).join()).toBe(order);
+      orders.add(order);
+      s = step(s, fallbackMove(allFacts(v)));
+    }
+    expect(orders.size).toBeGreaterThan(2);
   });
 
   it('stays under about 600 tokens (about 4 characters a token)', () => {
@@ -38,10 +62,10 @@ describe('the question', () => {
     for (const n of sizes) expect(n / 4).toBeLessThan(600);
   });
 
-  it('places the apple relative to the heading', () => {
-    expect(applePosition(viewOf(at([[5, 5], [5, 6], [5, 7]], 'up', [3, 2])))).toBe('3 ahead and 2 to the left');
-    expect(applePosition(viewOf(at([[5, 5], [4, 5], [3, 5]], 'right', [5, 9])))).toBe('level with the head and 4 to the right');
-    expect(applePosition(viewOf(at([[5, 5], [5, 4], [5, 3]], 'down', [5, 1])))).toBe('4 behind and straight in line');
+  it('places the apple in board directions from the head, whatever the heading', () => {
+    expect(applePosition(viewOf(at([[5, 5], [5, 6], [5, 7]], 'up', [3, 2])))).toBe('3 up and 2 left of the head');
+    expect(applePosition(viewOf(at([[5, 5], [4, 5], [3, 5]], 'right', [5, 9])))).toBe('4 down of the head');
+    expect(applePosition(viewOf(at([[5, 5], [5, 4], [5, 3]], 'down', [9, 5])))).toBe('4 right of the head');
   });
 
   it('counts the room a move leaves, freeing the tail unless the snake grows', () => {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DecideResponse, SystemOneRequest, Transport } from '../../../packages/kit/shared/systemone';
 import { seedFor } from '../game';
 import { baselineTransport } from '../shared/baselines';
-import { createGame, step, type Move } from '../shared/engine';
+import { createGame, step, turn, type Heading, type Move } from '../shared/engine';
 import { fallbackMove, allFacts, viewOf } from '../shared/questions';
 import { RealtimeSnake, SPEED_STEP_MS, startClock } from '../shared/race';
 
@@ -13,16 +13,18 @@ const answer = (choice: unknown, extra: Partial<DecideResponse> = {}): DecideRes
  * request it is told to cancel stops at once.
  */
 function slowModel(delay: (n: number) => number, choice: (n: number) => Move = () => 'straight') {
-  const t = { bodies: [] as SystemOneRequest[], inFlight: 0, maxInFlight: 0, cancelled: 0 };
+  const t = { bodies: [] as SystemOneRequest[], sentAt: [] as number[], answeredAt: [] as number[], inFlight: 0, maxInFlight: 0, cancelled: 0 };
   const transport: Transport = (body, opts) => {
     const n = t.bodies.length;
     t.bodies.push(body);
+    t.sentAt.push(Date.now());
     t.inFlight += 1;
     t.maxInFlight = Math.max(t.maxInFlight, t.inFlight);
     return new Promise((res, rej) => {
       const timer = setTimeout(() => {
         t.inFlight -= 1;
-        res(answer(choice(n), { signatures: { snake: `sig${n}` }, signedAs: 'm', latencyMs: delay(n) }));
+        t.answeredAt[n] = Date.now();
+        res(answer(turn((body.state as { heading: Heading }).heading, choice(n)), { signatures: { snake: `sig${n}` }, signedAs: 'm', latencyMs: delay(n) }));
       }, delay(n));
       opts?.signal?.addEventListener('abort', () => {
         clearTimeout(timer);
@@ -58,7 +60,7 @@ describe('RealtimeSnake', () => {
   });
 
   it("cancels a request the tick beat, plays the fallback, and asks about the next board at once", async () => {
-    // The first answer (left) would come 300 ms after it was asked: after the first tick at 250 ms.
+    // The first answer (left) would come 300 ms after it was asked: after the first tick at 275 ms.
     const { t, transport } = slowModel(
       (n) => (n === 0 ? 300 : 50),
       (n) => (n === 0 ? 'left' : 'straight'),
@@ -81,30 +83,46 @@ describe('RealtimeSnake', () => {
     expect(t.maxInFlight).toBe(1);
   });
 
-  it('a model at 240 ms is never late, one at 260 ms always is, and lateness never carries over', async () => {
-    const play = async (delay: (n: number) => number, ticks: number) => {
-      const { t, transport } = slowModel(delay);
-      // A seed where 20 steps of the fallback's or straight moves stay alive.
-      const ai = new RealtimeSnake({ transport, seed: seedFor(2), timeoutMs: 2000 });
-      for (let i = 0; i < ticks && !ai.over; i++) {
-        await vi.advanceTimersByTimeAsync(STEP);
-        ai.tick();
-      }
-      ai.stop();
-      return { t, ai };
-    };
-    const fast = await play(() => 240, 6);
-    expect(fast.ai.steps.length).toBeGreaterThan(3);
+  const playFor = async (delay: (n: number) => number, ticks: number) => {
+    const { t, transport } = slowModel(delay);
+    const started = Date.now();
+    const ai = new RealtimeSnake({ transport, seed: seedFor(2), timeoutMs: 2000 });
+    for (let i = 0; i < ticks && !ai.over; i++) {
+      await vi.advanceTimersByTimeAsync(STEP);
+      ai.tick();
+    }
+    ai.stop();
+    return { t, ai, sent: t.sentAt.map((x) => x - started), answered: t.answeredAt.map((x) => x - started) };
+  };
+
+  it('asks early: a model at 150 ms gets each question right after its previous answer, and is never late', async () => {
+    const { t, ai, sent, answered } = await playFor(() => 150, 8);
+    expect(ai.steps.length).toBe(8);
+    expect(ai.fallbacks).toBe(0);
+    // One step ahead at most: question n+1 goes out when answer n is in, unless step n-1 is still to be played.
+    for (let n = 1; n < sent.length; n++) expect(sent[n]).toBe(Math.max(answered[n - 1]!, (n - 1) * STEP));
+    expect(sent.slice(0, 3)).toEqual([0, 150, 300]);
+    expect(t.maxInFlight).toBe(1);
+  });
+
+  it('gives a step the time left from the one before: 150 ms then 300 ms is on time for both', async () => {
+    // Step 0 answered at 150; step 1 asked then, answered at 450, before its tick at 550.
+    const { ai, sent } = await playFor((n) => (n === 1 ? 300 : 150), 3);
+    expect(sent.slice(0, 2)).toEqual([0, 150]);
+    expect(ai.steps.slice(0, 2).map((s) => [s.source, s.latencyMs])).toEqual([
+      ['model', 150],
+      ['model', 300],
+    ]);
+  });
+
+  it('a late step restarts the next question at the tick: a model always over the step is always late', async () => {
+    const { t, ai, sent } = await playFor(() => STEP + 10, 6);
+    expect(ai.steps.every((s) => s.source === 'fallback' && s.latencyMs === STEP)).toBe(true);
+    expect(sent).toEqual(ai.steps.map((_, i) => i * STEP).concat(ai.over ? [] : [ai.steps.length * STEP]));
+    expect(t.maxInFlight).toBe(1);
+    const fast = await playFor(() => STEP - 10, 6);
     expect(fast.ai.fallbacks).toBe(0);
     expect(fast.ai.cancelled).toBe(0);
-    const slow = await play(() => 260, 6);
-    expect(slow.ai.steps.every((s) => s.source === 'fallback' && s.latencyMs === STEP)).toBe(true);
-    expect(slow.t.maxInFlight).toBe(1);
-    expect(slow.ai.requests).toBe(slow.ai.steps.length + 1);
-    // Late, then in time: a late step costs the model only that step.
-    const mixed = await play((n) => (n % 2 ? 240 : 260), 6);
-    expect(mixed.ai.steps.map((s) => s.source)).toEqual(mixed.ai.steps.map((_, i) => (i % 2 ? 'model' : 'fallback')));
-    expect(mixed.t.maxInFlight).toBe(1);
   });
 
   it('falls back on an error or an unusable answer', async () => {
@@ -113,7 +131,7 @@ describe('RealtimeSnake', () => {
       transport: async () => {
         n += 1;
         if (n === 1) throw new Error('boom');
-        return answer('up');
+        return answer('backwards');
       },
       seed: seedFor(4),
       timeoutMs: 2000,
