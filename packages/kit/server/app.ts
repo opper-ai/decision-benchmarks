@@ -147,14 +147,19 @@ export function createApp(opts: AppOptions): App {
     // The load balancer checks /health at the root, whatever the base path.
     if (url.split('?')[0] === '/health') return health(res);
     const mounted = mountedUrl(url, basePath);
-    if (mounted.kind === 'bare') {
-      res.writeHead(308, { Location: mounted.location, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
-      res.end();
-      return;
-    }
+    // The bare base path is the hub page on the website (the load balancer sends it there), not ours: never redirect
+    // it to the slashed form, which comes back here.
+    if (mounted.kind === 'bare') return notFound(res);
     if (mounted.kind === 'outside') return notFound(res);
     const inside = mounted.url;
     const path = inside.split('?')[0];
+    // `<base>/` would reach this service (the load balancer's `<base>/*` matches it): send it to the hub at `<base>`.
+    if (path === '/' && basePath) {
+      const q = inside.indexOf('?');
+      res.writeHead(308, { Location: `${basePath}${q === -1 ? '' : inside.slice(q)}`, 'Cache-Control': 'no-store', ...SECURITY_HEADERS });
+      res.end();
+      return;
+    }
     if (path === '/health') return health(res);
     if (path === '/revision') return sendJson(res, 200, { app: 'decision-benchmarks', commit: opts.commit, draining, games: [...games.keys()] });
     const at = gameMount(inside);

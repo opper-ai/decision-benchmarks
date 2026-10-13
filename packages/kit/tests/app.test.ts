@@ -239,11 +239,12 @@ describe('production server below APP_BASE_PATH', () => {
     expect((await fetch(`${url}${BASE}/coin/nothing-here`)).status).toBe(404);
   });
 
-  it('redirects the bare prefix and a bare slug to the same with a slash, keeping the query', async () => {
+  it('sends the prefix with a slash to the hub at the bare prefix, which is not ours, and a bare slug to the slug with a slash', async () => {
     const url = await startBelow();
-    const bare = await fetch(`${url}${BASE}`, { redirect: 'manual' });
-    expect(bare.status).toBe(308);
-    expect(bare.headers.get('location')).toBe(`${BASE}/`);
+    expect((await fetch(`${url}${BASE}`, { redirect: 'manual' })).status).toBe(404);
+    const slashed = await fetch(`${url}${BASE}/?ref=x`, { redirect: 'manual' });
+    expect(slashed.status).toBe(308);
+    expect(slashed.headers.get('location')).toBe(`${BASE}?ref=x`);
     const linked = await fetch(`${url}${BASE}/coin?model=sference%2Fclef`, { redirect: 'manual' });
     expect(linked.status).toBe(308);
     expect(linked.headers.get('location')).toBe(`${BASE}/coin/?model=sference%2Fclef`);
@@ -252,7 +253,7 @@ describe('production server below APP_BASE_PATH', () => {
 
   it('answers 404 outside the prefix, except /health', async () => {
     const url = await startBelow();
-    for (const path of ['/', '/coin/', '/coin/leaderboard.json', '/coin/api/me', '/revision', '/coin/auth/login', `${BASE}/`, `${BASE}x/coin/`, '/media-studio/']) {
+    for (const path of ['/', '/coin/', '/coin/leaderboard.json', '/coin/api/me', '/revision', '/coin/auth/login', `${BASE}x/coin/`, '/media-studio/']) {
       expect([path, (await fetch(`${url}${path}`, { redirect: 'manual' })).status]).toEqual([path, 404]);
     }
     const decide = await fetch(`${url}/coin/api/decide`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });

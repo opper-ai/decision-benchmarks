@@ -56,9 +56,10 @@ try:
     with urllib.request.urlopen(url + '/health', timeout=2) as response:
         assert response.status == 200
     if base:
-        code, headers = status_of(root + base)
-        assert (code, headers['Location']) == (308, base + '/'), (code, headers['Location'])
-        for outside in ('/', '/api/me', base + '/no-such-game/'):
+        # The bare base path is the website's hub, never ours; the base path with a slash is sent there.
+        code, headers = status_of(root + base + '/')
+        assert (code, headers['Location']) == (308, base), (code, headers['Location'])
+        for outside in ('/', '/api/me', base, base + '/no-such-game/'):
             assert status_of(root + outside)[0] == 404, outside
     with urllib.request.urlopen(url + '/revision', timeout=2) as response:
         revision = json.load(response)
