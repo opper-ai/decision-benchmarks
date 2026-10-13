@@ -11,13 +11,22 @@ import { audioToggles } from './audio-toggles.ts';
 import { audio } from '../audio.ts';
 import { clipName, exportClip, exportSupported } from '../export.ts';
 import { OUTCOME_COLORS, SIDES } from '../theme.ts';
+import { fullscreenButton } from './fullscreen.ts';
+import { collapsiblePanel } from './panel.ts';
+
+const PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>';
+const PAUSE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>';
 
 /** A match played back: the stage, the decisions, stats and clip export. `link` is its address, for a recorded one. */
 export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; note?: string; music?: boolean } = {}): (() => void) & { pause: () => void } {
   const player = new ReplayPlayer(r);
   const bySide = decisionsBySide(r);
-  const stageHost = h('div.fstage');
+  const stageHost = h('div.fstage.pausable', { title: 'Click to play or pause (space)' });
   const stage = new Stage(stageHost, r.fighters);
+  // Paused: a large play sign over the stage. A toggle also flashes the new state's sign for a moment.
+  const pausedSign = h('div.stage-paused', { 'aria-hidden': 'true' }, h('span', { html: PLAY_ICON }));
+  const flash = h('div.stage-flash', { 'aria-hidden': 'true' });
+  stageHost.append(pausedSign, flash);
   let state = player.stateAt(0);
   let pos = 0;
   let playing = true;
@@ -32,7 +41,19 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
   const setPlaying = (p: boolean) => {
     playing = p && state.round.phase !== 'over';
     playBtn.textContent = playing ? '❚❚' : '▶';
+    playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
     stage.paused = !playing;
+    stageHost.classList.toggle('paused', !playing);
+    // The music and the effects stand still with the fight.
+    audio.hold(!playing);
+  };
+  /** Play or pause from the stage or the keyboard: as the play button, with a flash of the new state on the stage. */
+  const toggle = () => {
+    playBtn.click();
+    flash.innerHTML = playing ? PLAY_ICON : PAUSE_ICON;
+    flash.classList.remove('show');
+    void flash.offsetWidth; // restart the animation
+    flash.classList.add('show');
   };
 
   function seek(t: number): void {
@@ -124,18 +145,28 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
   });
   bubblesBox.addEventListener('change', () => (stage.renderer.showBubbles = bubblesBox.checked));
 
-  // The keys work while the viewer has focus (a click in it gives it focus), so Space still scrolls the page elsewhere.
+  stageHost.addEventListener('click', () => toggle());
+
+  // Space, [ ] and T work while nothing else has focus (the page itself) or the viewer has it (a click in it gives it
+  // focus). A focused button, link or field keeps its own keys, and a dialog over the page (the picker) keeps them all.
+  // The arrows only work in the viewer, so they still scroll the page elsewhere.
   if (!host.hasAttribute('tabindex')) host.tabIndex = -1;
   const onPointer = (e: PointerEvent) => {
     if (!(e.target as HTMLElement).closest('button,a,input,select,textarea,summary')) host.focus({ preventScroll: true });
   };
   host.addEventListener('pointerdown', onPointer);
   const onKey = (e: KeyboardEvent) => {
-    if (!host.contains(document.activeElement) || e.altKey || e.ctrlKey || e.metaKey) return;
-    if ((e.target as HTMLElement)?.closest('input,select,textarea')) return;
+    if (e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return;
+    const active = document.activeElement;
+    const inViewer = host.contains(active);
+    if (!inViewer && active !== document.body && active !== null && active !== document.documentElement) return;
+    if ((e.target as HTMLElement)?.closest?.('input,select,textarea,button,a,summary,[contenteditable]')) return;
+    if (document.querySelector('[role="dialog"]')) return;
     if (e.key === ' ') {
       e.preventDefault();
-      playBtn.click();
+      toggle();
+    } else if (!inViewer && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      return;
     } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       e.preventDefault();
       setPlaying(false);
@@ -150,9 +181,13 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
   window.addEventListener('keydown', onKey);
 
   // Export.
+  const stageBox = h('div.stage-box');
+  const fs = fullscreenButton(stageBox);
   const exportBtn = h('button.fbtn', { type: 'button', title: 'Save a video clip' }, 'Export clip');
   const exportPanel = h('div.export', { hidden: true });
   exportBtn.addEventListener('click', () => {
+    // The export settings sit under the stage, out of sight in fullscreen.
+    fs.exit();
     exportPanel.hidden = !exportPanel.hidden;
     if (!exportPanel.hidden) {
       setPlaying(false);
@@ -260,47 +295,50 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
 
   const [a, b] = r.fighters;
   const winner = r.result.winner === null ? 'Draw' : `${r.fighters[r.result.winner].label} wins`;
-  host.replaceChildren(
+  stageBox.append(
+    stageHost,
     h(
-      'div.viewer',
+      'div.controls',
       null,
-      h(
-        'div.viewer-main',
-        null,
-        h(
-          'div.caption',
-          null,
-          h('p.caption-vs', null, h('span', { style: { color: SIDES[0].deep } }, a.label), h('span.vs-small', null, ' vs '), h('span', { style: { color: SIDES[1].deep } }, b.label)),
-          opts.note ? h('p.fnote', null, opts.note) : null,
-          h('p.caption-sub', null, `${winner}. ${r.mode === 'paused' ? 'Paused' : 'Real-time'} mode, ${r.track ?? 'assisted'} track, ${r.deadlineMs} ms deadline, ${r.decisions.length} decisions, ${money(r.costUsd)}.`, player.diverged !== null ? h('strong.warn', null, ` Replay diverged at ${clockTime(player.diverged)}.`) : ''),
-        ),
-        stageHost,
-        h(
-          'div.controls',
-          null,
-          playBtn,
-          h('button.fbtn.icon', { type: 'button', title: 'Previous decision ([)', onclick: () => nextDecision(-1) }, '⏮'),
-          h('button.fbtn.icon', { type: 'button', title: 'Next decision (])', onclick: () => nextDecision(1) }, '⏭'),
-          timeEl,
-          h('span.spacer'),
-          h('label.check', { for: 'bubbles' }, bubblesBox, ' Thoughts'),
-          speedSel,
-          exportBtn,
-          audioToggles(),
-        ),
-        exportPanel,
-        timeline.el,
-        h(
-          'div.legend.small',
-          null,
-          ...['hit', 'traded', 'punished', 'blocked', 'whiffed', 'defended'].map((o) => h('span', null, h('span.sq', { style: { background: OUTCOME_COLORS[o] } }), o === 'punished' ? 'got hit' : o)),
-          h('span', null, h('span.sq.ko'), 'KO'),
-          h('span.share', null, opts.link ? h('a', { href: opts.link }, 'Link to this match') : null, ' ', h('button.fbtn.small', { type: 'button', onclick: () => void downloadReplay(r) }, 'Download')),
-        ),
-      ),
-      h('aside.panel', null, h('div.tabs', null, tabDecisions, tabStats), panelBody),
+      playBtn,
+      h('button.fbtn.icon', { type: 'button', title: 'Previous decision ([)', 'aria-label': 'Previous decision', onclick: () => nextDecision(-1) }, '⏮'),
+      h('button.fbtn.icon', { type: 'button', title: 'Next decision (])', 'aria-label': 'Next decision', onclick: () => nextDecision(1) }, '⏭'),
+      timeEl,
+      h('span.spacer'),
+      h('label.check', { for: 'bubbles' }, bubblesBox, ' Thoughts'),
+      speedSel,
+      audioToggles(),
+      fs.el,
+      exportBtn,
     ),
   );
+  const viewer = h(
+    'div.viewer',
+    null,
+    h(
+      'div.viewer-main',
+      null,
+      h(
+        'div.caption',
+        null,
+        h('p.caption-vs', null, h('span', { style: { color: SIDES[0].deep } }, a.label), h('span.vs-small', null, ' vs '), h('span', { style: { color: SIDES[1].deep } }, b.label)),
+        opts.note ? h('p.fnote', null, opts.note) : null,
+        h('p.caption-sub', null, `${winner}. ${r.mode === 'paused' ? 'Paused' : 'Real-time'} mode, ${r.track ?? 'assisted'} track, ${r.deadlineMs} ms deadline, ${r.decisions.length} decisions, ${money(r.costUsd)}.`, player.diverged !== null ? h('strong.warn', null, ` Replay diverged at ${clockTime(player.diverged)}.`) : ''),
+      ),
+      stageBox,
+      exportPanel,
+      timeline.el,
+      h(
+        'div.legend.small',
+        null,
+        ...['hit', 'traded', 'punished', 'blocked', 'whiffed', 'defended'].map((o) => h('span', null, h('span.sq', { style: { background: OUTCOME_COLORS[o] } }), o === 'punished' ? 'got hit' : o)),
+        h('span', null, h('span.sq.ko'), 'KO'),
+        h('span.share', null, opts.link ? h('a', { href: opts.link }, 'Link to this match') : null, ' ', h('button.fbtn.small', { type: 'button', onclick: () => void downloadReplay(r) }, 'Download')),
+      ),
+    ),
+  );
+  viewer.append(collapsiblePanel(viewer, [tabDecisions, tabStats], panelBody));
+  host.replaceChildren(viewer);
   showDecisions();
   const at = Number(new URLSearchParams(location.hash.split('?')[1] ?? '').get('t'));
   if (at > 0) {
@@ -312,6 +350,8 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
   audio.scene(opts.music ?? true);
   const stop = () => {
     audio.scene(false);
+    audio.hold(false);
+    fs.destroy();
     window.removeEventListener('keydown', onKey);
     host.removeEventListener('pointerdown', onPointer);
     stage.destroy();

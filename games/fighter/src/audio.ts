@@ -166,6 +166,8 @@ class AudioEngine {
   private buffers: Map<string, AudioBuffer> | null = null;
   private musicSrc: AudioBufferSourceNode | null = null;
   private wantMusic = false;
+  /** The playback is paused: the whole mix (music and effects) stands still, and carries on from there on play. */
+  private held = false;
   private listeners: (() => void)[] = [];
 
   constructor() {
@@ -192,7 +194,7 @@ class AudioEngine {
       this.musicGain.connect(master);
       this.buffers = await loadBuffers(this.ctx, [...SOUNDS, MUSIC]);
     }
-    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    if (this.ctx.state === 'suspended' && !this.held) await this.ctx.resume();
     this.syncMusic();
   }
 
@@ -215,6 +217,15 @@ class AudioEngine {
   scene(fighting: boolean): void {
     this.wantMusic = fighting;
     this.syncMusic();
+  }
+
+  /** Pauses (true) or resumes (false) every sound with the fight on the stage. */
+  hold(paused: boolean): void {
+    if (this.held === paused) return;
+    this.held = paused;
+    if (!this.ctx) return;
+    if (paused && this.ctx.state === 'running') void this.ctx.suspend();
+    else if (!paused && this.ctx.state === 'suspended') void this.ctx.resume();
   }
 
   private syncMusic(): void {
