@@ -3,7 +3,7 @@
   "game": "fighter",
   "benchVersion": 1,
   "metric": {
-    "name": "Round-win share vs baselines",
+    "name": "Rounds won vs bots",
     "unit": "%",
     "higherIsBetter": true
   },

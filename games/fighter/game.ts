@@ -22,7 +22,7 @@ const game: GameDefinition<GauntletRecording, FighterResult> = {
     // A long match (five drawn-out rounds) gzips to a few hundred KB.
     maxRecordingBytes: 2 << 20,
   },
-  metric: { name: 'Round-win share vs baselines', unit: '%', higherIsBetter: true },
+  metric: { name: 'Rounds won vs bots', unit: '%', higherIsBetter: true },
   // Every baseline can be the player under test, for the reference results in public/baselines.json. They read the full
   // fight state, so `play` plays them itself (no transport): `--model baseline/<name>`.
   baselines: Object.fromEntries(BASELINES.map((id) => [id.slice(BASELINE_PREFIX.length), { name: baselineName(id) }])),

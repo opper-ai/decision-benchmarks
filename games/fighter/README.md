@@ -10,7 +10,7 @@ see [CREDITS.md](CREDITS.md).
 
 ## What it measures
 
-**Round-win share against the baselines.** One benchmark game is one match of the model under test against one of three
+**Rounds won against the bots (the baselines).** One benchmark game is one match of the model under test against one of three
 fixed-rule baselines, the strongest ones: **greedy** (the biggest swing if the opponent stands still or repeats itself),
 **payoff** (the best average) and **maximin** (the safest move). The score is the model's share of the rounds, a drawn
 round counting half, in percent; a model's result is the mean over its games.

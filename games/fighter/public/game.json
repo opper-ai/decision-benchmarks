@@ -9,7 +9,7 @@
   },
   "license": "MIT",
   "metric": {
-    "name": "Round-win share vs baselines",
+    "name": "Rounds won vs bots",
     "unit": "%",
     "higherIsBetter": true
   },

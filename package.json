@@ -1,7 +1,7 @@
 {
   "name": "decision-benchmarks",
   "private": true,
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

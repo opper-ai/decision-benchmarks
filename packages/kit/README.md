@@ -13,5 +13,5 @@ the bench and the submissions check. See [docs/design.md](../../docs/design.md) 
 
 ## License
 
-AGPL-3.0-or-later, as jevman (see [LICENSE](../../LICENSE)); authors Johnny Chadda, Felix Wunderlich and Jose
-Sabater. MIT is intended for the kit once all three agree; it is then relicensed in one commit.
+MIT (see [LICENSE](../../LICENSE)); authors Johnny Chadda, Felix Wunderlich and Jose Sabater. It was extracted from
+jevman, which is AGPL-3.0-or-later; its authors agreed to relicense the extracted harness as MIT (2026-10-13).
