@@ -1,5 +1,5 @@
 import { tag } from './track.ts';
-import { appPath } from './paths.ts';
+import { appPath, servicePath } from './paths.ts';
 
 export interface Me {
   /** player: signed in; pool: signed out, playing on the free credits; dev: the local key; none: signed out, no AI. */
@@ -77,12 +77,19 @@ export async function fetchMe(): Promise<Me> {
   return fallbackMe();
 }
 
+/**
+ * The one Login with Opper, for every game (`/decision-benchmarks/auth/login`), coming back to `here` (this page's path
+ * and query) afterwards. Signed in once, a player is signed in on every game.
+ */
+export const loginHref = (here: string): string => `${servicePath('/auth/login')}?${new URLSearchParams({ return: here })}`;
+
 export function signIn(): void {
-  window.location.href = appPath('/auth/login');
+  window.location.href = loginHref(window.location.pathname + window.location.search + window.location.hash);
 }
 
+/** Signs out of every game (the session is shared), then reloads. */
 export async function signOut(): Promise<void> {
-  await fetch(appPath('/auth/logout'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
+  await fetch(servicePath('/auth/logout'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
   window.location.reload();
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appPath, SHARE_URL, shareUrlFor, withBase } from '../client/paths';
+import { appPath, serviceBaseOf, servicePath, SHARE_URL, shareUrlFor, withBase } from '../client/paths';
 
 describe('client paths', () => {
   it.each([
@@ -15,7 +15,17 @@ describe('client paths', () => {
     expect(withBase(base, path)).toBe(expected);
   });
 
+  it.each([
+    ['/decision-benchmarks/snake/', '/decision-benchmarks/'],
+    ['/a/b/jevman/', '/a/b/'],
+    ['/snake/', '/'],
+    ['/', '/'],
+  ])('the service above the game at %s is %s', (base, expected) => {
+    expect(serviceBaseOf(base)).toBe(expected);
+  });
+
   it('builds for the root by default', () => {
+    expect(servicePath('/auth/login')).toBe('/auth/login');
     expect(appPath('/leaderboard.json')).toBe(withBase(import.meta.env.BASE_URL, '/leaderboard.json'));
     expect(SHARE_URL).toMatch(/^https:\/\//);
   });

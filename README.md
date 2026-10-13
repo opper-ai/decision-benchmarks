@@ -43,6 +43,10 @@ npm run build                                 # build every registry game into d
 npm start                                     # the service (PORT, APP_BASE_PATH; GAMES=jevman to serve only that game)
 ```
 
+Login with Opper is one sign-in for every game, at `<APP_BASE_PATH>/auth/*`: register one redirect URI on the OAuth
+app, `https://opper.ai/decision-benchmarks/auth/callback` in production and `http://localhost:5173/auth/callback` for
+the dev server (see `.env.example`).
+
 Benchmark your own model, or suggest a game: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License

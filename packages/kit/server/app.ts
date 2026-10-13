@@ -6,7 +6,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { gameMount, mountedUrl, normalizeBasePath } from '../shared/base-path.ts';
 import type { GameServer } from '../shared/game.ts';
 import type { PoolAccess } from './decide.ts';
-import { authConfigFromEnv, createGameMiddleware, poolAccessFromEnv, type Middleware } from './routes.ts';
+import { authConfigFromEnv, createAuthMiddleware, createGameMiddleware, poolAccessFromEnv, type Middleware } from './routes.ts';
 
 export type Log = (event: string, details?: Record<string, unknown>) => void;
 
@@ -64,8 +64,9 @@ export const SHUTDOWN_DRAIN_MS = 5000;
 export const SHUTDOWN_DEADLINE_MS = 25_000;
 
 /**
- * The production service: every game at <APP_BASE_PATH>/<slug>/ (its built page and files, Login with Opper, /api/me,
- * /api/decide, /api/warm, /api/highscores), with one free-credits pool and one visitor limiter for all of them. The
+ * The production service: every game at <APP_BASE_PATH>/<slug>/ (its built page and files, /api/me, /api/decide,
+ * /api/warm, /api/highscores), with one Login with Opper at <APP_BASE_PATH>/auth/* (one session for every game), one
+ * free-credits pool and one visitor limiter for all of them. The
  * bare `<base>/<slug>` redirects to `<base>/<slug>/`, an unknown slug is 404, and a game's files are only served
  * below its own slug. /health answers at the root (for the load balancer) and below the base path, as does /revision.
  */
@@ -80,16 +81,18 @@ export function createApp(opts: AppOptions): App {
     warn: (msg: string) => log('warn', { game: slug, msg }),
     error: (msg: string) => log('error', { game: slug, msg }),
   });
-  // The deployment settings are checked once up front, so a misconfigured image refuses to start even with no games.
-  authConfigFromEnv(env, () => {});
+  // One sign-in for every game: one config (one session secret, also when it is a random dev one), checked up front so
+  // a misconfigured image refuses to start even with no games.
+  const auth = authConfigFromEnv(env, (msg) => log('warn', { msg }));
+  const authRoutes = createAuthMiddleware(auth, { warn: (msg) => log('warn', { msg }) });
   // One pool and one limiter, shared by every game: a visitor's allowance does not grow with the number of games.
   const poolAccess = opts.poolAccess !== undefined ? opts.poolAccess : (poolAccessFromEnv(env, (msg) => log('warn', { msg })) ?? null);
   if (poolAccess) log('pool', { msg: 'free credits on: signed-out visitors play on OPPER_POOL_API_KEY until its balance runs out' });
   const games = new Map<string, { root: string; routes: Middleware }>();
   for (const g of opts.games) {
     if (games.has(g.server.slug)) throw new Error(`two games are called ${g.server.slug}`);
-    // Throws for an https deployment without a real SESSION_SECRET, before anything listens.
-    games.set(g.server.slug, { root: resolve(g.distDir), routes: createGameMiddleware(g.server, env, logger(g.server.slug), { poolAccess }) });
+    if (g.server.slug === 'auth') throw new Error('no game can be called auth: <APP_BASE_PATH>/auth/ is the sign-in');
+    games.set(g.server.slug, { root: resolve(g.distDir), routes: createGameMiddleware(g.server, env, logger(g.server.slug), { poolAccess, auth }) });
   }
   let ready = false;
   let draining = false;
@@ -162,6 +165,10 @@ export function createApp(opts: AppOptions): App {
     }
     if (path === '/health') return health(res);
     if (path === '/revision') return sendJson(res, 200, { app: 'decision-benchmarks', commit: opts.commit, draining, games: [...games.keys()] });
+    if (path.startsWith('/auth/')) {
+      req.url = inside;
+      return authRoutes(req, res, () => notFound(res));
+    }
     const at = gameMount(inside);
     const game = at.kind === 'none' ? undefined : games.get(at.slug);
     if (!game) return notFound(res);

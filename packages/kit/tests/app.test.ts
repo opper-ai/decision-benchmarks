@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { request } from 'node:http';
+import { createServer, request, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -119,15 +119,19 @@ describe('production server', () => {
     expect((await fetch(`${url}/coin/`, { method: 'POST' })).status).toBe(405);
   });
 
-  it("mounts each game's decide, auth and high-score routes", async () => {
+  it("mounts each game's decide and high-score routes, and one sign-in for all of them", async () => {
     const url = await start({ OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' });
     expect(await (await fetch(`${url}/coin/api/me`)).json()).toMatchObject({ mode: 'none', loginAvailable: true });
     const decide = await fetch(`${url}/coin/api/decide`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     expect(decide.status).toBe(401);
-    const login = await fetch(`${url}/dice/auth/login`, { redirect: 'manual' });
+    const login = await fetch(`${url}/auth/login?return=%2Fdice%2F`, { redirect: 'manual' });
     expect(login.status).toBe(302);
-    expect(login.headers.get('set-cookie')).toContain('Path=/dice/auth;');
-    expect(new URL(login.headers.get('location')!).searchParams.get('redirect_uri')).toBe('http://localhost:5173/dice/auth/callback');
+    expect(login.headers.get('set-cookie')).toContain('Path=/auth;');
+    expect(new URL(login.headers.get('location')!).searchParams.get('redirect_uri')).toBe('http://localhost:5173/auth/callback');
+    // A game's old sign-in address sends the player to the shared one.
+    const old = await fetch(`${url}/dice/auth/login`, { redirect: 'manual' });
+    expect([old.status, old.headers.get('location')]).toEqual([302, '/auth/login?return=%2Fdice%2F']);
+    expect((await fetch(`${url}/auth/nothing`)).status).toBe(404);
     expect(await (await fetch(`${url}/coin/api/highscores`)).json()).toEqual({ order: ['all', 'jev'], boards: { all: [], jev: [] } });
   });
 
@@ -161,7 +165,7 @@ describe('production server', () => {
 
   it('logs structured events without secrets', async () => {
     const url = await start({ OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh-secret' });
-    await fetch(`${url}/coin/auth/callback?code=c&state=x`, { redirect: 'manual' });
+    await fetch(`${url}/auth/callback?code=c&state=x`, { redirect: 'manual' });
     expect(JSON.stringify(events)).not.toContain('shh-secret');
     expect(JSON.stringify(events)).not.toContain(SECRET);
     expect(events[0]).toMatchObject({ event: 'listening' });
@@ -232,10 +236,10 @@ describe('production server below APP_BASE_PATH', () => {
     expect(await (await fetch(`${url}${BASE}/coin/demo/jev-demo.json`)).json()).toEqual({ version: 1 });
     expect(await (await fetch(`${url}${BASE}/coin/api/me`)).json()).toMatchObject({ mode: 'none', loginAvailable: true });
     expect(await (await fetch(`${url}${BASE}/revision`)).json()).toEqual({ app: 'decision-benchmarks', commit: 'a'.repeat(40), draining: false, games: ['coin', 'dice'] });
-    const login = await fetch(`${url}${BASE}/coin/auth/login`, { redirect: 'manual' });
+    const login = await fetch(`${url}${BASE}/auth/login?return=${encodeURIComponent(`${BASE}/coin/`)}`, { redirect: 'manual' });
     expect(login.status).toBe(302);
-    expect(login.headers.get('set-cookie')).toContain(`Path=${BASE}/coin/auth;`);
-    expect(new URL(login.headers.get('location')!).searchParams.get('redirect_uri')).toBe(`http://localhost:5173${BASE}/coin/auth/callback`);
+    expect(login.headers.get('set-cookie')).toContain(`Path=${BASE}/auth;`);
+    expect(new URL(login.headers.get('location')!).searchParams.get('redirect_uri')).toBe(`http://localhost:5173${BASE}/auth/callback`);
     expect((await fetch(`${url}${BASE}/coin/nothing-here`)).status).toBe(404);
   });
 
@@ -253,7 +257,7 @@ describe('production server below APP_BASE_PATH', () => {
 
   it('answers 404 outside the prefix, except /health', async () => {
     const url = await startBelow();
-    for (const path of ['/', '/coin/', '/coin/leaderboard.json', '/coin/api/me', '/revision', '/coin/auth/login', `${BASE}x/coin/`, '/media-studio/']) {
+    for (const path of ['/', '/coin/', '/coin/leaderboard.json', '/coin/api/me', '/revision', '/coin/auth/login', '/auth/login', '/auth/callback', `${BASE}x/coin/`, '/media-studio/']) {
       expect([path, (await fetch(`${url}${path}`, { redirect: 'manual' })).status]).toEqual([path, 404]);
     }
     const decide = await fetch(`${url}/coin/api/decide`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
@@ -275,14 +279,85 @@ describe('production server below APP_BASE_PATH', () => {
     expect(() => createApp({ env: { APP_BASE_PATH: '/../x', SESSION_SECRET: SECRET }, games: gamesIn(dist), commit: 'x' })).toThrow(/APP_BASE_PATH/);
   });
 
-  it("builds each game's redirect URI from PUBLIC_BASE_URL, the base path and its slug, which makes it a deployment", async () => {
+  it('builds the one redirect URI from PUBLIC_BASE_URL and the base path, which makes it a deployment', async () => {
     dist = makeDist();
     expect(() => createApp({ env: { APP_BASE_PATH: BASE, PUBLIC_BASE_URL: 'https://opper.ai' }, games: gamesIn(dist), commit: 'x' })).toThrow(/SESSION_SECRET/);
     const url = await startBelow({ PUBLIC_BASE_URL: 'https://opper.ai', OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' });
     for (const slug of ['coin', 'dice']) {
-      const login = await fetch(`${url}${BASE}/${slug}/auth/login`, { redirect: 'manual' });
-      expect(new URL(login.headers.get('location')!).searchParams.get('redirect_uri')).toBe(`https://opper.ai/decision-benchmarks/${slug}/auth/callback`);
-      expect(login.headers.get('set-cookie')).toBe(`db_oauth_state=${new URL(login.headers.get('location')!).searchParams.get('state')}; Max-Age=600; Path=/decision-benchmarks/${slug}/auth; HttpOnly; Secure; SameSite=Lax`);
+      const login = await fetch(`${url}${BASE}/auth/login?return=${encodeURIComponent(`${BASE}/${slug}/`)}`, { redirect: 'manual' });
+      expect(new URL(login.headers.get('location')!).searchParams.get('redirect_uri')).toBe('https://opper.ai/decision-benchmarks/auth/callback');
+      expect(login.headers.get('set-cookie')).toMatch(new RegExp(`^db_oauth_state=${new URL(login.headers.get('location')!).searchParams.get('state')}\\.[^;]+; Max-Age=600; Path=/decision-benchmarks/auth; HttpOnly; Secure; SameSite=Lax$`));
     }
   });
+
+  it('refuses no game called auth, which is where the sign-in lives', () => {
+    dist = makeDist();
+    expect(() => createApp({ env: { SESSION_SECRET: SECRET }, games: [{ server: coinServer('auth'), distDir: dist }], commit: 'x' })).toThrow(/auth/);
+  });
+});
+
+describe('one sign-in for every game', () => {
+  const BASE = '/decision-benchmarks';
+  let opper: Server | undefined;
+  const tokenRequests: URLSearchParams[] = [];
+
+  /** A stand-in for Opper's token endpoint (OPPER_BASE_URL): any code buys one player key. */
+  async function fakeOpper(): Promise<string> {
+    tokenRequests.length = 0;
+    opper = createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        if (req.url !== '/oauth/token') return void res.writeHead(404).end();
+        tokenRequests.push(new URLSearchParams(body));
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ api_key: 'op-player', user: { name: 'Ada', email: 'ada@example.com' } }));
+      });
+    });
+    await new Promise<void>((done) => opper!.listen(0, '127.0.0.1', done));
+    return `http://127.0.0.1:${(opper.address() as { port: number }).port}`;
+  }
+
+  afterEach(async () => {
+    await new Promise<void>((done) => (opper ? opper.close(() => done()) : done()));
+    opper = undefined;
+  });
+
+  it('signs in once from one game, at the one redirect URI, and every game sees the player', async () => {
+    const opperUrl = await fakeOpper();
+    const url = await start({ APP_BASE_PATH: BASE, PUBLIC_BASE_URL: 'https://opper.ai', OPPER_BASE_URL: opperUrl, OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' });
+    // The coin page's Login button.
+    const login = await fetch(`${url}${BASE}/auth/login?return=${encodeURIComponent(`${BASE}/coin/?model=x`)}`, { redirect: 'manual' });
+    expect(login.status).toBe(302);
+    const authorize = new URL(login.headers.get('location')!);
+    expect(authorize.origin + authorize.pathname).toBe(`${opperUrl}/oauth/authorize`);
+    expect(authorize.searchParams.get('redirect_uri')).toBe('https://opper.ai/decision-benchmarks/auth/callback');
+    // Opper sends the browser back to the redirect URI with a code and the state.
+    const state = login.headers.get('set-cookie')!.split(';')[0];
+    const callback = await fetch(`${url}${BASE}/auth/callback?code=c0de&state=${authorize.searchParams.get('state')}`, { headers: { cookie: state }, redirect: 'manual' });
+    expect(callback.status).toBe(302);
+    expect(callback.headers.get('location')).toBe(`${BASE}/coin/?model=x`);
+    expect(tokenRequests.map((r) => [r.get('code'), r.get('redirect_uri')])).toEqual([['c0de', 'https://opper.ai/decision-benchmarks/auth/callback']]);
+    const sessions = callback.headers.getSetCookie().filter((c) => c.startsWith('db_session='));
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatch(/; Max-Age=2592000; Path=\/decision-benchmarks\/; HttpOnly; Secure; SameSite=Lax$/);
+    const session = sessions[0]!.split(';')[0]!;
+    // Both games read the one session.
+    for (const slug of ['coin', 'dice']) {
+      expect(await (await fetch(`${url}${BASE}/${slug}/api/me`, { headers: { cookie: session } })).json()).toMatchObject({ mode: 'player', user: { name: 'Ada', email: 'ada@example.com' } });
+    }
+    // Signing out of one is signing out of all: the cookie is cleared at the same path.
+    const out = await fetch(`${url}${BASE}/auth/logout`, { method: 'POST', headers: { 'Content-Type': 'application/json', cookie: session }, body: '{}' });
+    expect(out.headers.getSetCookie()).toEqual(['db_session=; Max-Age=0; Path=/decision-benchmarks/; HttpOnly; Secure; SameSite=Lax']);
+  });
+
+  it.each(['//evil.com', 'https://evil.com', 'https://evil.com/decision-benchmarks/coin/', '/other-app/', '/decision-benchmarks/../other-app/', '/decision-benchmarks'])(
+    'refuses to return to %j after signing in',
+    async (to) => {
+      const url = await start({ APP_BASE_PATH: BASE, PUBLIC_BASE_URL: 'https://opper.ai', OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' });
+      const login = await fetch(`${url}${BASE}/auth/login?${new URLSearchParams({ return: to })}`, { redirect: 'manual' });
+      expect(login.status).toBe(400);
+      expect(login.headers.get('location')).toBeNull();
+      expect(login.headers.get('set-cookie')).toBeNull();
+    },
+  );
 });

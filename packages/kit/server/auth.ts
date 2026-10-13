@@ -4,7 +4,10 @@ import { openSession, parseCookies, safeEqual, sealSession, serializeCookie, SES
 import type { PoolStatus } from './pool.ts';
 
 export const WALLET_URL = 'https://platform.opper.ai/wallet';
-/** Cookie names; every game's cookies are scoped to its own path, so players sign in per game. */
+/**
+ * Cookie names. The session is scoped to the service's base path (`/decision-benchmarks/`), so one sign-in serves every
+ * game and no other app on the host ever receives it.
+ */
 export const SESSION_COOKIE = 'db_session';
 export const STATE_COOKIE = 'db_oauth_state';
 
@@ -15,8 +18,8 @@ export interface AuthConfig {
   opperUrl: string;
   sessionSecret: string;
   /**
-   * Where the game is mounted, APP_BASE_PATH plus its slug (`/decision-benchmarks/snake`; '' at the root): scopes the
-   * cookies and prefixes the game's own redirects.
+   * Where the service is mounted, APP_BASE_PATH (`/decision-benchmarks`; '' at the root): the sign-in routes live at
+   * <basePath>/auth/*, it scopes the cookies, and a sign-in may only return to a page below it.
    */
   basePath?: string;
   /** The public origin (PUBLIC_BASE_URL, e.g. https://opper.ai): an `Origin` with its host is same-site. */
@@ -75,12 +78,51 @@ export function crossSite(req: HttpRequest, cfg: Pick<AuthConfig, 'publicOrigin'
   }
 }
 
-/** The session cookie's path: the game and nothing else on the host (`/decision-benchmarks/snake/`). */
+/** The session cookie's path: every game of this service and nothing else on the host (`/decision-benchmarks/`). */
 export const sessionCookiePath = (cfg: AuthConfig): string => `${cfg.basePath ?? ''}/`;
 /** The OAuth state cookie only travels to the sign-in routes. */
 export const stateCookiePath = (cfg: AuthConfig): string => `${cfg.basePath ?? ''}/auth`;
-/** An app path ('/', '/?auth_error=…') below the base path, for the server's redirects. */
-const appPath = (cfg: AuthConfig, path: string): string => `${cfg.basePath ?? ''}${path}`;
+
+const RETURN_ORIGIN = 'http://return.invalid';
+
+/**
+ * Where a sign-in may return: a path below the base path on this origin (`/decision-benchmarks/snake/?model=x`), as
+ * the browser would resolve it, else null. Anything that could leave the service (`//evil.com`, `https://evil.com`,
+ * `/other-app/`, `/decision-benchmarks/../other-app/`, backslashes) is refused, so the login is no open redirect.
+ */
+export function safeReturn(raw: string | null | undefined, cfg: Pick<AuthConfig, 'basePath'>): string | null {
+  if (typeof raw !== 'string' || raw.length > 2048) return null;
+  const base = `${cfg.basePath ?? ''}/`;
+  if (!raw.startsWith(base) || raw.startsWith('//') || /[\\\u0000-\u001f\u007f]/.test(raw)) return null;
+  let url: URL;
+  try {
+    url = new URL(raw, RETURN_ORIGIN);
+  } catch {
+    return null;
+  }
+  if (url.origin !== RETURN_ORIGIN || !url.pathname.startsWith(base) || url.pathname.startsWith('//')) return null;
+  return url.pathname + url.search + url.hash;
+}
+
+/** Where a sign-in returns when it names no page (or its state is lost): the base path itself. */
+const defaultReturn = (cfg: AuthConfig): string => `${cfg.basePath ?? ''}/`;
+
+/** `to` (a checked return path) with `?auth_error=<why>`, which the game page reads and shows. */
+function withAuthError(to: string, why: string): string {
+  const url = new URL(to, RETURN_ORIGIN);
+  url.searchParams.set('auth_error', why);
+  return url.pathname + url.search + url.hash;
+}
+
+/** The state cookie holds the OAuth state and the page to return to: `<state>.<base64url(return)>`. */
+const stateValue = (state: string, to: string): string => `${state}.${Buffer.from(to).toString('base64url')}`;
+function readState(value: string | undefined, cfg: AuthConfig): { state?: string; to: string } {
+  if (!value) return { to: defaultReturn(cfg) };
+  const dot = value.indexOf('.');
+  if (dot === -1) return { state: value, to: defaultReturn(cfg) };
+  const to = safeReturn(Buffer.from(value.slice(dot + 1), 'base64url').toString('utf8'), cfg);
+  return { state: value.slice(0, dot), to: to ?? defaultReturn(cfg) };
+}
 
 export const redirect = (location: string, cookies: string[] = []): HttpResponse => ({
   status: 302,
@@ -131,26 +173,39 @@ export function opperExchange(cfg: AuthConfig, fetchImpl: typeof fetch = fetch):
   };
 }
 
-export function handleLogin(_req: HttpRequest, cfg: AuthConfig, random = () => randomBytes(32).toString('hex')): HttpResponse {
+/**
+ * GET <base>/auth/login?return=<a page below the base path>: off to Opper's consent page, remembering where to come
+ * back to. No `return` comes back to the base path; one that would leave the service is refused (400).
+ */
+export function handleLogin(req: HttpRequest, cfg: AuthConfig, random = () => randomBytes(32).toString('hex')): HttpResponse {
   if (!loginConfigured(cfg)) {
     return { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: 'Login with Opper is not configured: set OPPER_CLIENT_ID and OPPER_CLIENT_SECRET in .env.' };
   }
+  let asked: string | null;
+  try {
+    asked = new URL(req.url, RETURN_ORIGIN).searchParams.get('return');
+  } catch {
+    asked = null;
+  }
+  const to = asked === null ? defaultReturn(cfg) : safeReturn(asked, cfg);
+  if (to === null) return { status: 400, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }, body: 'A sign-in can only return to a page of this site.' };
   const state = random();
   const params = new URLSearchParams({ client_id: cfg.clientId!, redirect_uri: cfg.redirectUri, response_type: 'code', state });
   return redirect(`${cfg.opperUrl.replace(/\/+$/, '')}/oauth/authorize?${params}`, [
-    serializeCookie(STATE_COOKIE, state, { maxAge: 600, path: stateCookiePath(cfg), httpOnly: true, secure: secure(cfg) }),
+    serializeCookie(STATE_COOKIE, stateValue(state, to), { maxAge: 600, path: stateCookiePath(cfg), httpOnly: true, secure: secure(cfg) }),
   ]);
 }
 
 export async function handleCallback(req: HttpRequest, cfg: AuthConfig, exchange: ExchangeCode, now = Date.now()): Promise<HttpResponse> {
-  const fail = (why: string) => redirect(appPath(cfg, `/?auth_error=${why}`), [clearStateCookie(cfg)]);
+  const saved = readState(parseCookies(header(req, 'cookie'))[STATE_COOKIE], cfg);
+  const fail = (why: string) => redirect(withAuthError(saved.to, why), [clearStateCookie(cfg)]);
   let url: URL;
   try {
     url = new URL(req.url, 'http://localhost');
   } catch {
     return fail('state');
   }
-  const expected = parseCookies(header(req, 'cookie'))[STATE_COOKIE];
+  const expected = saved.state;
   const state = url.searchParams.get('state');
   if (!expected || !state || !safeEqual(expected, state)) return fail('state');
   if (url.searchParams.get('error')) return fail('denied');
@@ -168,7 +223,7 @@ export async function handleCallback(req: HttpRequest, cfg: AuthConfig, exchange
   if (result.expiresAt) session.expiresAt = result.expiresAt;
   const untilExpiry = result.expiresAt ? (Date.parse(result.expiresAt) - now) / 1000 : Infinity;
   const maxAge = Math.min(SESSION_MAX_AGE_S, Number.isFinite(untilExpiry) ? untilExpiry : SESSION_MAX_AGE_S);
-  return redirect(appPath(cfg, '/'), [
+  return redirect(saved.to, [
     serializeCookie(SESSION_COOKIE, sealSession(session, cfg.sessionSecret), { maxAge, path: sessionCookiePath(cfg), httpOnly: true, secure: secure(cfg) }),
     clearStateCookie(cfg),
   ]);

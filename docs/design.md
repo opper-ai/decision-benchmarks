@@ -15,7 +15,8 @@ packages/kit/
   client/      browser: transport to /api/decide, warm-up, Login with Opper client, high-score client, base paths,
                the generic scheduler (real time with ask-ahead, or paused), shared page chrome
   server/      node: one HTTP service that mounts every game at <APP_BASE_PATH>/<slug>/
-               (static files, /api/decide, /api/warm, /api/me, /auth/*, /api/highscores; /health at the root),
+               (static files, /api/decide, /api/warm, /api/me, /api/highscores), one Login with Opper for all
+               of them at <APP_BASE_PATH>/auth/* (/health at the root),
                the free-credit pool and ONE visitor limiter shared by every game, sessions, S3 high scores
   bench/       node: the bench CLI (--game --model(s) --endpoint --format systemone|chat --games --seed --submit
                --name --by), official runs -> leaderboard.json, submissions -> community.json
@@ -94,9 +95,17 @@ files and runs in CI.
 
 One Node process, one image, one ECS service. Mounted in two levels (`APP_BASE_PATH`, then the slug): the bare
 `/<slug>` redirects to `/<slug>/`, unknown slugs are 404, static files never cross between games. Shared: the pool
-key (`OPPER_POOL_API_KEY`) and one visitor limiter, one OAuth app (`OPPER_CLIENT_ID/SECRET`; a redirect URI per
-game: `<origin>/decision-benchmarks/<slug>/auth/callback`, each added to the OAuth app), one `SESSION_SECRET`.
-Cookies HttpOnly, `Path=/decision-benchmarks/<slug>/`: players sign in per game. Settings drop jevman's
+key (`OPPER_POOL_API_KEY`) and one visitor limiter, one OAuth app (`OPPER_CLIENT_ID/SECRET`), one `SESSION_SECRET`,
+and one sign-in: `/decision-benchmarks/auth/login?return=<page>`, `/auth/callback` and `/auth/logout` live at the base
+path, so the OAuth app has one redirect URI (`<origin>/decision-benchmarks/auth/callback`) and a player signed in on
+one game is signed in on all of them. `return` must be a path below the base path on this origin (`//evil.com`,
+`https://evil.com` and `/other-app/` get a 400), so the login is no open redirect; it rides in the OAuth state cookie
+and is checked again on the way back. A game's old `/<slug>/auth/login` redirects to the shared one. Cookies are
+HttpOnly (Secure on https, SameSite=Lax), `Path=/decision-benchmarks/`. This deviates from the brief's "cookies
+scoped to the game's path": they are scoped to the service's base path instead, which still keeps them away from every
+other app on opper.ai (the website, the hub and the rest never receive them), for one sign-in and one redirect URI.
+What is per game stays per game, keyed by slug and not by cookie path: answer-signing and seed keys, high scores and
+their rate limits. Settings drop jevman's
 `JEV`/`JEVMAN` prefixes (`TRUSTED_PROXIES`, `HIGHSCORES_BUCKET`, `ALLOW_DEV_KEY`, ...). The image installs with
 `npm ci --ignore-scripts`.
 
@@ -141,12 +150,14 @@ Where building the kit changed or filled in the design above, and why:
   `updatedAt` reads only accepted submissions. Hidden paths are 404. The image's code is root-owned.
 - **Seeds.** A submission's games must be `game-01` to `game-N`, each once; game n is replayed on `seedFor(n - 1)`,
   which the game's `verify` checks against the recording. Pac-Man has no randomness, so its `seedFor` is constant.
-- **Settings.** One redirect URI per game comes from `PUBLIC_BASE_URL` + `APP_BASE_PATH` + slug, so jevman's
+- **Settings.** The one redirect URI comes from `PUBLIC_BASE_URL` + `APP_BASE_PATH` (+ `/auth/callback`), so jevman's
   `OPPER_REDIRECT_URI` and `OPPER_OAUTH_REDIRECT_URI` are gone, as is `JEV_MODEL` (a request without a model plays
   Jev). High scores: `HIGHSCORES_BUCKET` (each game at `[HIGHSCORES_PREFIX/]<slug>/highscores.json`) or
   `HIGHSCORES_DIR`. `ALLOW_HTTP=1` replaces `JEVMAN_ALLOW_HTTP`. `GAMES=<slug>,...` makes the service serve those
-  games of the registry only (`GAMES=snake` locally). Cookies are `db_session` (path
-  `<base>/<slug>/`) and `db_oauth_state` (path `<base>/<slug>/auth`).
+  games of the registry only (`GAMES=snake` locally). Cookies are `db_session` (path `<base>/`, shared by every
+  game) and `db_oauth_state` (path `<base>/auth`, holding the state and the page to return to). The Vite dev server
+  (one game at `/<slug>/`, no `APP_BASE_PATH`) mounts the same sign-in at `/auth/*`, so local dev needs one redirect
+  URI too: `http://localhost:5173/auth/callback`.
 - **Routes.** `/revision` answers below the base path and lists the games served. `POST /api/highscores` answers with
   `order` too. A production image refuses to start without an https `PUBLIC_BASE_URL` even with no games mounted.
 - **Pac-Man.** Its `leaderboard.json` and the `community.json` the kit builds are in the contract shape (Opper ids;

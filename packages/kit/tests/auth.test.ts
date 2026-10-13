@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { crossSite, handleCallback, handleLogin, handleLogout, handleMe, opperExchange, sessionFrom, SESSION_COOKIE, STATE_COOKIE, type AuthConfig, type HttpRequest } from '../server/auth';
+import { crossSite, handleCallback, handleLogin, handleLogout, handleMe, opperExchange, safeReturn, sessionFrom, SESSION_COOKIE, STATE_COOKIE, type AuthConfig, type HttpRequest } from '../server/auth';
 import { openSession, sealSession } from '../server/session';
 import { DECISION_MODELS } from '../shared/models';
 
@@ -18,7 +18,8 @@ describe('handleLogin', () => {
     const loc = new URL(r.headers.Location as string);
     expect(loc.origin + loc.pathname).toBe('https://api.opper.ai/oauth/authorize');
     expect(Object.fromEntries(loc.searchParams)).toEqual({ client_id: 'opper_app_x', redirect_uri: cfg.redirectUri, response_type: 'code', state: 'st4te' });
-    expect(setCookies(r)[0]).toBe(`${STATE_COOKIE}=st4te; Max-Age=600; Path=/auth; HttpOnly; SameSite=Lax`);
+    // The state, and where to come back to (the base path when the login names no page).
+    expect(setCookies(r)[0]).toBe(`${STATE_COOKIE}=st4te.${Buffer.from('/').toString('base64url')}; Max-Age=600; Path=/auth; HttpOnly; SameSite=Lax`);
     expect(r.headers['Cache-Control']).toBe('no-store');
   });
   it('explains missing configuration', () => {
@@ -170,31 +171,81 @@ describe('crossSite', () => {
 });
 
 describe('below a base path', () => {
-  const based: AuthConfig = { ...cfg, basePath: '/decision-benchmarks/snake', redirectUri: 'https://opper.ai/decision-benchmarks/snake/auth/callback' };
-  const withState = (url: string) => req(url, { cookie: `${STATE_COOKIE}=st4te` });
+  const based: AuthConfig = { ...cfg, basePath: '/decision-benchmarks', redirectUri: 'https://opper.ai/decision-benchmarks/auth/callback' };
+  /** A login from `from` (a return path), then the callback with its state cookie: the round trip a browser makes. */
+  const roundTrip = async (from: string, callback = '/auth/callback?code=c&state=st4te') => {
+    const login = handleLogin(req(`/auth/login?${new URLSearchParams({ return: from })}`), based, () => 'st4te');
+    expect(login.status).toBe(302);
+    return handleCallback(req(callback, { cookie: `${STATE_COOKIE}=${encodeURIComponent(cookieValue(login, STATE_COOKIE))}` }), based, async () => ({ apiKey: 'op-player', user: {} }), 10_000);
+  };
 
-  it('scopes the state cookie to the sign-in routes below the prefix', () => {
-    const r = handleLogin(req('/auth/login'), based, () => 'st4te');
-    expect(setCookies(r)[0]).toBe(`${STATE_COOKIE}=st4te; Max-Age=600; Path=/decision-benchmarks/snake/auth; HttpOnly; Secure; SameSite=Lax`);
-    expect(new URL(r.headers.Location as string).searchParams.get('redirect_uri')).toBe('https://opper.ai/decision-benchmarks/snake/auth/callback');
+  it('signs in at the base path with its one redirect URI, the state cookie scoped to the sign-in routes', () => {
+    const r = handleLogin(req('/auth/login?return=%2Fdecision-benchmarks%2Fsnake%2F'), based, () => 'st4te');
+    expect(setCookies(r)[0]).toMatch(/^db_oauth_state=st4te\.[^;]+; Max-Age=600; Path=\/decision-benchmarks\/auth; HttpOnly; Secure; SameSite=Lax$/);
+    expect(new URL(r.headers.Location as string).searchParams.get('redirect_uri')).toBe('https://opper.ai/decision-benchmarks/auth/callback');
   });
 
-  it('scopes the session cookie to the app and returns to the app', async () => {
-    const r = await handleCallback(withState('/auth/callback?code=c&state=st4te'), based, async () => ({ apiKey: 'op-player', user: {} }), 10_000);
-    expect(r.headers.Location).toBe('/decision-benchmarks/snake/');
+  it('scopes the session cookie to the base path, for every game, and returns to the page the login came from', async () => {
+    const r = await roundTrip('/decision-benchmarks/snake/?model=x#top');
+    expect(r.headers.Location).toBe('/decision-benchmarks/snake/?model=x#top');
     const cookies = setCookies(r);
-    expect(cookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`))).toMatch(/; Path=\/decision-benchmarks\/snake\/; HttpOnly; Secure; SameSite=Lax$/);
-    expect(cookies.find((c) => c.startsWith(`${STATE_COOKIE}=`))).toMatch(/Max-Age=0; Path=\/decision-benchmarks\/snake\/auth;/);
+    expect(cookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`))).toMatch(/; Path=\/decision-benchmarks\/; HttpOnly; Secure; SameSite=Lax$/);
+    expect(cookies.find((c) => c.startsWith(`${STATE_COOKIE}=`))).toMatch(/Max-Age=0; Path=\/decision-benchmarks\/auth;/);
+    // The same session, whichever game reads it.
+    const session = `${SESSION_COOKIE}=${encodeURIComponent(cookieValue(r, SESSION_COOKIE))}`;
+    expect(sessionFrom(req('/api/me', { cookie: session }), based, 10_001)).toMatchObject({ apiKey: 'op-player' });
   });
 
-  it('sends sign-in errors back to the app', async () => {
-    const r = await handleCallback(withState('/auth/callback?code=c&state=wrong'), based, vi.fn());
-    expect(r.headers.Location).toBe('/decision-benchmarks/snake/?auth_error=state');
+  it('returns to the base path when the login names no page', async () => {
+    const login = handleLogin(req('/auth/login'), based, () => 'st4te');
+    const r = await handleCallback(req('/auth/callback?code=c&state=st4te', { cookie: `${STATE_COOKIE}=${encodeURIComponent(cookieValue(login, STATE_COOKIE))}` }), based, async () => ({ apiKey: 'op-player', user: {} }), 10_000);
+    expect(r.headers.Location).toBe('/decision-benchmarks/');
+  });
+
+  it.each(['//evil.com', '//evil.com/decision-benchmarks/', 'https://evil.com', 'https://evil.com/decision-benchmarks/', '/other-app/', '/decision-benchmarks', '/decision-benchmarksx/', '/decision-benchmarks/../other-app/', '/decision-benchmarks/%2e%2e/other-app/', '/decision-benchmarks\\..\\x', '/\\evil.com', 'javascript:alert(1)', ''])(
+    'refuses to return to %j',
+    (to) => {
+      const r = handleLogin(req(`/auth/login?${new URLSearchParams({ return: to })}`), based, () => 'st4te');
+      expect(r.status).toBe(400);
+      expect(r.headers.Location).toBeUndefined();
+      expect(setCookies(r)).toEqual([]);
+    },
+  );
+
+  it.each([
+    ['/decision-benchmarks/snake/', '/decision-benchmarks/snake/'],
+    ['/decision-benchmarks/jevman/leaderboard?x=1', '/decision-benchmarks/jevman/leaderboard?x=1'],
+    ['/decision-benchmarks/snake/../jevman/', '/decision-benchmarks/jevman/'],
+    ['/decision-benchmarks/snake/?auth_error=state', '/decision-benchmarks/snake/?auth_error=state'],
+  ])('accepts the return %j as %j', (to, expected) => {
+    expect(safeReturn(to, based)).toBe(expected);
+  });
+
+  it('at the root (the dev server), returns anywhere on the origin but never off it', () => {
+    expect(safeReturn('/snake/', {})).toBe('/snake/');
+    for (const to of ['//evil.com', 'https://evil.com/', '/\\evil.com', 'snake/']) expect(safeReturn(to, {})).toBeNull();
+  });
+
+  it('sends sign-in errors back to the page the login came from', async () => {
+    const r = await roundTrip('/decision-benchmarks/fighter/?a=1', '/auth/callback?code=c&state=wrong');
+    expect(r.headers.Location).toBe('/decision-benchmarks/fighter/?a=1&auth_error=state');
+    expect(setCookies(r).some((c) => c.startsWith(`${SESSION_COOKIE}=`))).toBe(false);
+  });
+
+  it('without the state cookie (expired), sends the error to the base path', async () => {
+    const r = await handleCallback(req('/auth/callback?code=c&state=wrong'), based, vi.fn());
+    expect(r.headers.Location).toBe('/decision-benchmarks/?auth_error=state');
+  });
+
+  it('ignores a tampered return in the state cookie', async () => {
+    const forged = `st4te.${Buffer.from('https://evil.com/').toString('base64url')}`;
+    const r = await handleCallback(req('/auth/callback?code=c&state=st4te', { cookie: `${STATE_COOKIE}=${forged}` }), based, async () => ({ apiKey: 'op-player', user: {} }), 10_000);
+    expect(r.headers.Location).toBe('/decision-benchmarks/');
   });
 
   it('clears the session cookie on the same path at sign-out', () => {
     const r = handleLogout(req('/auth/logout', { 'content-type': 'application/json' }, 'POST'), based);
-    expect(setCookies(r)).toEqual([`${SESSION_COOKIE}=; Max-Age=0; Path=/decision-benchmarks/snake/; HttpOnly; Secure; SameSite=Lax`]);
+    expect(setCookies(r)).toEqual([`${SESSION_COOKIE}=; Max-Age=0; Path=/decision-benchmarks/; HttpOnly; Secure; SameSite=Lax`]);
   });
 });
 

@@ -46,21 +46,21 @@ function publicOriginFromEnv(env: Record<string, string | undefined>): string | 
 export const gamePath = (env: Record<string, string | undefined>, slug?: string): string => `${normalizeBasePath(env.APP_BASE_PATH)}${slug ? `/${slug}` : ''}`;
 
 /**
- * Login with Opper's redirect URI for a game: PUBLIC_BASE_URL plus the game's path (one URI per game, each added to
- * the OAuth app), else the Vite dev server's.
+ * Login with Opper's one redirect URI, for every game: PUBLIC_BASE_URL plus the base path
+ * (https://opper.ai/decision-benchmarks/auth/callback), else the Vite dev server's (http://localhost:5173/auth/callback).
  */
-export function redirectUriFromEnv(env: Record<string, string | undefined>, path: string): string {
-  return `${publicOriginFromEnv(env) ?? 'http://localhost:5173'}${path}/auth/callback`;
+export function redirectUriFromEnv(env: Record<string, string | undefined>, basePath = gamePath(env)): string {
+  return `${publicOriginFromEnv(env) ?? 'http://localhost:5173'}${basePath}/auth/callback`;
 }
 
 /**
- * A game's auth settings from the environment. An https redirect URI means a deployment, which needs a real
- * SESSION_SECRET. Without a slug, the settings of the base path itself (the Vite dev server of one game passes it).
+ * The service's auth settings from the environment, one set for every game (one sign-in, one session secret). An https
+ * redirect URI means a deployment, which needs a real SESSION_SECRET.
  */
-export function authConfigFromEnv(env: Record<string, string | undefined>, warn: (msg: string) => void, slug?: string): AuthConfig {
+export function authConfigFromEnv(env: Record<string, string | undefined>, warn: (msg: string) => void): AuthConfig {
   const clientId = env.OPPER_CLIENT_ID || undefined;
   const clientSecret = env.OPPER_CLIENT_SECRET || undefined;
-  const basePath = gamePath(env, slug);
+  const basePath = gamePath(env);
   const publicOrigin = publicOriginFromEnv(env);
   const redirectUri = redirectUriFromEnv(env, basePath);
   // A production image (NODE_ENV=production) is a deployment: without an https PUBLIC_BASE_URL it would run with a
@@ -147,25 +147,13 @@ export function poolAccessFromEnv(env: Record<string, string | undefined>, log: 
   return pool ? { pool, limits: new VisitorLimits(), trustedProxies: trustedProxiesFromEnv(env) } : undefined;
 }
 
-export interface GameRouteOptions {
-  quiet?: boolean;
-  /** The service's shared free credits (null: none). Undefined reads them from the environment (one game alone). */
-  poolAccess?: PoolAccess | null;
-  highScores?: HighScores;
-}
-
 /**
- * Connect-style middleware for one game's routes, with URLs relative to the game's path: Login with Opper, /api/me,
- * /api/decide, /api/warm, /api/highscores and, for a game whose high scores play on issued seeds, /api/seed. Used by the service (packages/kit/server/app.ts) and the Vite dev and
- * preview servers. The player, pool and dev keys never leave the server.
+ * Connect-style middleware for Login with Opper, with URLs relative to the base path: <base>/auth/login?return=<page>,
+ * <base>/auth/callback (the one redirect URI) and <base>/auth/logout. Mounted once for all games, by the service and
+ * the Vite dev server alike; other paths go to `next`.
  */
-export function createGameMiddleware(game: GameServer, env: Record<string, string | undefined>, logger: RouteLogger, opts: GameRouteOptions = {}): Middleware {
-  const cfg = authConfigFromEnv(env, (m) => logger.warn(m), game.slug);
-  const devKey = devKeyFromEnv(env, cfg, (m) => logger.warn(m));
-  const access = opts.poolAccess === undefined ? poolAccessFromEnv(env, (m) => logger.warn(m)) : (opts.poolAccess ?? undefined);
-  if (opts.poolAccess === undefined && access && !opts.quiet) logger.info('[pool] free credits on: signed-out visitors play on OPPER_POOL_API_KEY until its balance runs out');
-  if (!devKey && !access && !loginConfigured(cfg) && !opts.quiet) logger.warn(`[${game.slug}] none of TYPESAFE_API_KEY, OPPER_API_KEY, OPPER_POOL_API_KEY or OPPER_CLIENT_ID/SECRET is set: no model can play`);
-  const redactSecrets = (s: string) => [cfg.clientSecret, devKey?.apiKey, access?.pool.apiKey].reduce<string>((acc, k) => (k ? acc.split(k).join('[redacted]') : acc), s);
+export function createAuthMiddleware(cfg: AuthConfig, logger: Pick<RouteLogger, 'warn'>): Middleware {
+  const redactSecrets = (s: string) => (cfg.clientSecret ? s.split(cfg.clientSecret).join('[redacted]') : s);
   const baseExchange = opperExchange(cfg);
   // handleCallback maps any failure to ?auth_error=exchange; log why (message only, redacted, capped) so a misconfigured app is diagnosable.
   const exchange: typeof baseExchange = async (code) => {
@@ -176,6 +164,45 @@ export function createGameMiddleware(game: GameServer, env: Record<string, strin
       throw err;
     }
   };
+  return (req, res, next) => {
+    const path = (req.url ?? '').split('?')[0];
+    const http = toHttp(req);
+    if (path === '/auth/login') return send(res, handleLogin(http, cfg));
+    if (path === '/auth/callback') {
+      void handleCallback(http, cfg, exchange)
+        .then((r) => send(res, r), () => send(res, redirect(`${cfg.basePath ?? ''}/?auth_error=exchange`)))
+        .catch(() => abort(res));
+      return;
+    }
+    if (path === '/auth/logout') return send(res, handleLogout(http, cfg));
+    next();
+  };
+}
+
+export interface GameRouteOptions {
+  quiet?: boolean;
+  /** The service's auth settings, shared by every game (one session). Undefined reads them from the environment (one game alone). */
+  auth?: AuthConfig;
+  /** The service's shared free credits (null: none). Undefined reads them from the environment (one game alone). */
+  poolAccess?: PoolAccess | null;
+  highScores?: HighScores;
+}
+
+/**
+ * Connect-style middleware for one game's routes, with URLs relative to the game's path: /api/me (which reads the
+ * shared session), /api/decide, /api/warm, /api/highscores and, for a game whose high scores play on issued seeds,
+ * /api/seed. Sign-in itself is the service's (createAuthMiddleware); the game's old /auth/login redirects there. Used
+ * by the service (packages/kit/server/app.ts) and the Vite dev and preview servers. The player, pool and dev keys
+ * never leave the server.
+ */
+export function createGameMiddleware(game: GameServer, env: Record<string, string | undefined>, logger: RouteLogger, opts: GameRouteOptions = {}): Middleware {
+  const cfg = opts.auth ?? authConfigFromEnv(env, (m) => logger.warn(m));
+  const ownPath = `${gamePath(env, game.slug)}/`;
+  const devKey = devKeyFromEnv(env, cfg, (m) => logger.warn(m));
+  const access = opts.poolAccess === undefined ? poolAccessFromEnv(env, (m) => logger.warn(m)) : (opts.poolAccess ?? undefined);
+  if (opts.poolAccess === undefined && access && !opts.quiet) logger.info('[pool] free credits on: signed-out visitors play on OPPER_POOL_API_KEY until its balance runs out');
+  if (!devKey && !access && !loginConfigured(cfg) && !opts.quiet) logger.warn(`[${game.slug}] none of TYPESAFE_API_KEY, OPPER_API_KEY, OPPER_POOL_API_KEY or OPPER_CLIENT_ID/SECRET is set: no model can play`);
+  const redactSecrets = (s: string) => [cfg.clientSecret, devKey?.apiKey, access?.pool.apiKey].reduce<string>((acc, k) => (k ? acc.split(k).join('[redacted]') : acc), s);
   const key = answerKey(cfg.sessionSecret, game.slug);
   const ctx: DecideContext = { game, cfg, ...(devKey ? { devKey } : {}), ...(access ? { access } : {}), answerKey: key };
 
@@ -270,14 +297,8 @@ export function createGameMiddleware(game: GameServer, env: Record<string, strin
       if (http.method !== 'GET') return send(res, json(405, { error: 'GET only' }, [], { Allow: 'GET' }));
       return send(res, json(200, issueSeed(seeds, Date.now())));
     }
-    if (path === '/auth/login') return send(res, handleLogin(http, cfg));
-    if (path === '/auth/callback') {
-      void handleCallback(http, cfg, exchange)
-        .then((r) => send(res, r), () => send(res, redirect(`${cfg.basePath ?? ''}/?auth_error=exchange`)))
-        .catch(() => abort(res));
-      return;
-    }
-    if (path === '/auth/logout') return send(res, handleLogout(http, cfg));
+    // The game's own sign-in before it moved to the base path (old pages, bookmarks): the shared one, back to the game.
+    if (path === '/auth/login') return send(res, redirect(`${cfg.basePath ?? ''}/auth/login?${new URLSearchParams({ return: ownPath })}`));
     if (path === '/api/me') return send(res, handleMe(http, cfg, devKey?.provider, access?.pool.current()));
     if (path !== '/api/decide' && path !== '/api/warm') return next();
 

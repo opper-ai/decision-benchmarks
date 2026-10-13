@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { accountNotice, fetchMe, walletNotice, type Me } from '../client/auth';
+import { accountNotice, fetchMe, loginHref, walletNotice, type Me } from '../client/auth';
 
 const WALLET = 'https://platform.opper.ai/wallet';
 
@@ -125,5 +125,13 @@ describe('walletNotice', () => {
 
   it('links to the default wallet for a non-https URL', () => {
     expect(walletNotice('javascript:alert(1)').noticeLink).toBe(WALLET);
+  });
+});
+
+describe('loginHref', () => {
+  it("goes to the service's one sign-in and comes back to this page", () => {
+    // This build's base is the root, so the service's is too.
+    expect(loginHref('/snake/?model=sference%2Fclef')).toBe('/auth/login?return=%2Fsnake%2F%3Fmodel%3Dsference%252Fclef');
+    expect(new URLSearchParams(loginHref('/snake/?model=x#top').split('?')[1]).get('return')).toBe('/snake/?model=x#top');
   });
 });

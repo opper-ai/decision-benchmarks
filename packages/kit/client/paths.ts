@@ -10,6 +10,15 @@ export const withBase = (base: string, path: string): string => base + path.repl
 /** An app path below the base path this build was made for. */
 export const appPath = (path: string): string => withBase(BASE_URL, path);
 
+/**
+ * The service's base path, above every game (`/decision-benchmarks/` for `/decision-benchmarks/snake/`, `/` for the dev
+ * server's `/snake/`): where the one Login with Opper lives.
+ */
+export const serviceBaseOf = (base: string): string => base.replace(/[^/]+\/$/, '');
+
+/** A path below the service's base path, e.g. '/auth/login' -> '/decision-benchmarks/auth/login'. */
+export const servicePath = (path: string): string => withBase(serviceBaseOf(BASE_URL), path);
+
 /** The address share links point at: the bare origin at the root (as before), else the app's own address. */
 export const shareUrlFor = (base: string, publicUrl: string, appUrl: string): string => (base === '/' ? publicUrl : appUrl);
 
