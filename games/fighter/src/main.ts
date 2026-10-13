@@ -1,0 +1,282 @@
+// Jev Fighter's page, laid out as every game page is (Snake's, after jevman's): opper.ai's chrome, the hero, the stage
+// playing a recorded match with a chip per recording, one "Fight an AI" button, then the Leaderboard, Benchmark your
+// model and Method sections. Watch plays recordings only: no model is called for a visitor who did not ask to fight.
+import { accountNotice, fetchMe, POOL_EMPTY_NOTICE, renderAccount, renderDrawerAccount, signIn, takeAuthError, updatePoolAmount, walletNotice, type AccountView, type Me } from '../../../packages/kit/client/auth.ts';
+import { fmt, loadLeaderboard } from '../../../packages/kit/client/leaderboard.ts';
+import { appPath } from '../../../packages/kit/client/paths.ts';
+import { tag, track, trackClicks } from '../../../packages/kit/client/track.ts';
+import type { TransportHooks } from '../../../packages/kit/client/transport.ts';
+import type { Replay } from '../shared/replay.ts';
+import { getDemo, getDemos, type Demo } from './api.ts';
+import { audio } from './audio.ts';
+import { h } from './dom.ts';
+import { live, pickerCard } from './views/fight.ts';
+import { posesView } from './views/poses.ts';
+import { replayView } from './views/replay.ts';
+import { stillView } from './views/still.ts';
+
+const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
+const DEMO = /^#\/(?:watch|still)\/([a-z0-9][a-z0-9-]*\.fight\.json\.gz)/;
+
+// A recorded match's frame on its own, filling the window (#/still/<file>?t=<tick>): for the poster and embeds.
+// The pose sheet (#/poses) is a tool for tuning the animation.
+const special = location.hash.startsWith('#/still/') ? 'still' : location.hash === '#/poses' ? 'poses' : null;
+if (special) {
+  const host = h('div.tool');
+  document.body.replaceChildren(host);
+  document.body.classList.add('tool-page');
+  const file = DEMO.exec(location.hash)?.[1];
+  if (special === 'poses') posesView(host);
+  else if (file) {
+    const r = await getDemo(file).catch(() => null);
+    if (r) stillView(host, r, Number(new URLSearchParams(location.hash.split('?')[1] ?? '').get('t')) || 0);
+  }
+} else await page();
+
+async function page(): Promise<void> {
+  trackClicks(appPath('/'), 'fighter');
+
+  // ---------- the opper.ai chrome: the phone menu, the account, the theme ----------
+  const drawer = $('#oc-drawer');
+  const menuButton = document.getElementById('oc-menu-button');
+  const setDrawer = (open: boolean) => {
+    drawer.hidden = !open;
+    menuButton?.setAttribute('aria-expanded', String(open));
+  };
+  menuButton?.addEventListener('click', () => setDrawer(drawer.hidden !== false));
+  const famToggle = $<HTMLButtonElement>('#oc-fam-toggle');
+  famToggle.addEventListener('click', () => {
+    const open = famToggle.getAttribute('aria-expanded') !== 'true';
+    famToggle.setAttribute('aria-expanded', String(open));
+    $('#oc-fam').hidden = !open;
+  });
+  drawer.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('[data-close], a')) setDrawer(false);
+  });
+  // The theme follows the system while the visitor hasn't picked one on opper.ai (index.html sets it before the first paint).
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    let picked: string | null = null;
+    try {
+      picked = localStorage.getItem('theme');
+    } catch {
+      // storage blocked: follow the system
+    }
+    if (picked !== 'dark' && picked !== 'light') document.documentElement.classList.toggle('dark', e.matches);
+  });
+
+  let me: Me = await fetchMe();
+  const authError = takeAuthError();
+  const accountEl = $('#account');
+  let account: AccountView = { kind: me.mode === 'player' ? 'player' : me.mode === 'pool' ? 'pool' : me.mode === 'dev' ? 'dev' : me.pool ? 'pool-empty' : 'signed-out', me };
+  const showAccount = (view: AccountView) => {
+    account = view;
+    renderAccount(accountEl, view);
+    renderDrawerAccount($('#oc-drawer-account'), view);
+  };
+  showAccount({ ...account, notice: accountNotice(me, authError, false) });
+  if (me.mode === 'pool') {
+    setInterval(() => {
+      if (document.hidden || account.kind !== 'pool') return;
+      void fetchMe().then((fresh) => {
+        if (account.kind !== 'pool') return;
+        if (fresh.mode === 'pool') {
+          updatePoolAmount(accountEl, fresh.pool?.remainingUsd ?? null);
+          updatePoolAmount($('#oc-drawer-account'), fresh.pool?.remainingUsd ?? null);
+        } else if (fresh.mode === 'none' && fresh.pool && !fresh.unavailable) {
+          me = fresh;
+          showAccount({ kind: 'pool-empty', me: fresh });
+        }
+      });
+    }, 60_000);
+  }
+  /** What the transport tells the page when a model call cannot be paid for; the picker reads `me` afresh. */
+  const hooks: TransportHooks = {
+    onSignedOut: () => {
+      me = { ...me, mode: me.pool ? 'pool' : 'none', user: undefined };
+      showAccount({ kind: 'signed-out', me, notice: 'Signed out. Sign in to fight a decision model.' });
+    },
+    onPoolEmpty: () => {
+      if (me.pool) me = { ...me, pool: { ...me.pool, open: false } };
+      showAccount({ kind: 'pool-empty', me, notice: POOL_EMPTY_NOTICE });
+    },
+    onWalletEmpty: (url) => showAccount({ ...account, ...walletNotice(url) }),
+  };
+
+  // ---------- the leaderboard ----------
+  const pct = (v: number | string) => `${fmt(Number(v))}%`;
+  void loadLeaderboard($<HTMLTableElement>('#leaderboard-table'), appPath, {
+    metric: 'Rounds won (mean ± margin)',
+    format: (n) => `${fmt(n)}%`,
+    scaleMax: 100,
+    best: false,
+    extra: [
+      { label: 'vs greedy', key: 'vsGreedy', format: pct },
+      { label: 'vs payoff', key: 'vsPayoff', format: pct },
+      { label: 'vs maximin', key: 'vsMaximin', format: pct },
+    ],
+  });
+
+  // ---------- the stage: a recording (Watch), the picker, a live fight ----------
+  const viewer = $('#viewer');
+  const overlay = $('#overlay');
+  const cta = $<HTMLButtonElement>('#play-cta');
+  const ctaLabel = $('#play-label');
+  const noticeEl = $('#notice');
+  const chipsEl = $('#watch-chips');
+  let cleanup: () => void = () => {};
+  /** Pauses the recording on the stage, if one plays. */
+  let pause: () => void = () => {};
+  let mode: 'watch' | 'fight' = 'watch';
+  /** Bumped by every switch, so a recording that loads late doesn't replace what came after it. */
+  let run = 0;
+
+  const setCta = (kind: 'fight' | 'stop') => {
+    cta.classList.toggle('stop', kind === 'stop');
+    ctaLabel.textContent = kind === 'fight' ? 'Fight an AI' : 'Stop the fight';
+  };
+  const notice = (text: string | null) => {
+    noticeEl.textContent = text ?? '';
+    noticeEl.hidden = text === null;
+  };
+  const closePicker = () => {
+    overlay.hidden = true;
+    overlay.replaceChildren();
+  };
+  const switchTo = (next: () => () => void) => {
+    run += 1;
+    cleanup();
+    cleanup = () => {};
+    pause = () => {};
+    closePicker();
+    cleanup = next();
+  };
+
+  const demos: Demo[] = await getDemos().catch(() => []);
+  const loaded = new Map<string, Promise<Replay | null>>();
+  const demoFor = (d: Demo) => {
+    let p = loaded.get(d.file);
+    if (!p) {
+      p = getDemo(d.file).catch(() => null);
+      loaded.set(d.file, p);
+      void p.then((r) => r ?? loaded.delete(d.file));
+    }
+    return p;
+  };
+  let watching: Demo | null = demos.find((d) => d.file === DEMO.exec(location.hash)?.[1]) ?? demos[0] ?? null;
+  const short = (title: string) => title.replace(/ baseline\b/g, '');
+
+  function renderChips(): void {
+    chipsEl.replaceChildren(
+      ...demos.map((d) => {
+        const b = h('button.chip', { type: 'button', role: 'radio', 'aria-checked': String(mode === 'watch' && d === watching), title: d.note ?? d.title }, h('span', null, short(d.title)));
+        const sub = h('span.sub');
+        void demoFor(d).then((r) => {
+          if (r) sub.textContent = r.result.rounds.filter((x) => x.winner === 0).length + '-' + r.result.rounds.filter((x) => x.winner === 1).length;
+        });
+        b.append(sub);
+        b.addEventListener('click', () => {
+          watching = d;
+          void watch(true);
+        });
+        return tag(b, 'click_watch', { source: d.file });
+      }),
+    );
+  }
+
+  /** Plays the chosen recording on the stage; `music` once the visitor picked it (not on page load). */
+  async function watch(music = false): Promise<void> {
+    mode = 'watch';
+    setCta('fight');
+    notice(null);
+    renderChips();
+    const d = watching;
+    switchTo(() => {
+      viewer.replaceChildren(h('div.viewer-loading', null, d ? 'Loading the match...' : 'No recorded matches yet.'));
+      return () => {};
+    });
+    if (!d) return;
+    const mine = run;
+    const r = await demoFor(d);
+    if (mine !== run) return;
+    if (!r) {
+      viewer.replaceChildren(h('div.viewer-loading', null, "This recording didn't load."));
+      return;
+    }
+    const v = replayView(viewer, r, { link: `#/watch/${d.file}`, music });
+    cleanup = v;
+    pause = v.pause;
+  }
+
+  function watchLast(r: Replay): void {
+    mode = 'watch';
+    setCta('fight');
+    renderChips();
+    switchTo(() => {
+      const v = replayView(viewer, r, { note: 'The match you just played. It is not saved anywhere: download it to keep it.' });
+      pause = v.pause;
+      return v;
+    });
+  }
+
+  function openPicker(): void {
+    // The recording pauses under the picker (its play button carries on).
+    pause();
+    const card = pickerCard({
+      me,
+      hooks,
+      signIn,
+      poolEmpty: account.kind === 'pool-empty',
+      close: closePicker,
+      start: (setup, plans) => {
+        track('play_start', { game: 'fighter', opponent: `${setup.left} vs ${setup.right}` });
+        mode = 'fight';
+        setCta('stop');
+        renderChips();
+        notice(null);
+        switchTo(() =>
+          live(viewer, setup, plans, {
+            // The match just played: replayed here, kept nowhere else.
+            watch: (r) => watchLast(r),
+            again: () => openPicker(),
+            ended: () => {
+              setCta('fight');
+              track('play_end', { game: 'fighter', opponent: `${setup.left} vs ${setup.right}` });
+            },
+          }),
+        );
+        viewer.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      },
+    });
+    overlay.replaceChildren(card);
+    overlay.hidden = false;
+    card.querySelector<HTMLElement>('.fight-go:not([disabled])')?.focus({ preventScroll: true });
+  }
+
+  cta.addEventListener('click', () => {
+    if (cta.classList.contains('stop')) {
+      void watch();
+      return;
+    }
+    openPicker();
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closePicker();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!drawer.hidden) return setDrawer(false);
+    if (!overlay.hidden) return closePicker();
+  });
+  window.addEventListener('hashchange', () => {
+    const file = DEMO.exec(location.hash)?.[1];
+    const d = demos.find((x) => x.file === file);
+    if (d) {
+      watching = d;
+      void watch(true);
+      $('#stage').scrollIntoView({ behavior: 'smooth' });
+    } else if (location.hash === '#/leaderboard') $('#leaderboard').scrollIntoView({ behavior: 'smooth' });
+  });
+  if (location.hash === '#/leaderboard') requestAnimationFrame(() => $('#leaderboard').scrollIntoView());
+  audio.scene(false);
+  await watch();
+}

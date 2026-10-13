@@ -1,0 +1,240 @@
+import { SCATTER_CORNERS } from './layout.ts';
+import { DIR_VEC, REVERSE } from './maze.ts';
+import { occupiedTile, optionsAt, type DecisionPoint, type GameState, type Ghost } from './sim.ts';
+import { GHOST_IDS, sameTile, type ActorId, type Dir, type GhostId, type Tile } from './types.ts';
+
+export type GoalKind = 'pacman' | 'ambush' | 'flank' | 'corner' | 'flee' | 'eat' | 'hunt';
+
+export interface Goal {
+  kind: GoalKind;
+  label: string;
+  target: Tile | null;
+}
+
+export interface OptionFeatures {
+  dir: Dir;
+  /** Steps to the actor's current goal via this option (Pac-Man: nearest pellet, or frightened ghost when hunting). */
+  goalDistance: number | null;
+  /** Ghosts only: steps to Pac-Man via this option. */
+  pacmanDistance: number | null;
+  nearestPellet: number | null;
+  /** Pellets on the corridor this option leads into, up to and including the next junction. */
+  corridorPellets: number;
+  nearestDangerGhost: number | null;
+  /** Normal (non-frightened) ghosts other than the actor standing on that corridor. */
+  dangerInCorridor: GhostId[];
+  nearestFrightenedGhost: number | null;
+  /** Steps to every reachable frightened ghost via this option, nearest first. */
+  frightenedGhostSteps: number[];
+  fruitDistance: number | null;
+  nearestPowerPellet: number | null;
+  /** Whether the nearest dangerous ghost on this route is moving toward the actor (closer to where the route starts from). */
+  dangerApproaching: boolean;
+  /** Dangerous ghosts within NEARBY_STEPS via this route. */
+  dangerNearby: number;
+  /** Steps from where the actor is now to the junction where this option's corridor ends. */
+  junctionSteps: number;
+  /** The dangerous ghost that can reach that junction fastest, and how many steps it needs. */
+  junctionGhost: { id: GhostId; steps: number } | null;
+}
+
+const CORRIDOR_LIMIT = 40;
+const CLYDE_SHY_DISTANCE = 8;
+export const NEARBY_STEPS = 8;
+
+/** A ghost can get to the end of this route's corridor no later than Pac-Man. */
+export const isTrap = (f: OptionFeatures): boolean => f.junctionGhost !== null && f.junctionGhost.steps <= f.junctionSteps;
+
+export function goalFor(state: GameState, id: ActorId): Goal {
+  if (id === 'pacman') {
+    return state.frightLeft > 0
+      ? { kind: 'hunt', label: 'frightened ghost', target: null }
+      : { kind: 'eat', label: 'pellet', target: null };
+  }
+  const { maze } = state;
+  const ghost = state.ghosts[id];
+  const pac = occupiedTile(state, state.pacman);
+  if (ghost.state === 'frightened') return { kind: 'flee', label: 'Pac-Man', target: pac };
+  const corner: Goal = { kind: 'corner', label: 'home corner', target: SCATTER_CORNERS[id] };
+  if (state.mode === 'scatter') return corner;
+  const ahead = (n: number): Tile => {
+    const v = DIR_VEC[state.pacman.dir];
+    return { x: pac.x + v.x * n, y: pac.y + v.y * n };
+  };
+  switch (id) {
+    case 'blinky':
+      return { kind: 'pacman', label: 'Pac-Man', target: pac };
+    case 'pinky':
+      return { kind: 'ambush', label: 'ambush point ahead of Pac-Man', target: maze.nearestWalkable(ahead(4)) };
+    case 'inky': {
+      const pivot = ahead(2);
+      const b = occupiedTile(state, state.ghosts.blinky);
+      return {
+        kind: 'flank',
+        label: 'flanking point',
+        target: maze.nearestWalkable({ x: 2 * pivot.x - b.x, y: 2 * pivot.y - b.y }),
+      };
+    }
+    case 'clyde': {
+      const d = maze.distances(occupiedTile(state, ghost))[maze.key(pac)];
+      return d >= 0 && d <= CLYDE_SHY_DISTANCE ? corner : { kind: 'pacman', label: 'Pac-Man', target: pac };
+    }
+  }
+}
+
+export function optionFeatures(state: GameState, point: DecisionPoint): OptionFeatures[] {
+  const { maze } = state;
+  const goal = goalFor(state, point.actor);
+  const pac = occupiedTile(state, state.pacman);
+  const others = GHOST_IDS.filter((id) => id !== point.actor).map((id) => state.ghosts[id]);
+  const danger = others.filter((g) => g.state === 'normal');
+  const frightened = others.filter((g) => g.state === 'frightened');
+  const pelletTiles = [...maze.pellets, ...maze.powerPellets].map((k) => maze.fromKey(k));
+  const powerTiles = [...maze.powerPellets].map((k) => maze.fromKey(k));
+
+  return point.options.map((dir) => {
+    const { start, origin } = routeOf(state, point, dir);
+    const dist = maze.distances(start, origin);
+    const steps = (t: Tile): number | null => {
+      const v = dist[maze.key(t)];
+      return v < 0 ? null : v + 1;
+    };
+    const nearest = (tiles: Tile[]): number | null => {
+      let best: number | null = null;
+      for (const t of tiles) {
+        const s = steps(t);
+        if (s !== null && (best === null || s < best)) best = s;
+      }
+      return best;
+    };
+    const corridor = corridorFrom(state, start, dir);
+    const junction = corridor[corridor.length - 1];
+    const toJunction = maze.distanceMap(junction);
+    let junctionGhost: OptionFeatures['junctionGhost'] = null;
+    for (const g of danger) {
+      const d = toJunction[maze.key(occupiedTile(state, g))];
+      if (d >= 0 && (junctionGhost === null || d < junctionGhost.steps)) junctionGhost = { id: g.id, steps: d };
+    }
+    const dangerSteps = danger
+      .map((g) => ({ g, steps: steps(occupiedTile(state, g)) }))
+      .filter((x): x is { g: (typeof danger)[number]; steps: number } => x.steps !== null)
+      .sort((a, b) => a.steps - b.steps);
+    const closest = dangerSteps[0];
+    const nearestPellet = nearest(pelletTiles);
+    const frightenedGhostSteps = frightened
+      .map((g) => steps(occupiedTile(state, g)))
+      .filter((d): d is number => d !== null)
+      .sort((a, b) => a - b);
+    const nearestFrightenedGhost = frightenedGhostSteps[0] ?? null;
+    const goalDistance = goal.target
+      ? steps(goal.target)
+      : goal.kind === 'hunt'
+        ? (nearestFrightenedGhost ?? nearestPellet)
+        : nearestPellet;
+    return {
+      dir,
+      goalDistance,
+      pacmanDistance: point.actor === 'pacman' ? null : steps(pac),
+      nearestPellet,
+      corridorPellets: corridor.filter((t) => maze.pellets.has(maze.key(t)) || maze.powerPellets.has(maze.key(t))).length,
+      nearestDangerGhost: nearest(danger.map((g) => occupiedTile(state, g))),
+      dangerInCorridor: danger.filter((g) => corridor.some((t) => sameTile(t, occupiedTile(state, g)))).map((g) => g.id),
+      nearestFrightenedGhost,
+      frightenedGhostSteps,
+      fruitDistance: state.fruit ? steps(state.fruit.tile) : null,
+      nearestPowerPellet: nearest(powerTiles),
+      dangerApproaching: closest !== undefined && movingToward(state, closest.g, origin),
+      dangerNearby: dangerSteps.filter((x) => x.steps <= NEARBY_STEPS).length,
+      // Ghost steps are counted from where the ghosts are now, so count Pac-Man's walk to the decision point too.
+      junctionSteps: point.distance + corridor.length,
+      junctionGhost,
+    };
+  });
+}
+
+/** Whether ghost `g`'s next move takes it closer to `to` (for a ghost waiting at a junction: any move it may take). */
+function movingToward(state: GameState, g: Ghost, to: Tile): boolean {
+  const { maze } = state;
+  const dist = maze.distanceMap(to);
+  const here = dist[maze.key(g.tile)];
+  const moves = g.waiting ? optionsAt(state, g.id, g.tile, g.dir) : [g.dir];
+  return moves.some((d) => {
+    const next = dist[maze.key(maze.neighbor(g.tile, d))];
+    return next >= 0 && next < here;
+  });
+}
+
+/**
+ * Where an option's route starts, and the tile behind it (where the actor is) that it never passes back through.
+ * Turning back mid-tile leads onto the tile Pac-Man is leaving, with the tile he was heading into behind him.
+ */
+function routeOf(state: GameState, point: DecisionPoint, dir: Dir): { start: Tile; origin: Tile } {
+  if (point.escape && dir !== point.heading && state.pacman.progress > 0) {
+    return { start: point.tile, origin: state.maze.neighbor(point.tile, point.heading) };
+  }
+  return { start: state.maze.neighbor(point.tile, dir), origin: point.tile };
+}
+
+function corridorFrom(state: GameState, start: Tile, heading: Dir): Tile[] {
+  const tiles: Tile[] = [];
+  let tile = start;
+  let dir = heading;
+  for (let i = 0; i < CORRIDOR_LIMIT; i++) {
+    tiles.push(tile);
+    const ahead = state.maze.openDirs(tile).filter((d) => d !== REVERSE[dir]);
+    if (ahead.length !== 1) break;
+    dir = ahead[0];
+    tile = state.maze.neighbor(tile, dir);
+  }
+  return tiles;
+}
+
+/** Pac-Man covers 7.5 tiles a second; count a little less so a fruit or frightened ghost is still there on arrival. */
+const PACMAN_STEPS_PER_SECOND = 7;
+
+/** Steps Pac-Man can still cover before the fright ends; a frightened ghost farther away is dangerous on arrival. */
+const frightReach = (state: GameState, point: DecisionPoint): number =>
+  Math.floor(state.frightLeft * PACMAN_STEPS_PER_SECOND) - point.distance;
+
+/**
+ * The quickest route to the fruit that gets there before it disappears, with no ghost in its first corridor, close by
+ * or able to block its junction; or null. Counts the walk to the decision point too.
+ */
+export function fruitRoute(state: GameState, point: DecisionPoint, feats: OptionFeatures[]): Dir | null {
+  if (!state.fruit) return null;
+  const reach = Math.floor(state.fruit.secondsLeft * PACMAN_STEPS_PER_SECOND);
+  // A frightened ghost on the way that Pac-Man only meets after the fright ends is a normal ghost by then.
+  const soonDangerous = (f: OptionFeatures) => f.frightenedGhostSteps.some((d) => d <= f.fruitDistance! && d > frightReach(state, point));
+  const ok = feats.filter(
+    (f) =>
+      f.fruitDistance !== null &&
+      point.distance + f.fruitDistance <= reach &&
+      f.dangerInCorridor.length === 0 &&
+      (f.nearestDangerGhost ?? 999) > 2 &&
+      !isTrap(f) &&
+      !soonDangerous(f),
+  );
+  return ok.length ? ok.reduce((best, f) => (f.fruitDistance! < best.fruitDistance! ? f : best)).dir : null;
+}
+
+/** Deterministic stand-in used when jev cannot answer in time. */
+export function greedyChoice(state: GameState, point: DecisionPoint, feats: OptionFeatures[]): Dir {
+  const lowest = (pool: OptionFeatures[], score: (f: OptionFeatures) => number) =>
+    pool.reduce((best, f) => (score(f) < score(best) ? f : best)).dir;
+  const or = (v: number | null, missing: number) => v ?? missing;
+
+  if (point.actor !== 'pacman') {
+    return goalFor(state, point.actor).kind === 'flee'
+      ? lowest(feats, (f) => -or(f.pacmanDistance, 999))
+      : lowest(feats, (f) => or(f.goalDistance, 999));
+  }
+  const safe = feats.filter((f) => f.dangerInCorridor.length === 0 && or(f.nearestDangerGhost, 999) > 2 && !isTrap(f));
+  const pool = safe.length ? safe : feats;
+  // Only hunt a ghost Pac-Man can reach before the fright ends; otherwise it is dangerous again on arrival.
+  const huntReach = frightReach(state, point);
+  const huntable = pool.filter((f) => f.nearestFrightenedGhost !== null && f.nearestFrightenedGhost <= huntReach);
+  if (huntable.length) return lowest(huntable, (f) => or(f.nearestFrightenedGhost, 999));
+  const fruit = fruitRoute(state, point, pool);
+  if (fruit) return fruit;
+  return lowest(pool, (f) => or(f.nearestPellet, 999));
+}

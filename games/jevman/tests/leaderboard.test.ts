@@ -1,0 +1,47 @@
+import { describe, expect, it } from 'vitest';
+import { jointLeaders, rank, summarize, tooCloseToCall, type GameResult, type LeaderboardEntry } from '../shared/leaderboard';
+
+const game = (over: Partial<GameResult>): GameResult => ({
+  survived: 60, score: 2000, pellets: 200, deaths: 3, level: 1, calls: 100, decisions: 90, fallbacks: 0,
+  latencyMsSum: 25_000, cost: 0.005, fruitSpawned: 2, fruitEaten: 1, ghostsEaten: 2, deathsBy: { 'at/near junction': 3 }, ...over,
+});
+
+describe('leaderboard', () => {
+  it('summarizes a model over its games', () => {
+    const e = summarize('opper/kev-4b', [game({ score: 1000, fallbacks: 9 }), game({ score: 3000, level: 2, deaths: 2, deathsBy: { 'ghost from behind': 2 } })]);
+    expect(e).toMatchObject({
+      model: 'opper/kev-4b', name: 'Kev 4B', games: 2, meanScore: 2000, meanSurvivedSeconds: 60, pelletsPerLife: 80,
+      fruitEaten: '2/4', bestLevel: 2, fallbackRate: 0.05, meanLatencyMs: 250, costPerGame: 0.005,
+      deathsBy: { 'at/near junction': 3, 'ghost from behind': 2 },
+    });
+  });
+
+  it('ranks by mean score, best first', () => {
+    const a = summarize('opper/clef', [game({ score: 1500 })]);
+    const b = summarize('typesafe/jev-1.13.0', [game({ score: 2500 })]);
+    expect(rank([a, b]).map((e) => e.model)).toEqual(['typesafe/jev-1.13.0', 'opper/clef']);
+  });
+
+  it('gives the margin of error on the score, and tells a real lead from noise', () => {
+    const a = summarize('opper/clef', [1000, 3000, 2000, 2000].map((score) => game({ score })));
+    expect(a.scoreStdError).toBe(408); // sd 816 over 4 games
+    const close = summarize('typesafe/jev-1.13.0', [1500, 3500, 2500, 2500].map((score) => game({ score })));
+    const far = summarize('opper/kev-4b', [100, 200, 150, 150].map((score) => game({ score })));
+    expect(tooCloseToCall(a, close)).toBe(true);
+    expect(tooCloseToCall(a, far)).toBe(false);
+  });
+
+  it('ties for first without ranking a better score below a worse one', () => {
+    const e = (name: string, meanScore: number, scoreStdError: number) => ({ name, meanScore, scoreStdError }) as LeaderboardEntry;
+    // A 24-game run (wide margin) is too close to call with the leader; the better 100-game score above it isn't.
+    const board = [e('SemIf', 3210, 134), e('jev', 2750, 109), e('Qwen 3.8', 2725, 216), e('RizzoFlow', 2675, 110), e('Luna', 2568, 75)];
+    expect(jointLeaders(board).map((x) => x.name)).toEqual(['SemIf', 'jev', 'Qwen 3.8']);
+    // Our own board as published: jev, Luna and Clef Flash tied, Clef not.
+    expect(jointLeaders([e('jev', 2750, 109), e('Luna', 2568, 75), e('Clef Flash', 2538, 60), e('Clef', 2476, 65)]).map((x) => x.name)).toEqual(['jev', 'Luna', 'Clef Flash']);
+    expect(jointLeaders([e('SemIf', 3210, 134), e('Von', 984, 20)])).toEqual([]);
+  });
+
+  it('reports no latency for a model that never answered', () => {
+    expect(summarize('berget/convaiinnovations/laya', [game({ calls: 0, latencyMsSum: 0 })]).meanLatencyMs).toBeNull();
+  });
+});

@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2026-10-12T00:00:00.000Z",
+  "game": "fighter",
+  "benchVersion": 1,
+  "metric": {
+    "name": "Rounds won vs bots",
+    "unit": "%",
+    "higherIsBetter": true
+  },
+  "entries": [],
+  "skipped": []
+}

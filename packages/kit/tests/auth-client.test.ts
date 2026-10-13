@@ -1,0 +1,137 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { accountNotice, fetchMe, loginHref, walletNotice, type Me } from '../client/auth';
+
+const WALLET = 'https://platform.opper.ai/wallet';
+
+function stub(impl: () => Promise<Response>) {
+  const f = vi.fn(impl);
+  vi.stubGlobal('fetch', f);
+  return f;
+}
+const reply = (body: unknown, status = 200) => stub(async () => new Response(JSON.stringify(body), { status }));
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('fetchMe', () => {
+  const fallback = { mode: 'none', walletUrl: WALLET, loginAvailable: true, unavailable: true };
+
+  it('falls back (sign-in still enabled) on a network error', async () => {
+    stub(async () => {
+      throw new TypeError('fetch failed');
+    });
+    await expect(fetchMe()).resolves.toEqual(fallback);
+  });
+
+  it('falls back on a timeout', async () => {
+    stub(async () => {
+      throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
+    });
+    await expect(fetchMe()).resolves.toEqual(fallback);
+  });
+
+  it('falls back on a non-OK response', async () => {
+    reply({ mode: 'player', walletUrl: WALLET, loginAvailable: true }, 500);
+    await expect(fetchMe()).resolves.toEqual(fallback);
+  });
+
+  it('falls back on bad JSON', async () => {
+    stub(async () => new Response('<html>', { status: 200 }));
+    await expect(fetchMe()).resolves.toEqual(fallback);
+  });
+
+  it('falls back on an invalid shape', async () => {
+    for (const body of [null, 'player', 42, [], {}, { mode: 'admin' }]) {
+      reply(body);
+      await expect(fetchMe()).resolves.toEqual(fallback);
+    }
+  });
+
+  it('replaces a non-https walletUrl with the default', async () => {
+    for (const walletUrl of ['http://evil.example/wallet', 'javascript:alert(1)', 'not a url', 7, undefined]) {
+      reply({ mode: 'player', walletUrl, loginAvailable: true, user: { name: 'Ada' } });
+      expect((await fetchMe()).walletUrl).toBe(WALLET);
+    }
+  });
+
+  it('reads the free credits: playing on them while open, signed out once empty', async () => {
+    reply({ mode: 'pool', walletUrl: WALLET, loginAvailable: true, pool: { open: true, remainingUsd: 84.12 } });
+    expect(await fetchMe()).toMatchObject({ mode: 'pool', pool: { open: true, remainingUsd: 84.12 } });
+    reply({ mode: 'none', walletUrl: WALLET, loginAvailable: true, pool: { open: false, remainingUsd: -1 } });
+    expect(await fetchMe()).toMatchObject({ mode: 'none', pool: { open: false, remainingUsd: 0 } });
+    reply({ mode: 'pool', walletUrl: WALLET, loginAvailable: true, pool: { open: true, remainingUsd: 'lots' } });
+    expect((await fetchMe()).pool).toEqual({ open: true, remainingUsd: null });
+  });
+
+  it('keeps the models the key can use and the server default, ignoring anything malformed', async () => {
+    reply({ mode: 'dev', walletUrl: WALLET, loginAvailable: true, defaultModel: 'opper/clef', models: ['typesafe/jev-1.13.0', 7, 'opper/clef', ''] });
+    expect(await fetchMe()).toMatchObject({ defaultModel: 'opper/clef', models: ['typesafe/jev-1.13.0', 'opper/clef'] });
+    reply({ mode: 'dev', walletUrl: WALLET, loginAvailable: true, models: 'all' });
+    const me = await fetchMe();
+    expect(me.models).toBeUndefined();
+    expect(me.defaultModel).toBeUndefined();
+  });
+
+  it('treats empty user name and email as missing', async () => {
+    reply({ mode: 'player', walletUrl: WALLET, loginAvailable: true, user: { name: '', email: '' } });
+    const me = await fetchMe();
+    expect(me.user?.name).toBeUndefined();
+    expect(me.user?.email).toBeUndefined();
+  });
+
+  it('returns a valid response and asks with a timeout signal', async () => {
+    const body = { mode: 'player', user: { name: 'Ada', email: 'ada@example.com' }, projectName: 'jevman', walletUrl: 'https://platform.opper.ai/w', loginAvailable: true };
+    const f = reply(body);
+    await expect(fetchMe()).resolves.toEqual(body);
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/me');
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe('fetchMe dev provider', () => {
+  it('passes through which API the dev key calls, and drops unknown values', async () => {
+    reply({ mode: 'dev', devProvider: 'typesafe', walletUrl: WALLET, loginAvailable: false });
+    await expect(fetchMe()).resolves.toMatchObject({ mode: 'dev', devProvider: 'typesafe' });
+    reply({ mode: 'dev', devProvider: 'elsewhere', walletUrl: WALLET, loginAvailable: false });
+    expect((await fetchMe()).devProvider).toBeUndefined();
+  });
+});
+
+describe('accountNotice', () => {
+  const me = (extra: Partial<Me> = {}): Me => ({ mode: 'none', walletUrl: WALLET, loginAvailable: true, ...extra });
+
+  it('prefers the sign-in error', () => {
+    expect(accountNotice(me({ unavailable: true }), 'Sign-in was cancelled.', true)).toBe('Sign-in was cancelled.');
+  });
+
+  it('says the server could not be reached when /api/me failed', () => {
+    expect(accountNotice(me({ unavailable: true }), null, true)).toBe("Couldn't reach the server, so this is the recorded demo");
+    expect(accountNotice(me({ unavailable: true }), null, false)).toBe("Couldn't reach the server");
+  });
+
+  it('shows nothing otherwise', () => {
+    expect(accountNotice(me(), null, true)).toBeUndefined();
+    expect(accountNotice(me({ mode: 'player' }), null, false)).toBeUndefined();
+  });
+});
+
+describe('walletNotice', () => {
+  it('asks the player to top up, linking to the wallet', () => {
+    expect(walletNotice('https://platform.opper.ai/wallet?x=1')).toEqual({
+      notice: 'Your Opper wallet is empty. Top it up to keep playing.',
+      noticeLink: 'https://platform.opper.ai/wallet?x=1',
+    });
+  });
+
+  it('links to the default wallet for a non-https URL', () => {
+    expect(walletNotice('javascript:alert(1)').noticeLink).toBe(WALLET);
+  });
+});
+
+describe('loginHref', () => {
+  it("goes to the service's one sign-in and comes back to this page", () => {
+    // This build's base is the root, so the service's is too.
+    expect(loginHref('/snake/?model=sference%2Fclef')).toBe('/auth/login?return=%2Fsnake%2F%3Fmodel%3Dsference%252Fclef');
+    expect(new URLSearchParams(loginHref('/snake/?model=x#top').split('?')[1]).get('return')).toBe('/snake/?model=x#top');
+  });
+});

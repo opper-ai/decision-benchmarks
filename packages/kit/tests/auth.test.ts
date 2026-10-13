@@ -1,0 +1,264 @@
+import { describe, expect, it, vi } from 'vitest';
+import { crossSite, handleCallback, handleLogin, handleLogout, handleMe, opperExchange, safeReturn, sessionFrom, SESSION_COOKIE, STATE_COOKIE, type AuthConfig, type HttpRequest } from '../server/auth';
+import { openSession, sealSession } from '../server/session';
+import { DECISION_MODELS } from '../shared/models';
+
+const cfg: AuthConfig = { clientId: 'opper_app_x', clientSecret: 'shh', redirectUri: 'http://localhost:5173/auth/callback', opperUrl: 'https://api.opper.ai', sessionSecret: 's'.repeat(64) };
+const req = (url: string, headers: HttpRequest['headers'] = {}, method = 'GET'): HttpRequest => ({ method, url, headers });
+const setCookies = (r: { headers: Record<string, string | string[]> }) => ([] as string[]).concat(r.headers['Set-Cookie'] ?? []);
+const cookieValue = (r: { headers: Record<string, string | string[]> }, name: string) => {
+  const c = setCookies(r).find((s) => s.startsWith(`${name}=`))!;
+  return decodeURIComponent(c.slice(name.length + 1).split(';')[0]);
+};
+
+describe('handleLogin', () => {
+  it('redirects to Opper with a state cookie', () => {
+    const r = handleLogin(req('/auth/login'), cfg, () => 'st4te');
+    expect(r.status).toBe(302);
+    const loc = new URL(r.headers.Location as string);
+    expect(loc.origin + loc.pathname).toBe('https://api.opper.ai/oauth/authorize');
+    expect(Object.fromEntries(loc.searchParams)).toEqual({ client_id: 'opper_app_x', redirect_uri: cfg.redirectUri, response_type: 'code', state: 'st4te' });
+    // The state, and where to come back to (the base path when the login names no page).
+    expect(setCookies(r)[0]).toBe(`${STATE_COOKIE}=st4te.${Buffer.from('/').toString('base64url')}; Max-Age=600; Path=/auth; HttpOnly; SameSite=Lax`);
+    expect(r.headers['Cache-Control']).toBe('no-store');
+  });
+  it('explains missing configuration', () => {
+    const r = handleLogin(req('/auth/login'), { ...cfg, clientSecret: undefined });
+    expect(r.status).toBe(503);
+    expect(r.body).toMatch(/OPPER_CLIENT_ID.*OPPER_CLIENT_SECRET/);
+  });
+});
+
+describe('handleCallback', () => {
+  const withState = (url: string) => req(url, { cookie: `${STATE_COOKIE}=st4te` });
+  it('exchanges the code, sets a sealed session and clears the state', async () => {
+    const exchange = vi.fn(async () => ({ apiKey: 'op-player', user: { name: 'Ada' } }));
+    const r = await handleCallback(withState('/auth/callback?code=c0de&state=st4te'), cfg, exchange, 10_000);
+    expect(exchange).toHaveBeenCalledWith('c0de');
+    expect(r.status).toBe(302);
+    expect(r.headers.Location).toBe('/');
+    expect(r.body).not.toContain('op-player');
+    const session = openSession(cookieValue(r, SESSION_COOKIE), cfg.sessionSecret, 10_001)!;
+    expect(session).toMatchObject({ apiKey: 'op-player', user: { name: 'Ada' }, issuedAt: 10_000 });
+    expect(setCookies(r).find((c) => c.startsWith(SESSION_COOKIE))).toMatch(/Max-Age=2592000; Path=\/; HttpOnly; SameSite=Lax/);
+    expect(setCookies(r).find((c) => c.startsWith(STATE_COOKIE))).toMatch(/Max-Age=0/);
+    expect(r.headers['Cache-Control']).toBe('no-store');
+  });
+  it('caps the cookie lifetime at the key expiry', async () => {
+    const exchange = async () => ({ apiKey: 'op-player', user: {}, expiresAt: new Date(10_000 + 3_600_000).toISOString() });
+    const r = await handleCallback(withState('/auth/callback?code=c&state=st4te'), cfg, exchange, 10_000);
+    expect(setCookies(r).find((c) => c.startsWith(SESSION_COOKIE))).toMatch(/Max-Age=3600;/);
+  });
+  it.each([
+    ['/auth/callback?code=c&state=wrong', 'state'],
+    ['/auth/callback?code=c', 'state'],
+    ['/auth/callback?error=access_denied&state=st4te', 'denied'],
+    ['/auth/callback?state=st4te', 'exchange'],
+  ])('rejects %s with auth_error=%s and no session', async (url, why) => {
+    const exchange = vi.fn(async () => ({ apiKey: 'op-player', user: {} }));
+    const r = await handleCallback(withState(url), cfg, exchange);
+    expect(r.headers.Location).toBe(`/?auth_error=${why}`);
+    expect(r.headers['Cache-Control']).toBe('no-store');
+    if (why === 'state') expect(exchange).not.toHaveBeenCalled();
+    expect(setCookies(r).some((c) => c.startsWith(`${SESSION_COOKIE}=`) && !c.includes('Max-Age=0'))).toBe(false);
+  });
+  it.each([
+    ['unparseable', 'not-a-date'],
+    ['already past', new Date(9_000).toISOString()],
+  ])('rejects a %s key expiry without setting a session', async (_name, expiresAt) => {
+    const r = await handleCallback(withState('/auth/callback?code=c&state=st4te'), cfg, async () => ({ apiKey: 'op-player', user: {}, expiresAt }), 10_000);
+    expect(r.headers.Location).toBe('/?auth_error=exchange');
+    expect(setCookies(r).some((c) => c.startsWith(`${SESSION_COOKIE}=`) && !c.includes('Max-Age=0'))).toBe(false);
+  });
+  it.each(['/auth/callback?x=%', 'http://', '//'])('resolves to auth_error=state for the malformed URL %s', async (url) => {
+    const exchange = vi.fn(async () => ({ apiKey: 'op-player', user: {} }));
+    const r = await handleCallback(withState(url), cfg, exchange);
+    expect(r.headers.Location).toBe('/?auth_error=state');
+    expect(exchange).not.toHaveBeenCalled();
+  });
+  it('marks both cookies Secure for an https redirect URI', async () => {
+    const httpsCfg = { ...cfg, redirectUri: 'https://jevman.example/auth/callback' };
+    const login = handleLogin(req('/auth/login'), httpsCfg, () => 'st4te');
+    expect(setCookies(login)[0]).toMatch(/; HttpOnly; Secure; SameSite=Lax$/);
+    const r = await handleCallback(withState('/auth/callback?code=c&state=st4te'), httpsCfg, async () => ({ apiKey: 'op-player', user: {} }), 10_000);
+    const cookies = setCookies(r);
+    expect(cookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`))).toMatch(/HttpOnly; Secure; SameSite=Lax$/);
+    expect(cookies.find((c) => c.startsWith(`${STATE_COOKIE}=`))).toMatch(/HttpOnly; Secure; SameSite=Lax$/);
+  });
+  it('reports a failing token exchange', async () => {
+    const r = await handleCallback(withState('/auth/callback?code=c&state=st4te'), cfg, async () => {
+      throw new Error('nope');
+    });
+    expect(r.headers.Location).toBe('/?auth_error=exchange');
+  });
+});
+
+describe('opperExchange', () => {
+  it('posts the form and normalises the response', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ api_key: 'op-k', token_type: 'bearer', user: { name: 'Ada', email: 'a@x', id: 7 } }), { status: 200 }));
+    const out = await opperExchange(cfg, fetchMock)('c0de');
+    expect(out).toEqual({ apiKey: 'op-k', user: { name: 'Ada', email: 'a@x' } });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.opper.ai/oauth/token');
+    expect(init.redirect).toBe('error');
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/x-www-form-urlencoded');
+    expect(Object.fromEntries(new URLSearchParams(String(init.body)))).toEqual({ grant_type: 'authorization_code', code: 'c0de', client_id: 'opper_app_x', client_secret: 'shh', redirect_uri: cfg.redirectUri });
+  });
+  it('throws on a failed exchange or a response without a key', async () => {
+    await expect(opperExchange(cfg, async () => new Response('{"detail":"bad code"}', { status: 400 }))('c')).rejects.toThrow('bad code');
+    await expect(opperExchange(cfg, async () => new Response('{}', { status: 200 }))('c')).rejects.toThrow(/no api key/i);
+  });
+});
+
+describe('session lookup, logout and /api/me', () => {
+  const sealed = sealSession({ v: 1, apiKey: 'op-player', user: { name: 'Ada' }, projectName: 'jevman', issuedAt: Date.now() }, cfg.sessionSecret);
+  const signedIn = (url: string, method = 'GET', extra: Record<string, string> = {}) => req(url, { cookie: `${SESSION_COOKIE}=${encodeURIComponent(sealed)}`, ...extra }, method);
+
+  it('reads the session from the cookie', () => {
+    expect(sessionFrom(signedIn('/'), cfg)?.apiKey).toBe('op-player');
+    expect(sessionFrom(req('/', { cookie: `${SESSION_COOKIE}=tampered` }), cfg)).toBeNull();
+  });
+  it('logs out only with a JSON POST', () => {
+    expect(handleLogout(signedIn('/auth/logout', 'POST'), cfg).status).toBe(415);
+    const r = handleLogout(signedIn('/auth/logout', 'POST', { 'content-type': 'application/json' }), cfg);
+    expect(r.status).toBe(200);
+    expect(setCookies(r)[0]).toMatch(new RegExp(`^${SESSION_COOKIE}=; Max-Age=0; Path=/`));
+    expect(r.headers['Cache-Control']).toBe('no-store');
+    const notPost = handleLogout(signedIn('/auth/logout'), cfg);
+    expect(notPost.status).toBe(405);
+    expect(notPost.headers.Allow).toBe('POST');
+    expect(notPost.headers['Cache-Control']).toBe('no-store');
+  });
+  it('refuses a cross-site logout without clearing the session', () => {
+    const crossSiteHeaders: Record<string, string>[] = [{ 'sec-fetch-site': 'cross-site' }, { origin: 'https://evil.example', host: 'localhost:5173' }];
+    for (const extra of crossSiteHeaders) {
+      const r = handleLogout(signedIn('/auth/logout', 'POST', { 'content-type': 'application/json', ...extra }), cfg);
+      expect(r.status).toBe(403);
+      expect(setCookies(r)).toEqual([]);
+    }
+    const sameOrigin = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: 'localhost:5173' };
+    expect(handleLogout(signedIn('/auth/logout', 'POST', sameOrigin), cfg).status).toBe(200);
+  });
+  it('describes the account without the key', () => {
+    const player = JSON.parse(handleMe(signedIn('/api/me'), cfg, 'opper').body);
+    const all = DECISION_MODELS.map((m) => m.id);
+    expect(player).toEqual({ mode: 'player', user: { name: 'Ada' }, projectName: 'jevman', walletUrl: 'https://platform.opper.ai/wallet', loginAvailable: true, defaultModel: 'typesafe/jev-1.13.0', models: all });
+    // A TypeSafe key reaches Jev only; the demo needs no models.
+    expect(JSON.parse(handleMe(req('/api/me'), cfg, 'typesafe').body)).toMatchObject({ mode: 'dev', devProvider: 'typesafe', models: ['typesafe/jev-1.13.0'] });
+    expect(JSON.parse(handleMe(req('/api/me'), cfg, 'opper').body)).toMatchObject({ mode: 'dev', models: all });
+    expect(JSON.parse(handleMe(req('/api/me'), { ...cfg, clientId: undefined }, undefined).body)).toMatchObject({ mode: 'none', loginAvailable: false });
+    expect(handleMe(signedIn('/api/me'), cfg, 'opper').body).not.toContain('op-player');
+    expect(handleMe(signedIn('/api/me'), cfg, 'opper').headers['Cache-Control']).toBe('no-store');
+  });
+});
+
+describe('crossSite', () => {
+  it.each([
+    [{}, false],
+    [{ 'sec-fetch-site': 'same-origin' }, false],
+    [{ 'sec-fetch-site': 'same-site' }, true],
+    [{ 'sec-fetch-site': 'cross-site' }, true],
+    [{ 'sec-fetch-site': 'none' }, true],
+    [{ origin: 'http://localhost:5173', host: 'localhost:5173' }, false],
+    [{ origin: 'http://localhost:5174', host: 'localhost:5173' }, true],
+    [{ origin: 'https://evil.example', host: 'localhost:5173' }, true],
+    [{ origin: 'null', host: 'localhost:5173' }, true],
+    [{ origin: 'http://localhost:5173' }, true],
+  ])('%j -> %s', (headers, expected) => {
+    expect(crossSite(req('/', headers, 'POST'))).toBe(expected);
+  });
+});
+
+describe('below a base path', () => {
+  const based: AuthConfig = { ...cfg, basePath: '/decision-benchmarks', redirectUri: 'https://opper.ai/decision-benchmarks/auth/callback' };
+  /** A login from `from` (a return path), then the callback with its state cookie: the round trip a browser makes. */
+  const roundTrip = async (from: string, callback = '/auth/callback?code=c&state=st4te') => {
+    const login = handleLogin(req(`/auth/login?${new URLSearchParams({ return: from })}`), based, () => 'st4te');
+    expect(login.status).toBe(302);
+    return handleCallback(req(callback, { cookie: `${STATE_COOKIE}=${encodeURIComponent(cookieValue(login, STATE_COOKIE))}` }), based, async () => ({ apiKey: 'op-player', user: {} }), 10_000);
+  };
+
+  it('signs in at the base path with its one redirect URI, the state cookie scoped to the sign-in routes', () => {
+    const r = handleLogin(req('/auth/login?return=%2Fdecision-benchmarks%2Fsnake%2F'), based, () => 'st4te');
+    expect(setCookies(r)[0]).toMatch(/^db_oauth_state=st4te\.[^;]+; Max-Age=600; Path=\/decision-benchmarks\/auth; HttpOnly; Secure; SameSite=Lax$/);
+    expect(new URL(r.headers.Location as string).searchParams.get('redirect_uri')).toBe('https://opper.ai/decision-benchmarks/auth/callback');
+  });
+
+  it('scopes the session cookie to the base path, for every game, and returns to the page the login came from', async () => {
+    const r = await roundTrip('/decision-benchmarks/snake/?model=x#top');
+    expect(r.headers.Location).toBe('/decision-benchmarks/snake/?model=x#top');
+    const cookies = setCookies(r);
+    expect(cookies.find((c) => c.startsWith(`${SESSION_COOKIE}=`))).toMatch(/; Path=\/decision-benchmarks\/; HttpOnly; Secure; SameSite=Lax$/);
+    expect(cookies.find((c) => c.startsWith(`${STATE_COOKIE}=`))).toMatch(/Max-Age=0; Path=\/decision-benchmarks\/auth;/);
+    // The same session, whichever game reads it.
+    const session = `${SESSION_COOKIE}=${encodeURIComponent(cookieValue(r, SESSION_COOKIE))}`;
+    expect(sessionFrom(req('/api/me', { cookie: session }), based, 10_001)).toMatchObject({ apiKey: 'op-player' });
+  });
+
+  it('returns to the base path when the login names no page', async () => {
+    const login = handleLogin(req('/auth/login'), based, () => 'st4te');
+    const r = await handleCallback(req('/auth/callback?code=c&state=st4te', { cookie: `${STATE_COOKIE}=${encodeURIComponent(cookieValue(login, STATE_COOKIE))}` }), based, async () => ({ apiKey: 'op-player', user: {} }), 10_000);
+    expect(r.headers.Location).toBe('/decision-benchmarks/');
+  });
+
+  it.each(['//evil.com', '//evil.com/decision-benchmarks/', 'https://evil.com', 'https://evil.com/decision-benchmarks/', '/other-app/', '/decision-benchmarks', '/decision-benchmarksx/', '/decision-benchmarks/../other-app/', '/decision-benchmarks/%2e%2e/other-app/', '/decision-benchmarks\\..\\x', '/\\evil.com', 'javascript:alert(1)', ''])(
+    'refuses to return to %j',
+    (to) => {
+      const r = handleLogin(req(`/auth/login?${new URLSearchParams({ return: to })}`), based, () => 'st4te');
+      expect(r.status).toBe(400);
+      expect(r.headers.Location).toBeUndefined();
+      expect(setCookies(r)).toEqual([]);
+    },
+  );
+
+  it.each([
+    ['/decision-benchmarks/snake/', '/decision-benchmarks/snake/'],
+    ['/decision-benchmarks/jevman/leaderboard?x=1', '/decision-benchmarks/jevman/leaderboard?x=1'],
+    ['/decision-benchmarks/snake/../jevman/', '/decision-benchmarks/jevman/'],
+    ['/decision-benchmarks/snake/?auth_error=state', '/decision-benchmarks/snake/?auth_error=state'],
+  ])('accepts the return %j as %j', (to, expected) => {
+    expect(safeReturn(to, based)).toBe(expected);
+  });
+
+  it('at the root (the dev server), returns anywhere on the origin but never off it', () => {
+    expect(safeReturn('/snake/', {})).toBe('/snake/');
+    for (const to of ['//evil.com', 'https://evil.com/', '/\\evil.com', 'snake/']) expect(safeReturn(to, {})).toBeNull();
+  });
+
+  it('sends sign-in errors back to the page the login came from', async () => {
+    const r = await roundTrip('/decision-benchmarks/fighter/?a=1', '/auth/callback?code=c&state=wrong');
+    expect(r.headers.Location).toBe('/decision-benchmarks/fighter/?a=1&auth_error=state');
+    expect(setCookies(r).some((c) => c.startsWith(`${SESSION_COOKIE}=`))).toBe(false);
+  });
+
+  it('without the state cookie (expired), sends the error to the base path', async () => {
+    const r = await handleCallback(req('/auth/callback?code=c&state=wrong'), based, vi.fn());
+    expect(r.headers.Location).toBe('/decision-benchmarks/?auth_error=state');
+  });
+
+  it('ignores a tampered return in the state cookie', async () => {
+    const forged = `st4te.${Buffer.from('https://evil.com/').toString('base64url')}`;
+    const r = await handleCallback(req('/auth/callback?code=c&state=st4te', { cookie: `${STATE_COOKIE}=${forged}` }), based, async () => ({ apiKey: 'op-player', user: {} }), 10_000);
+    expect(r.headers.Location).toBe('/decision-benchmarks/');
+  });
+
+  it('clears the session cookie on the same path at sign-out', () => {
+    const r = handleLogout(req('/auth/logout', { 'content-type': 'application/json' }, 'POST'), based);
+    expect(setCookies(r)).toEqual([`${SESSION_COOKIE}=; Max-Age=0; Path=/decision-benchmarks/; HttpOnly; Secure; SameSite=Lax`]);
+  });
+});
+
+describe('crossSite behind proxies', () => {
+  it('never trusts X-Forwarded-Host (neither CloudFront nor the ALB sets it)', () => {
+    const headers = { origin: 'https://opper.ai', host: 'internal-alb.example', 'x-forwarded-host': 'opper.ai' };
+    expect(crossSite(req('/', headers, 'POST'))).toBe(true);
+  });
+  it('accepts the PUBLIC_BASE_URL origin and nothing else', () => {
+    const headers = (origin: string) => ({ origin, host: 'internal-alb.example' });
+    expect(crossSite(req('/', headers('https://opper.ai'), 'POST'), { publicOrigin: 'https://opper.ai' })).toBe(false);
+    expect(crossSite(req('/', headers('https://evil.example'), 'POST'), { publicOrigin: 'https://opper.ai' })).toBe(true);
+    expect(crossSite(req('/', { ...headers('https://opper.ai'), 'sec-fetch-site': 'cross-site' }, 'POST'), { publicOrigin: 'https://opper.ai' })).toBe(true);
+  });
+
+});

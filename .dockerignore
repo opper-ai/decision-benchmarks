@@ -1,10 +1,13 @@
-.git
-node_modules
-dist
-data
-scratch
-assets
-docs
-tests
-.env
-fighters.json
+# Only what the image build needs; never .env or local tooling state.
+*
+!package.json
+!package-lock.json
+!vite.config.ts
+!tsconfig.json
+!packages/
+!games/
+!server/
+!scripts/
+!Dockerfile
+**/tests/
+**/node_modules/

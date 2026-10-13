@@ -1,33 +1,28 @@
 {
-  "name": "jev-fighter",
+  "name": "decision-benchmarks",
   "private": true,
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "build": "node scripts/build.ts",
+    "start": "node server/main.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build": "vite build",
-    "start": "node --env-file-if-exists=.env --import tsx server/main.ts",
-    "bench": "node --env-file-if-exists=.env --import tsx scripts/bench.ts",
-    "leaderboard": "node --env-file-if-exists=.env --import tsx scripts/bench.ts --leaderboard",
-    "smoke": "node --env-file-if-exists=.env --import tsx scripts/smoke.ts",
-    "gen-audio": "node --env-file-if-exists=.env --import tsx scripts/gen-audio.ts",
-    "official": "node --env-file-if-exists=.env --import tsx scripts/bench.ts --official",
-    "replays": "node --env-file-if-exists=.env --import tsx scripts/replays.ts"
+    "bench": "node --env-file-if-exists=.env scripts/bench.ts",
+    "submissions": "node scripts/submissions.ts",
+    "check-contract": "node scripts/check-contract.ts"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "typescript": "7.0.2",
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
   },
   "engines": {
     "node": ">=22.18"
   },
-  "devDependencies": {
-    "@types/node": "^26.6.4",
-    "puppeteer-core": "^25.12.0",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.3",
-    "vitest": "^5.0.3"
-  },
   "dependencies": {
-    "mediabunny": "^1.61.3",
-    "tsx": "^4.23.15"
+    "mediabunny": "1.61.3"
   }
 }

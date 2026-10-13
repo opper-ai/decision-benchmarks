@@ -1,20 +1,70 @@
 name: CI
 
+# Every pull request (and, through deploy.yml, every push to main): typecheck, unit tests, every game's submissions
+# replayed with our code, the hub contract checked, then the image as deployed (below /decision-benchmarks) gets a
+# container smoke test. deploy.yml calls this workflow and deploys only when it passes.
+
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  APP_BASE_PATH: /decision-benchmarks
+  VITE_PUBLIC_URL: https://opper.ai
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
+  test:
+    name: Typecheck, test, replay submissions, check the contract, smoke the image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read # pull ghcr.io/opper-ai/opper-secrets (the loadsecrets layer)
+    env:
+      # Only this repository can pull the private loadsecrets image: forks, and pull requests from them, build and smoke
+      # the image without it (the `runtime` target: the same server, without the secrets-loading entrypoint).
+      NO_LOADSECRETS: ${{ github.repository != 'opper-ai/decision-benchmarks' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          node-version: "22.18"
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
+      # Every submitted run of every game in the registry, replayed with our code.
+      # The slugs are listed first: a failing list fails the step instead of looping over nothing.
+      - name: Replay every submission
+        run: |
+          set -euo pipefail
+          games=$(node --input-type=module -e "const r = await import('./games/registry.ts'); console.log(r.REGISTRY.map((g) => g.slug).join(' '))")
+          if [ -z "$games" ]; then echo "no games listed in games/registry.ts" >&2; exit 1; fi
+          for game in $games; do
+            npm run submissions -- --game "$game"
+          done
+      - run: npm run check-contract
+      - name: Log in to GHCR (for the loadsecrets layer)
+        if: env.NO_LOADSECRETS != 'true'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build the image as deployed
+        run: |
+          target=()
+          if [ "$NO_LOADSECRETS" = true ]; then target=(--target runtime); fi
+          docker build "${target[@]}" --tag decision-benchmarks:ci \
+            --build-arg APP_BASE_PATH="$APP_BASE_PATH" \
+            --build-arg VITE_PUBLIC_URL="$VITE_PUBLIC_URL" \
+            --build-arg SOURCE_COMMIT="$GITHUB_SHA" .
+      # The image builds every registry game (scripts/build.ts: submissions, Vite, game.json's updatedAt); the smoke test
+      # loads each one's page, hub files and API.
+      - run: python3 scripts/smoke-image.py decision-benchmarks:ci

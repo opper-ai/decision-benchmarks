@@ -1,9 +1,9 @@
-node_modules
-dist
+node_modules/
+dist/
+.DS_Store
 .env
-data/replays/*
-!data/replays/.gitkeep
-scratch
-data/matches.jsonl
-fighters.json
-*.local.md
+.env.*
+!.env.example
+# Built from each game's submissions/ by npm run submissions (and the build).
+games/*/public/community.json
+envs/
