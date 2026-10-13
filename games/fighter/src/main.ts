@@ -109,6 +109,9 @@ async function page(): Promise<void> {
     format: (n) => `${fmt(n)}%`,
     scaleMax: 100,
     best: false,
+    // Real time: the moves the fallback made (an answer over 2 s, or unusable), and how long answers took.
+    fallbacks: 'Late moves',
+    latency: 'Mean latency',
     extra: [
       { label: 'vs greedy', key: 'vsGreedy', format: pct },
       { label: 'vs payoff', key: 'vsPayoff', format: pct },
