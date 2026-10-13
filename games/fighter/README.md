@@ -101,8 +101,9 @@ sign in), or any two fighters, baselines included, in real time or paused. Keys:
 double-tap to dash), W jump, S block low, U I O punches, J K L kicks, H throw, Y jump kick, Space special. A match you
 play stays in your browser: watch it with its stats, export a clip, or download it.
 
-**Watch**: recorded benchmark matches (public/demo/), with every decision, the question it answered, a timeline and
-per-fighter stats. Click the stage, then Space plays and pauses, arrows step, `[` `]` jump between decisions.
+**Watch**: recorded matches (public/demo/: Jev against each baseline, and GPT-6 Luna against Jev), with every
+decision, the question it answered, a timeline and per-fighter stats. Click the stage, then Space plays and pauses,
+arrows step, `[` `]` jump between decisions.
 
 ## Layout
 
@@ -115,6 +116,7 @@ shared/            questions, perception, baselines, fallback, the live match dr
 src/               the page: renderer, sound, keyboard, the fight, replay, stats and leaderboard views, clip export
 public/            game.json, poster.png, leaderboard.json, baselines.json, demo/, audio/
 tests/             engine, questions, matches, the benchmark and its verifier, the request check, submissions
+scripts/           record-demo.ts: records a match for Watch (a benchmark game, or two decision models)
 ```
 
 The sounds and music were generated with ElevenLabs models through Opper's audio API.

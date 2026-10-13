@@ -220,7 +220,7 @@ export function fightersFor(spec: MatchSpec, model: string): [FighterMeta, Fight
 }
 
 /** Asks `adapter` within the deadline; a late, failed or unusable answer is settled as the reason the fallback plays. */
-async function askWithin(adapter: Adapter, a: Ask, deadlineMs: number, now: () => number): Promise<Settled> {
+export async function askWithin(adapter: Adapter, a: Ask, deadlineMs: number, now: () => number): Promise<Settled> {
   const started = now();
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;

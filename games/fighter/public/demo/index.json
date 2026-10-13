@@ -1,19 +1,24 @@
 {
   "demos": [
     {
-      "file": "payoff-vs-greedy.fight.json.gz",
-      "title": "Payoff baseline vs Greedy baseline",
-      "note": "Greedy baseline wins, 2-1 in rounds, every round a knockout. A benchmark match: greedy is the player under test."
+      "file": "luna-vs-jev.fight.json.gz",
+      "title": "Luna vs Jev",
+      "note": "GPT-6 Luna Decisions vs Jev 1.13, both decision models, on the benchmark's settings (paused, assisted track). Jev wins, 2-1 in rounds, every round a knockout."
     },
     {
-      "file": "maximin-vs-greedy.fight.json.gz",
-      "title": "Maximin baseline vs Greedy baseline",
-      "note": "Greedy baseline wins, 2-0 in rounds, every round a knockout. A benchmark match: maximin is the player under test."
+      "file": "jev-vs-payoff.fight.json.gz",
+      "title": "Jev vs Payoff baseline",
+      "note": "Jev 1.13 vs the payoff baseline. Payoff wins, 2-1 in rounds, every round a knockout. A benchmark match (bench seed 1): Jev is the player under test."
     },
     {
-      "file": "payoff-vs-maximin.fight.json.gz",
-      "title": "Payoff baseline vs Maximin baseline",
-      "note": "Maximin baseline wins, 2-0 in rounds, every round to the clock. A benchmark match: payoff is the player under test."
+      "file": "jev-vs-maximin.fight.json.gz",
+      "title": "Jev vs Maximin baseline",
+      "note": "Jev 1.13 vs the maximin baseline. Maximin wins, 2-1 in rounds, every round a knockout. A benchmark match (bench seed 2): Jev is the player under test."
+    },
+    {
+      "file": "jev-vs-greedy.fight.json.gz",
+      "title": "Jev vs Greedy baseline",
+      "note": "Jev 1.13 vs the greedy baseline. Greedy wins, 2-1 in rounds, every round a knockout. A benchmark match (bench seed 0): Jev is the player under test."
     }
   ]
 }
