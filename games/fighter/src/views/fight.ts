@@ -13,6 +13,8 @@ import { Stage } from '../stage.ts';
 import { SIDES } from '../theme.ts';
 import { audioToggles } from './audio-toggles.ts';
 import { decisionCard, topMoves } from './decisions.ts';
+import { fullscreenButton } from './fullscreen.ts';
+import { collapsiblePanel } from './panel.ts';
 
 export const COLORS = [SIDES[0].deep, SIDES[1].deep] as const;
 const STORE = 'fighter.setup';
@@ -206,26 +208,28 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
   const status = h('span.status');
   const lat: [number[], number[]] = [[], []];
 
-  host.replaceChildren(
+  // A live match cannot pause (the models answer in real time), so its stage takes no clicks; it can go fullscreen.
+  const stageBox = h('div.stage-box');
+  const fs = fullscreenButton(stageBox);
+  stageBox.append(stageHost, h('div.controls', null, status, h('span.spacer'), audioToggles(), fs.el));
+  const viewer = h(
+    'div.viewer',
+    null,
     h(
-      'div.viewer',
+      'div.viewer-main',
       null,
       h(
-        'div.viewer-main',
+        'div.caption',
         null,
-        h(
-          'div.caption',
-          null,
-          h('p.caption-vs', null, h('span', { style: { color: COLORS[0] } }, meta[0].label), h('span.vs-small', null, ' vs '), h('span', { style: { color: COLORS[1] } }, meta[1].label)),
-          h('p.caption-sub', null, `Live, ${s.mode === 'paused' ? 'paused' : 'real-time'} mode, ${s.track} track, ${s.deadline} ms deadline.`),
-        ),
-        stageHost,
-        h('div.controls', null, status, h('span.spacer'), audioToggles()),
-        human !== null ? controlsCard(human) : null,
+        h('p.caption-vs', null, h('span', { style: { color: COLORS[0] } }, meta[0].label), h('span.vs-small', null, ' vs '), h('span', { style: { color: COLORS[1] } }, meta[1].label)),
+        h('p.caption-sub', null, `Live, ${s.mode === 'paused' ? 'paused' : 'real-time'} mode, ${s.track} track, ${s.deadline} ms deadline.`),
       ),
-      h('aside.panel', null, h('div.tabs', null, h('span.tab.active', null, 'Decisions, newest first')), h('div.panel-body', null, feed)),
+      stageBox,
+      human !== null ? controlsCard(human) : null,
     ),
   );
+  viewer.append(collapsiblePanel(viewer, [h('span.tab.active', null, 'Decisions, newest first')], h('div.panel-body', null, feed)));
+  host.replaceChildren(viewer);
 
   match.onTick((st, events) => stage.tick(st, events));
   match.onDecision((d) => {
@@ -291,6 +295,7 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
     stopped = true;
     if (human !== null) getKeyboard().stop();
     audio.scene(false);
+    fs.destroy();
     match.stop();
     stage.destroy();
   };

@@ -17,6 +17,7 @@ export class Stage {
   private raf = 0;
   private last = 0;
   private ro: ResizeObserver;
+  private dprQuery: MediaQueryList | null = null;
   /** How long one tick lasts on screen (ms): TICK_MS / playback speed. */
   tickMs = TICK_MS;
   paused = false;
@@ -29,6 +30,7 @@ export class Stage {
     this.renderer = new FightRenderer(this.canvas, meta);
     this.ro = new ResizeObserver(() => this.renderer.resize());
     this.ro.observe(this.canvas);
+    this.watchDpr();
     this.raf = requestAnimationFrame(this.loop);
   }
 
@@ -52,6 +54,20 @@ export class Stage {
     this.renderer.reset();
   }
 
+  /**
+   * The canvas is drawn at its displayed size times the device pixel ratio (see FightRenderer.resize). The ratio changes
+   * with the browser's zoom or a move to another screen without the layout changing, so watch it too.
+   */
+  private watchDpr = () => {
+    this.dprQuery?.removeEventListener('change', this.onDpr);
+    this.dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    this.dprQuery.addEventListener('change', this.onDpr);
+  };
+  private onDpr = () => {
+    this.renderer.resize();
+    this.watchDpr();
+  };
+
   private loop = (now: number) => {
     const dt = this.last ? Math.min(0.1, (now - this.last) / 1000) : 1 / 60;
     this.last = now;
@@ -64,6 +80,7 @@ export class Stage {
   destroy(): void {
     cancelAnimationFrame(this.raf);
     this.ro.disconnect();
+    this.dprQuery?.removeEventListener('change', this.onDpr);
     this.canvas.remove();
   }
 }

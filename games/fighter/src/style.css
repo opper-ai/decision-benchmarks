@@ -17,6 +17,7 @@
   --f-accent: #3c3caf;
   --f-danger: #c2255c;
   --f-shadow: 0 22px 46px -30px rgba(27, 46, 64, 0.45);
+  --f-ar: 1.9512; /* the stage's width over its height: 16 / 8.2 (4 / 3 on phones, below) */
 }
 html.dark {
   --f-accent: #9d9df0;
@@ -25,13 +26,25 @@ html.dark {
 }
 
 /* ---------- the stage: the viewer (a recording or a fight), Fight an AI, the watch chips ---------- */
-/* The viewer spans the page column, as the sections below it do (10 of 12 columns, at most 1280px). */
+/*
+ * On a phone the viewer spans the page column, as the sections below it do (10 of 12 columns). From a tablet up it
+ * breaks out of the column to use most of the window (32px gutters, at most 1320px), so the fight is not tiny on a big
+ * screen. From 1100px the decisions panel sits beside the stage (a third, 300 to 420px); below that, under it.
+ */
 .stage { display: grid; justify-items: center; gap: 14px; }
 .viewer-host { width: calc(min(100%, 1280px) * 10 / 12); min-width: 0; outline: none; }
+@media (min-width: 768px) { .viewer-host { width: min(calc(100% - 64px), 1320px); } }
 .notice-line, .watch { width: calc(min(100%, 1280px) * 10 / 12); }
 .viewer-loading { display: grid; place-items: center; aspect-ratio: 16 / 8.2; border: 1px solid var(--j-line); border-radius: 16px; color: var(--j-muted); font-size: 14px; }
-.viewer { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+.viewer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (min-width: 1100px) {
+  .viewer { grid-template-columns: minmax(0, 1fr) clamp(300px, 32%, 420px); }
+  /* The panel folded away: the stage takes the whole width, as tall as the window allows, the panel's header under it. */
+  .viewer.panel-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .viewer.panel-collapsed .viewer-main { width: min(100%, calc((100vh - 250px) * var(--f-ar))); justify-self: center; }
+}
 .viewer-main { min-width: 0; display: grid; gap: 10px; align-content: start; }
+.stage-box { display: grid; gap: 10px; min-width: 0; }
 .caption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 14px; }
 .caption p { margin: 0; }
 .caption-vs { font: 700 28px/1.1 var(--f-hand); }
@@ -40,6 +53,24 @@ html.dark {
 .caption .fnote { flex-basis: 100%; }
 .fstage { position: relative; border: 1px solid var(--j-line); border-radius: 16px; overflow: hidden; background: var(--f-paper); aspect-ratio: 16 / 8.2; box-shadow: var(--f-shadow); }
 canvas.stage { display: block; width: 100%; height: 100%; }
+
+/* A recording pauses and plays with a click on the stage: a large play sign while paused, a short flash on a toggle. */
+.fstage.pausable { cursor: pointer; }
+.stage-paused { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+.fstage.paused .stage-paused { opacity: 1; transition-delay: 0.3s; }
+.stage-paused span, .stage-flash { display: grid; place-items: center; width: clamp(56px, 11%, 104px); aspect-ratio: 1; border-radius: 50%; background: rgba(27, 46, 64, 0.62); color: #fff; box-shadow: 0 10px 30px -12px rgba(27, 46, 64, 0.6); }
+.stage-paused svg, .stage-flash svg { width: 50%; height: 50%; }
+.stage-flash { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); opacity: 0; pointer-events: none; }
+.stage-flash.show { animation: stage-flash 0.55s ease-out; }
+@keyframes stage-flash {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
+}
+
+/* Fullscreen: the stage and its controls, as large as the screen allows at the stage's own shape. */
+.stage-box:fullscreen, .stage-box.is-fullscreen { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 16px; background: var(--j-bg); color: var(--j-text); }
+.stage-box.is-fullscreen > * { width: min(100%, calc((100vh - 96px) * var(--f-ar))); }
+.stage-box.is-fullscreen .fstage { box-shadow: none; }
 
 /* Buttons and fields in the page's own look: pills like the Watch chips. */
 .fbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; border: 1px solid var(--j-line); border-radius: 999px; background: var(--j-card); color: var(--j-text); padding: 5px 14px; font: 500 13px var(--j-body); white-space: nowrap; text-decoration: none; }
@@ -60,6 +91,7 @@ label.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13
 strong.warn { color: var(--f-danger); }
 
 .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.controls label.check { white-space: nowrap; }
 .controls .time, .status { font: 500 13px var(--j-mono); font-variant-numeric: tabular-nums; color: var(--j-muted); }
 canvas.timeline { display: block; width: 100%; height: 46px; border: 1px solid var(--j-line); border-radius: 10px; cursor: pointer; touch-action: none; }
 .legend { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--j-muted); }
@@ -79,8 +111,15 @@ video.preview { width: 100%; border-radius: 12px; border: 1px solid var(--j-line
 
 /* The decision log and the stats, beside the stage: as tall as the stage's column, never taller. */
 .panel { background: var(--j-card); border: 1px solid var(--j-line); border-radius: 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-@media (min-width: 1000px) { .panel { align-self: stretch; height: 0; min-height: 100%; } }
+@media (min-width: 1100px) { .viewer:not(.panel-collapsed) .panel { align-self: stretch; height: 0; min-height: 100%; } }
 .tabs { display: flex; gap: 4px; padding: 6px 8px 0; border-bottom: 1px solid var(--j-line); background: var(--j-soft); }
+.panel-collapsed .tabs { border-bottom: 0; }
+/* Folds the panel away (to its header) and back. */
+.panel-toggle { flex: none; align-self: center; display: grid; place-items: center; width: 30px; height: 30px; margin: -4px 0 0; border: 0; border-radius: 8px; background: none; color: var(--j-muted); }
+.panel-toggle:hover { background: var(--j-hl); color: var(--j-text); }
+.panel-toggle svg { transition: transform 0.15s; }
+.panel-toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
+@media (min-width: 1100px) { .panel-toggle[aria-expanded='true'] svg { transform: rotate(-90deg); } }
 .tab { border: 0; background: none; padding: 8px 10px; font: 500 13px var(--j-body); color: var(--j-muted); border-bottom: 2px solid transparent; }
 .tab.active { color: var(--j-text); border-bottom-color: var(--j-text); }
 .panel-body { padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
@@ -206,11 +245,11 @@ body.tool-page { background: var(--f-paper); }
 .pose figcaption { font-size: 12px; color: var(--j-muted); }
 
 /* ---------- small screens ---------- */
-@media (max-width: 999px) {
-  .viewer { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1099px) {
   .panel { max-height: 440px; }
 }
 @media (max-width: 560px) {
+  :root { --f-ar: 1.3333; }
   .fstage, .viewer-loading { aspect-ratio: 4 / 3; }
   .caption-vs { font-size: 24px; }
   .vs { grid-template-columns: minmax(0, 1fr); }
