@@ -13,11 +13,6 @@ export interface RegisteredGame {
 /** Served at <APP_BASE_PATH>/<slug>/. */
 export const REGISTRY: readonly RegisteredGame[] = [
   {
-    slug: 'jevman',
-    server: () => import('./jevman/game.server.ts').then((m) => m.default),
-    definition: () => import('./jevman/game.ts').then((m) => m.default as unknown as GameDefinition<unknown, GameResult>),
-  },
-  {
     slug: 'snake',
     server: () => import('./snake/game.server.ts').then((m) => m.default),
     definition: () => import('./snake/game.ts').then((m) => m.default as unknown as GameDefinition<unknown, GameResult>),
@@ -28,6 +23,15 @@ export const REGISTRY: readonly RegisteredGame[] = [
     definition: () => import('./fighter/game.ts').then((m) => m.default as unknown as GameDefinition<unknown, GameResult>),
   },
 ];
+
+/**
+ * Games served here once that now live elsewhere on opper.ai: slug -> the path they moved to. Anything below
+ * <APP_BASE_PATH>/<slug> redirects there for good, so old links and search engines follow.
+ *
+ * jevman lives in its own repository (opper-ai/jevman-benchmark) at /jevman-benchmark/, the URL its links point to.
+ * The hub lists it there; this repository holds every other game.
+ */
+export const MOVED: Readonly<Record<string, string>> = { jevman: '/jevman-benchmark/' };
 
 /** A registered game by slug. */
 export const findGame = (slug: string): RegisteredGame | undefined => REGISTRY.find((g) => g.slug === slug);

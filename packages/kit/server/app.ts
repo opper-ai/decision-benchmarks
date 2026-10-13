@@ -21,6 +21,11 @@ export interface AppOptions {
   env: Record<string, string | undefined>;
   /** The games, each at <APP_BASE_PATH>/<slug>/. */
   games: readonly MountedGame[];
+  /**
+   * Games that moved elsewhere on this origin: slug -> the path they live at now (from the root, ending in '/').
+   * Anything below <APP_BASE_PATH>/<slug> answers a permanent redirect there, the rest of its path and query kept.
+   */
+  moved?: Readonly<Record<string, string>>;
   /** The deployed Git commit (SOURCE_COMMIT, set at image build time). */
   commit: string;
   log?: Log;
@@ -137,6 +142,12 @@ export function createApp(opts: AppOptions): App {
     if (g.server.slug === 'auth') throw new Error('no game can be called auth: <APP_BASE_PATH>/auth/ is the sign-in');
     games.set(g.server.slug, { root: resolve(g.distDir), routes: createGameMiddleware(g.server, env, logger(g.server.slug), { poolAccess, auth }) });
   }
+  const moved = new Map(Object.entries(opts.moved ?? {}));
+  for (const [slug, to] of moved) {
+    if (games.has(slug)) throw new Error(`${slug} is served here and listed as moved: it can only be one`);
+    // A path on this origin only, so the redirect can never send a visitor to another site.
+    if (!/^\/(?!\/)[^?#\\]*\/$/.test(to)) throw new Error(`${slug} moved to ${to}: give a path from the root, ending in /`);
+  }
   let ready = false;
   let draining = false;
   let shutdownPromise: Promise<'clean' | 'deadline'> | null = null;
@@ -229,6 +240,14 @@ export function createApp(opts: AppOptions): App {
       return authRoutes(req, res, () => notFound(res));
     }
     const at = gameMount(inside);
+    const movedTo = at.kind === 'none' ? undefined : moved.get(at.slug);
+    if (at.kind !== 'none' && movedTo) {
+      // Permanent (308 keeps the method of any stray API call); `rest` has no leading slash, `movedTo` ends in one.
+      const rest = at.kind === 'bare' ? at.query : at.url.slice(1);
+      res.writeHead(308, { Location: `${movedTo}${rest}`, 'Cache-Control': 'public, max-age=3600', ...SECURITY_HEADERS });
+      res.end();
+      return;
+    }
     const game = at.kind === 'none' ? undefined : games.get(at.slug);
     if (!game) return notFound(res);
     if (at.kind === 'bare') {

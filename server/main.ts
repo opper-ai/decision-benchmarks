@@ -3,7 +3,7 @@
 // (e.g. GAMES=snake after npm run build -- snake).
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../packages/kit/server/app.ts';
-import { gamesToServe } from '../games/registry.ts';
+import { gamesToServe, MOVED } from '../games/registry.ts';
 
 const port = Number(process.env.PORT || 3000);
 if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('PORT must be a valid port number');
@@ -12,7 +12,7 @@ const games = await Promise.all(
   gamesToServe(process.env.GAMES).map(async (g) => ({ server: await g.server(), distDir: fileURLToPath(new URL(`../dist/${g.slug}`, import.meta.url)) })),
 );
 
-const app = createApp({ env: process.env, games, commit: process.env.SOURCE_COMMIT || 'local' });
+const app = createApp({ env: process.env, games, moved: MOVED, commit: process.env.SOURCE_COMMIT || 'local' });
 
 await app.listen(port);
 

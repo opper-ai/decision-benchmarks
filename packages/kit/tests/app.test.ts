@@ -48,11 +48,15 @@ const rawStatus = (url: string, path: string) =>
 
 const gamesIn = (root: string): MountedGame[] => ['coin', 'dice'].map((slug) => ({ server: coinServer(slug), distDir: join(root, slug) }));
 
-async function start(env: Record<string, string> = {}, opts: { drainMs?: number; deadlineMs?: number; poolAccess?: Parameters<typeof createApp>[0]['poolAccess'] } = {}) {
+async function start(
+  env: Record<string, string> = {},
+  opts: { drainMs?: number; deadlineMs?: number; poolAccess?: Parameters<typeof createApp>[0]['poolAccess']; moved?: Record<string, string> } = {},
+) {
   dist = makeDist();
   events.length = 0;
   app = createApp({
     ...(opts.poolAccess !== undefined ? { poolAccess: opts.poolAccess } : {}),
+    ...(opts.moved ? { moved: opts.moved } : {}),
     env: { SESSION_SECRET: SECRET, HIGHSCORES_DIR: dist, ...env },
     games: gamesIn(dist),
     commit: 'a'.repeat(40),
@@ -251,7 +255,35 @@ describe('two-level mounting', () => {
 
 describe('production server below APP_BASE_PATH', () => {
   const BASE = '/decision-benchmarks';
-  const startBelow = (env: Record<string, string> = {}, opts: { drainMs?: number } = {}) => start({ APP_BASE_PATH: BASE, ...env }, opts);
+  const startBelow = (env: Record<string, string> = {}, opts: { drainMs?: number; moved?: Record<string, string> } = {}) =>
+    start({ APP_BASE_PATH: BASE, ...env }, opts);
+
+  it('sends a game that moved elsewhere on the site there for good, with the rest of its path and query', async () => {
+    const url = await startBelow({}, { moved: { jevman: '/jevman-benchmark/' } });
+    for (const [path, to] of [
+      [`${BASE}/jevman`, '/jevman-benchmark/'],
+      [`${BASE}/jevman?ref=hn`, '/jevman-benchmark/?ref=hn'],
+      [`${BASE}/jevman/`, '/jevman-benchmark/'],
+      [`${BASE}/jevman/leaderboard?x=1`, '/jevman-benchmark/leaderboard?x=1'],
+      [`${BASE}/jevman/demo/jev-demo.json`, '/jevman-benchmark/demo/jev-demo.json'],
+    ]) {
+      const res = await fetch(`${url}${path}`, { redirect: 'manual' });
+      expect([path, res.status, res.headers.get('location')]).toEqual([path, 308, to]);
+    }
+    const api = await fetch(`${url}${BASE}/jevman/api/decide`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', redirect: 'manual' });
+    expect([api.status, api.headers.get('location')]).toEqual([308, '/jevman-benchmark/api/decide']);
+    expect((await fetch(`${url}/jevman/`, { redirect: 'manual' })).status).toBe(404);
+    expect((await fetch(`${url}${BASE}/coin/`)).status).toBe(200);
+  });
+
+  it('refuses a moved game that is also served here, and a move to anything but a path on this site', () => {
+    dist = makeDist();
+    const withMoved = (moved: Record<string, string>) => () => createApp({ env: { SESSION_SECRET: SECRET }, games: gamesIn(dist), moved, commit: 'x' });
+    expect(withMoved({ coin: '/coin-elsewhere/' })).toThrow(/only be one/);
+    for (const to of ['https://evil.example/', '//evil.example/', '/no-slash', 'relative/', '/a?b/', '/a\\b/']) {
+      expect(withMoved({ jevman: to })).toThrow(/path from the root/);
+    }
+  });
 
   it('serves each game, its assets, results, demo and API below the prefix and its slug', async () => {
     const url = await startBelow({ OPPER_CLIENT_ID: 'opper_app_x', OPPER_CLIENT_SECRET: 'shh' });
