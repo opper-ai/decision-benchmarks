@@ -171,7 +171,7 @@ void fetchHighScores().then((view) => {
 });
 
 // ---------- the leaderboard ----------
-void loadLeaderboard($<HTMLTableElement>('#leaderboard-table'), appPath, { metric: 'Apples (mean ± margin)' });
+void loadLeaderboard($<HTMLTableElement>('#leaderboard-table'), appPath, { metric: 'Apples (mean ± margin)', fallbacks: 'Late steps', latency: 'Mean latency' });
 
 // ---------- Watch: recorded games only ----------
 const demos = new Map<string, Promise<Demo | null>>();

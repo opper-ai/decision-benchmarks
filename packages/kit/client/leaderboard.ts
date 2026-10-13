@@ -49,6 +49,10 @@ export interface TableOptions {
   /** Whether to show each row's best game (Snake: the most apples). */
   best?: boolean;
   extra?: readonly ExtraColumn[];
+  /** The fallback share's heading (a real-time game: the steps the model was too late for). */
+  fallbacks?: string;
+  /** The mean latency's heading. */
+  latency?: string;
   /** The line while no model is ranked. */
   empty?: string;
 }
@@ -106,8 +110,8 @@ export function tableHeadings(o: TableOptions = {}): [string, string][] {
     ...((o.best ?? DEFAULTS.best) ? [['Best', 'r'] as [string, string]] : []),
     ...(o.extra ?? []).map((c): [string, string] => [c.label, 'r']),
     ['Games', 'r'],
-    ['Fallbacks', 'r'],
-    ['Latency', 'r'],
+    [o.fallbacks ?? 'Fallbacks', 'r'],
+    [o.latency ?? 'Latency', 'r'],
     ['Cost / game', 'r'],
     ['Run by', ''],
   ];

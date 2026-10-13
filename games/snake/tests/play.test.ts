@@ -1,12 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DecideResponse, SystemOneRequest } from '../../../packages/kit/shared/systemone';
 import { verifyGame } from '../bench/verify';
-import { seedFor } from '../game';
-import { playSnake } from '../shared/play';
+import game, { seedFor } from '../game';
+import { baselineTransport } from '../shared/baselines';
+import { playSnake, STEP_MS } from '../shared/play';
 
 const answer = (choice: unknown, extra: Partial<DecideResponse> = {}): DecideResponse => ({ answers: { snake: { type: 'choice', choice } }, usage: { input_tokens: 400, output_tokens: 2 }, latencyMs: 30, costUsd: 0.0001, traceId: null, ...extra });
+const later = <T>(ms: number, v: T) => new Promise<T>((res) => setTimeout(() => res(v), ms));
 
 describe('playSnake', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('is real time on a 250 ms clock, the same for every model', () => {
+    expect(game.mode).toBe('realtime');
+    expect(STEP_MS).toBe(250);
+    expect(game.timing).toEqual({ decisionTimeoutMs: 250, callTimeoutMs: 2000, maxInFlight: 1 });
+  });
+
   it('asks one snake question per step, names the model on the page, and records the answers, costs and signatures', async () => {
     const bodies: SystemOneRequest[] = [];
     const { result, recording } = await playSnake({
@@ -18,6 +28,7 @@ describe('playSnake', () => {
       model: 'sference/clef',
       requestModel: 'sference/clef',
       timeoutMs: 2000,
+      stepMs: 2,
     });
     // Straight on from the middle: into the wall after 8 steps, unless an apple was in the way.
     expect(result.end).toBe('wall');
@@ -30,30 +41,69 @@ describe('playSnake', () => {
     expect(verifyGame(JSON.parse(JSON.stringify(recording)), { seed: seedFor(2) }).ok).toBe(true);
   });
 
-  it("uses the fallback for an invalid answer, an error or a timeout, and still counts a late call's cost", async () => {
+  it('steps on the clock whatever the model does: a step a tick, the late ones played by the fallback', async () => {
+    vi.useFakeTimers();
+    // Every third answer takes 400 ms, past its tick; the others take 50 ms.
+    let n = 0;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const transport = (_body: SystemOneRequest) => {
+      const slow = n++ % 3 === 2;
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      return later(slow ? 400 : 50, answer('left', { latencyMs: slow ? 400 : 50 })).finally(() => (inFlight -= 1));
+    };
+    const started = Date.now();
+    const played = playSnake({ transport, seed: seedFor(7), model: 'm', timeoutMs: 2000 });
+    await vi.advanceTimersByTimeAsync(1000 * STEP_MS);
+    const { result, recording } = await played;
+    // One step a tick: the game took its steps x 250 ms.
+    expect(recording.steps.length).toBe(result.steps);
+    expect(Math.round((Date.now() - started) / STEP_MS)).toBeGreaterThanOrEqual(result.steps);
+    expect(maxInFlight).toBe(1);
+    const late = recording.steps.filter((s) => s.source === 'fallback');
+    expect(late.length).toBeGreaterThan(0);
+    expect(result.fallbacks).toBe(late.length);
+    // A late call's latency and cost are kept on the step the fallback played.
+    expect(late.every((s) => s.latencyMs === 400 && s.costUsd === 0.0001)).toBe(true);
+    expect(recording.steps.filter((s) => s.source === 'model').every((s) => s.latencyMs === 50)).toBe(true);
+    expect(verifyGame(JSON.parse(JSON.stringify(recording)), { seed: seedFor(7) }).ok).toBe(true);
+  });
+
+  it('uses the fallback for an invalid answer or an error', async () => {
     let n = 0;
     const { result, recording } = await playSnake({
       transport: async () => {
         n += 1;
-        if (n === 1) return answer('up');
-        if (n === 2) throw new Error('boom');
-        if (n === 3) return new Promise((res) => setTimeout(() => res(answer('left')), 80));
-        return answer('nonsense');
+        if (n % 2) return answer('up');
+        throw new Error('boom');
       },
       seed: seedFor(3),
       model: 'm',
-      timeoutMs: 20,
+      timeoutMs: 2000,
+      stepMs: 1,
     });
     expect(recording.steps.every((s) => s.source === 'fallback')).toBe(true);
-    // The late answer's call came back after its step: its cost still counts.
-    expect(recording.steps[2]).toMatchObject({ source: 'fallback', latencyMs: 30, costUsd: 0.0001 });
     expect(result.fallbacks).toBe(recording.steps.length);
     expect(verifyGame(JSON.parse(JSON.stringify(recording)), { seed: seedFor(3) }).ok).toBe(true);
   });
 
-  it('stops when asked', async () => {
+  it('a baseline answers at once, so it never falls back at the benchmark speed', async () => {
+    vi.useFakeTimers();
+    const played = playSnake({ transport: baselineTransport('flood'), seed: seedFor(1), model: 'baseline/flood', timeoutMs: 2000 });
+    await vi.advanceTimersByTimeAsync(1000 * STEP_MS);
+    const { result } = await played;
+    expect(result).toMatchObject({ fallbacks: 0 });
+    expect(result.steps).toBeGreaterThan(20);
+  });
+
+  it('stops when asked, before or during a game', async () => {
     const ctl = new AbortController();
     ctl.abort();
     await expect(playSnake({ transport: async () => answer('straight'), seed: 1, model: 'm', timeoutMs: 100, signal: ctl.signal })).rejects.toThrow(/stopped/);
+    const mid = new AbortController();
+    const played = playSnake({ transport: async () => answer('straight'), seed: 1, model: 'm', timeoutMs: 100, stepMs: 5, signal: mid.signal });
+    setTimeout(() => mid.abort(), 12);
+    await expect(played).rejects.toThrow(/stopped/);
   });
 });

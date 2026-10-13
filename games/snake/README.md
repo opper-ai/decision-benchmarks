@@ -1,7 +1,7 @@
 # Snake
 
-Which AI decision model plays Snake best? Every model plays 100 seeded games, one decision per step, and the
-leaderboard ranks them by the apples they eat. Live at
+Which AI decision model plays Snake best? Every model plays 100 seeded games in real time, a step every 250 ms,
+and the leaderboard ranks them by the apples they eat. Live at
 [opper.ai/decision-benchmarks/snake](https://opper.ai/decision-benchmarks/snake/), where you can watch the recorded
 games or race a model on the same board.
 
@@ -32,9 +32,12 @@ the heading, the length, the steps since the last apple, the step number, and wh
 ("3 ahead and 2 to the left"). Each option states facts only: the new heading, what is in the next cell, the distance
 to the apple after the move, and how many cells the snake could still reach from there. None is labelled safe or best.
 
-The game waits up to 2 seconds from sending. After that, after an error, or for an answer that isn't an option, the
-fallback moves straight unless that is deadly, else the first of left and right that isn't, else straight. It never
-steers toward the apple.
+The game runs in real time on a fixed clock: the snake steps every 250 ms, the same speed for every model. The model
+is asked about the board as soon as its last step is applied, one request at a time, and its answer must be in by the
+next tick. A late answer, an error or an answer that isn't an option makes a late step: the fallback moves straight
+unless that is deadly, else the first of left and right that isn't, else straight. It never steers toward the apple.
+A late answer is not used for a later step. So the score reflects decision quality and speed together; the
+leaderboard also shows each model's share of late steps and its mean latency.
 
 ## Benchmark your model
 
@@ -50,7 +53,9 @@ npm run submissions -- --game snake       # the check CI runs
 ```
 
 Then open a pull request with the `games/snake/submissions/my-model/` folder. CI replays every game from its seed and
-recomputes its score; a move marked as the fallback's must be the move the fallback makes there.
+recomputes its score; a move marked as the fallback's must be the move the fallback makes there. CI can't prove the
+timing of a game you played yourself (which steps your model answered in time), so these rows are marked
+self-reported.
 
 The free baselines play without a key: `npm run bench -- --game snake --model baseline/greedy` (also
 `baseline/random` and `baseline/flood`). Their 100-game results are in `public/baselines.json`, shown on the page for
@@ -60,7 +65,8 @@ reference and never on the leaderboard.
 
 - `game.ts`: the bench and replay side (`GameDefinition`); `game.server.ts`: the service side (request check, high
   scores on seeds the server issues)
-- `shared/`: the engine, the question, the play loop, the baselines, the recording and the high-score check
+- `shared/`: the engine, the question, the real-time play loop (`play.ts`, which the race on the page also uses), the
+  baselines, the recording and the high-score check
 - `bench/verify.ts`: the replay the submissions check runs
 - `src/`, `index.html`: the page
 - `public/`: `game.json`, `poster.png` (rendered by `node games/snake/scripts/poster.ts`), `leaderboard.json` (official

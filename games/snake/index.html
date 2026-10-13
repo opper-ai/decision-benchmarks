@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Snake: a benchmark for AI decision models | Opper AI</title>
-    <meta name="description" content="Every AI decision model Opper serves plays 100 seeded games of Snake, one decision per step. See who eats the most apples, watch them play, or race one on the same board." />
+    <meta name="description" content="Every AI decision model Opper serves plays 100 seeded games of Snake in real time, a step every 250 ms. See who eats the most apples, watch them play, or race one on the same board." />
     <link rel="canonical" href="%VITE_APP_URL%" />
     <link rel="icon" href="https://opper.ai/favicon.ico" sizes="48x48 96x96 192x192" />
     <link rel="icon" href="https://opper.ai/images/icon-dark.png" media="(prefers-color-scheme: light)" />
@@ -14,14 +14,14 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Opper AI" />
     <meta property="og:title" content="Snake: a benchmark for AI decision models | Opper AI" />
-    <meta property="og:description" content="Every AI decision model Opper serves plays 100 seeded games of Snake, one decision per step. See who eats the most apples, watch them play, or race one on the same board." />
+    <meta property="og:description" content="Every AI decision model Opper serves plays 100 seeded games of Snake in real time, a step every 250 ms. See who eats the most apples, watch them play, or race one on the same board." />
     <meta property="og:url" content="%VITE_APP_URL%" />
     <meta property="og:image" content="%VITE_APP_URL%poster.png" />
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="720" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Snake: a benchmark for AI decision models | Opper AI" />
-    <meta name="twitter:description" content="Every AI decision model Opper serves plays 100 seeded games of Snake, one decision per step. See who eats the most apples, watch them play, or race one on the same board." />
+    <meta name="twitter:description" content="Every AI decision model Opper serves plays 100 seeded games of Snake in real time, a step every 250 ms. See who eats the most apples, watch them play, or race one on the same board." />
     <meta name="twitter:image" content="%VITE_APP_URL%poster.png" />
     <!-- The theme before the first paint, as on opper.ai: the visitor's choice there (same origin), else the system's. -->
     <script>
@@ -74,7 +74,7 @@
       <div class="oc col">
         <section class="hero flex flex-col items-center justify-center text-center gap-8 pt-24 pb-10 md:pt-32 md:pb-12">
           <h1 class="hero-h1 font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Snake: the benchmark for AI decision models</h1>
-          <p class="hero-sub font-wix font-medium text-left md:text-center text-lg md:text-xl">Every model plays 100 seeded games, one decision per step. Watch them, or race one on the same board.</p>
+          <p class="hero-sub font-wix font-medium text-left md:text-center text-lg md:text-xl">Every model plays 100 seeded games in real time, a step every 250 ms. Watch them, or race one on the same board.</p>
         </section>
       </div>
 
@@ -119,9 +119,9 @@
 
       <section id="leaderboard" class="section" aria-labelledby="leaderboard-title">
         <div class="oc"><h2 id="leaderboard-title" class="font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Leaderboard</h2></div>
-        <p id="leaderboard-sub" class="sub">100 games per model on the same seeded boards: the mean number of apples eaten.</p>
+        <p id="leaderboard-sub" class="sub">100 games per model on the same seeded boards, in real time at a step every 250 ms: the mean number of apples eaten.</p>
         <div class="tablecard"><div class="table-scroll"><table class="lbt" id="leaderboard-table"></table></div></div>
-        <p class="foot">=1 means tied: those means are within each other's margin of error (two standard errors). Run by @opper-ai means we played the games through Opper. Self-reported models were benchmarked by whoever submitted them, named under Run by: CI replayed every game they sent in to check its score, and the latency and cost are as they reported. Baselines are simple scripts, shown for reference and never ranked.</p>
+        <p class="foot">=1 means tied: those means are within each other's margin of error (two standard errors). Run by @opper-ai means we played the games through Opper. Late steps are the share of steps the model didn't answer in time, so the fallback moved the snake. Self-reported models were benchmarked by whoever submitted them, named under Run by: CI replayed every game they sent in to check its score, and the timing (late steps, latency) and cost are as they reported. Baselines are simple scripts, shown for reference and never ranked.</p>
       </section>
 
       <section id="highscores" class="section" aria-labelledby="highscores-title">
@@ -142,7 +142,7 @@
           <li class="step">
             <span class="n">02</span>
             <h3>Run the benchmark</h3>
-            <p>One command plays the games under the leaderboard's rules: the same seeded boards, 2 seconds per answer, then a simple fallback move.</p>
+            <p>One command plays the games under the leaderboard's rules: the same seeded boards on the same 250 ms clock, and a simple fallback move for every step your model is late on.</p>
           </li>
           <li class="step">
             <span class="n">03</span>
@@ -161,7 +161,7 @@
         <dl class="spec">
           <div><dt>Board</dt><dd>16 by 16 cells with walls around it. The snake starts 3 long in the middle, heading right, with one apple on the board. Apples come from a seeded random sequence, so the same moves always make the same game.</dd></div>
           <div><dt>Decisions</dt><dd>Every step the model gets the board as text and picks left, straight or right. Each option states facts: what is in the next cell, the distance to the apple after the move, and how much room is left from there. None is labelled safe or best.</dd></div>
-          <div><dt>Deadline</dt><dd>The game waits up to 2 seconds for an answer. After that, or for an answer that isn't one of the options, a fallback moves straight unless that is deadly, else left, else right. It never steers toward the apple.</dd></div>
+          <div><dt>Clock</dt><dd>The game runs in real time: the snake steps every 250 ms, the same speed for every model. The model is asked as soon as its last step is applied and must answer by the next tick. An answer that misses it, or isn't one of the options, makes a late step: a fallback moves straight unless that is deadly, else left, else right. It never steers toward the apple. So the score measures good decisions made in time.</dd></div>
           <div><dt>End</dt><dd>Into a wall or the snake's own body, 150 steps without an apple, or 1000 steps. The score is the apples eaten.</dd></div>
           <div><dt>Scores</dt><dd>The ranking uses the mean over 100 fixed seeds, with a 95% margin of error (two standard errors); models within each other's margin are tied. Every game is recorded and replays exactly, so any result can be checked.</dd></div>
         </dl>

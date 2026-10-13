@@ -3,7 +3,7 @@
 Our own game (MIT, author opper-ai, category Arcade). The smallest game that proves every part of the kit: bench,
 submissions, CI replay, play, watch, high scores, deploy.
 
-## Rules (SNAKE_RULES, part of benchVersion 1)
+## Rules (SNAKE_RULES, part of benchVersion 2)
 
 - Board 16 x 16, walls around it (leaving the board = death), no inner walls in v1.
 - Snake starts length 3 in the middle, heading right; one apple on the board at a time. Apple positions come from a
@@ -14,7 +14,7 @@ submissions, CI replay, play, watch, high scores, deploy.
   without an apple (so a looping model cannot stall forever).
 - The game ends at death or after 1000 steps. Score = apples eaten.
 
-## Questions (paused mode)
+## Questions (real-time mode, benchVersion 2)
 
 One System One `choice` question per step, named `snake`, options `left`, `straight`, `right`.
 - `state`: the board as rows of text (`#` wall, `H` head, `o` body, `t` tail, `A` apple, `.` empty) with the
@@ -23,9 +23,17 @@ One System One `choice` question per step, named `snake`, options `left`, `strai
   distance to the apple after the move, and how many cells the snake could still reach from there (flood fill),
   WITHOUT labelling any option "safe" or "best". Instructions explain the rules once.
 - Keep a question under about 600 tokens. Order of options fixed (left, straight, right).
-- Fallback (timeout 2 s from send, error, invalid answer): `straight` if the next cell is not deadly, else the first
-  non-deadly of left/right, else straight. It never steers toward the apple: the harness does not play well on the
-  model's behalf.
+- Clock: the game steps every 250 ms (`STEP_MS`), the same speed for every model (the race's Normal speed). The
+  model is asked about the board as soon as its last step is applied; one request is in flight at a time, so while a
+  late one is still out the next question waits for it. An answer that is in by the tick moves the snake; a late one
+  is ignored (never used for a later step). A call may run for up to 2 s before it is given up on.
+- Fallback (answer not in by the tick, error, invalid answer): `straight` if the next cell is not deadly, else the
+  first non-deadly of left/right, else straight. It never steers toward the apple: the harness does not play well on
+  the model's behalf. The score therefore reflects decision quality and speed together; the leaderboard shows the
+  share of late steps and the mean latency next to it.
+- Baselines answer at once, so they play on the same clock and never fall back.
+- benchVersion 1 was paused (the game waited up to 2 s for each answer); its results are not comparable and its
+  submissions are refused.
 
 ## Baselines (free, `--model baseline/<name>`)
 
@@ -41,12 +49,15 @@ step's choice is one of the three options and that a fallback step's choice equa
 (so a submitter cannot dress model moves up as fallbacks or vice versa), recomputes the score, and compares to the
 claimed result. Fingerprint = hash of seed + choices. Official seeds: `seedFor(i)` fixed, 100 games.
 
+A replay proves the moves and the score, not the timing: whether a step was answered in time is as the bench
+recorded it. For our official runs we run the bench; for a submission CI can't prove the timing, which is why
+submissions are labelled self-reported (as on jevman).
+
 ## Page (games/snake/index.html, jevman-style: dark, arcade, Opper chrome from the kit)
 
 - Hero: the board playing the top model's recorded game (Watch = recordings only), model chips to switch recordings.
 - Play: you (arrow keys / swipe) on the left board, a model of your choice on the right board, same seed; both start
-  together; the model board advances whenever its answer arrives (paused per step, a step at most every 120 ms so it
-  is watchable). Your board ticks at 8 steps/s. When both are over, show both scores; enter initials for the board.
+  together on one clock (see "Race speed" below). When both are over, show both scores; enter initials for the board.
   The seed for a high-score game is issued by the server (/api/snake/seed, signed), not chosen by the client.
 - High scores: one board `classic` (your apples). Server replays your inputs from the issued seed.
 - Leaderboard section: official + community rows from leaderboard.json/community.json, Run by column, =1 ties,
@@ -74,11 +85,11 @@ a baseline as a model.
   (a step every 400 ms), Normal (250 ms, the default) or Fast (125 ms). The AI is asked about each board as soon as
   its last step is applied, one request at a time; an answer that isn't in by the tick is too late, and the
   benchmark's fallback moves the snake instead. All speeds share one high-score board, and the check above uses the
-  Fast step as its floor, so a game played at a slower speed always passes it. The benchmark is unchanged: paused,
-  one step per answer.
+  Fast step as its floor, so a game played at a slower speed always passes it. Normal is the benchmark's clock: the
+  AI's side of the race is the benchmark's own real-time player (`RealtimeSnake`, `shared/play.ts`).
 - **Benchmark recording.** As specified, plus `costUsd` per step (the leaderboard's cost column needs it) and
   `result: { score, steps, end }` (`end`: `wall`, `body`, `starved`, `steps` or `full`). A late answer's latency and
-  cost are kept on its step, as the kit's scheduler reports them. The fingerprint is the SHA-256 of the seed and the
+  cost are kept on the step the fallback played for it. The fingerprint is the SHA-256 of the seed and the
   moves.
 - **Seeds and sizes.** `seedFor(i)` is `Math.imul(i + 1, 0x9e3779b1) >>> 1` (golden-ratio steps, 31 bits). A
   submission needs at least 24 games (100 to match ours), as on jevman.
