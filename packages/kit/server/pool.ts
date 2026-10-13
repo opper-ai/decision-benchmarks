@@ -17,7 +17,7 @@ export const POOL_EMPTY_MESSAGE = 'The free credits are used up. Sign in with Op
 /** Every visitor together is sending faster than the free credits allow (POOL_GLOBAL_RATE_PER_SEC). */
 export const POOL_BUSY_MESSAGE = 'The free credits are busy right now. Sign in with Opper to keep playing on your own account.';
 /** Most the free credits may spend in an hour, across every visitor and game, unless POOL_BUDGET_USD_PER_HOUR says otherwise. */
-export const DEFAULT_POOL_BUDGET_USD_PER_HOUR = 2;
+export const DEFAULT_POOL_BUDGET_USD_PER_HOUR = 20;
 const HOUR_MS = 3_600_000;
 const MINUTE_MS = 60_000;
 
@@ -185,7 +185,7 @@ export interface LimitSettings {
 
 export const DEFAULT_LIMITS: LimitSettings = { ratePerSec: 8, burst: 40 };
 /** Every signed-out visitor together: about ten games against four AI ghosts at once. */
-export const DEFAULT_GLOBAL_LIMITS: LimitSettings = { ratePerSec: 40, burst: 120 };
+export const DEFAULT_GLOBAL_LIMITS: LimitSettings = { ratePerSec: 400, burst: 1200 };
 /** An IPv6 /48 gets this many visitors' allowance. */
 const NETWORK_FACTOR = 4;
 /** `rate`: this visitor (or their network) sends too fast; `busy`: every visitor together does. */

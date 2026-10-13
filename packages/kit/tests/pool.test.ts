@@ -128,17 +128,17 @@ describe('the hourly budget', () => {
     expect(pool.current().open).toBe(true); // no budget, no cap
   });
 
-  it('defaults to $2 an hour, from POOL_BUDGET_USD_PER_HOUR when it is a positive number', () => {
+  it('defaults to $20 an hour, from POOL_BUDGET_USD_PER_HOUR when it is a positive number', () => {
     const budgetOf = (env: Record<string, string>) => {
       const warn = vi.fn();
       const pool = poolFromEnv({ OPPER_POOL_API_KEY: 'op-pool', ...env }, 'http://127.0.0.1:9', warn)!;
-      pool.spent(1.99);
+      pool.spent(19.99);
       const before = pool.current().open;
       pool.spent(0.01);
       return { before, after: pool.current().open, warned: warn.mock.calls.some(([m]) => String(m).includes('POOL_BUDGET_USD_PER_HOUR')) };
     };
     expect(budgetOf({})).toEqual({ before: true, after: false, warned: false });
-    expect(budgetOf({ POOL_BUDGET_USD_PER_HOUR: '5' })).toMatchObject({ before: true, after: true });
+    expect(budgetOf({ POOL_BUDGET_USD_PER_HOUR: '50' })).toMatchObject({ before: true, after: true });
     expect(budgetOf({ POOL_BUDGET_USD_PER_HOUR: 'lots' })).toEqual({ before: true, after: false, warned: true });
   });
 
@@ -216,10 +216,10 @@ describe('the global and /48 limits', () => {
 
   it('reads the global limits from POOL_GLOBAL_RATE_PER_SEC and POOL_GLOBAL_BURST, else 40 and 120', () => {
     const warn = vi.fn();
-    expect(globalLimitsFromEnv({}, warn)).toEqual({ ratePerSec: 40, burst: 120 });
+    expect(globalLimitsFromEnv({}, warn)).toEqual({ ratePerSec: 400, burst: 1200 });
     expect(globalLimitsFromEnv({ POOL_GLOBAL_RATE_PER_SEC: '10', POOL_GLOBAL_BURST: '30' }, warn)).toEqual({ ratePerSec: 10, burst: 30 });
     expect(warn).not.toHaveBeenCalled();
-    expect(globalLimitsFromEnv({ POOL_GLOBAL_RATE_PER_SEC: '-1' }, warn)).toEqual({ ratePerSec: 40, burst: 120 });
+    expect(globalLimitsFromEnv({ POOL_GLOBAL_RATE_PER_SEC: '-1' }, warn)).toEqual({ ratePerSec: 400, burst: 1200 });
     expect(warn).toHaveBeenCalledOnce();
   });
 });
