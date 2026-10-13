@@ -14,6 +14,12 @@ export const MAX_POOL_BODY_BYTES = 16 * 1024;
 /** Most questions in one request, for any key: no game asks more at once (Pac-Man's four ghosts and Pac-Man). */
 export const MAX_QUESTIONS = 5;
 export const POOL_EMPTY_MESSAGE = 'The free credits are used up. Sign in with Opper to keep playing on your own account.';
+/** Every visitor together is sending faster than the free credits allow (POOL_GLOBAL_RATE_PER_SEC). */
+export const POOL_BUSY_MESSAGE = 'The free credits are busy right now. Sign in with Opper to keep playing on your own account.';
+/** Most the free credits may spend in an hour, across every visitor and game, unless POOL_BUDGET_USD_PER_HOUR says otherwise. */
+export const DEFAULT_POOL_BUDGET_USD_PER_HOUR = 2;
+const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
 
 export interface PoolStatus {
   /** Whether the pool pays for signed-out play right now. */
@@ -29,6 +35,8 @@ export interface PoolDeps {
   now: () => number;
   log?: (line: string) => void;
   refreshMs?: number;
+  /** Most the pool may spend in any hour (counted by the minute); closed above it until older spend ages out. Undefined: no cap. */
+  budgetUsdPerHour?: number;
 }
 
 /** What GET /v3/me says about the key's money: blocked means Opper rejects new spend. */
@@ -45,6 +53,9 @@ export class Pool {
   private checkedAt = Number.NEGATIVE_INFINITY;
   private pending: Promise<PoolStatus> | null = null;
   private readonly refreshMs: number;
+  /** Spend per minute (minute number to USD) over the last hour, for the hourly budget. */
+  private readonly spentByMinute = new Map<number, number>();
+  private overBudget = false;
   // A plain field, not a constructor parameter property: the server runs as stripped TypeScript, which has none.
   private readonly deps: PoolDeps;
 
@@ -57,10 +68,41 @@ export class Pool {
     return this.deps.apiKey;
   }
 
-  /** The last known status; starts a background refresh once it is older than refreshMs. */
+  /**
+   * The last known status; starts a background refresh once it is older than refreshMs. Closed, too, while the last
+   * hour's spend is at the hourly budget: signed-out visitors are asked to sign in, as when the balance runs out.
+   */
   current(): PoolStatus {
     if (this.deps.now() - this.checkedAt >= this.refreshMs) void this.refresh();
-    return { ...this.status };
+    return this.checkBudget() ? { ...this.status } : { ...this.status, open: false };
+  }
+
+  /** USD spent in the last hour (by whole minutes), as far as Opper reported each call's cost. */
+  spentLastHour(): number {
+    const minute = Math.floor(this.deps.now() / MINUTE_MS);
+    let sum = 0;
+    for (const [m, usd] of this.spentByMinute) {
+      if (m <= minute - HOUR_MS / MINUTE_MS) this.spentByMinute.delete(m);
+      else sum += usd;
+    }
+    return sum;
+  }
+
+  /** Whether the hourly budget has room; logs once when it fills up and once when it has room again. */
+  private checkBudget(): boolean {
+    const budget = this.deps.budgetUsdPerHour;
+    if (budget === undefined) return true;
+    const spent = this.spentLastHour();
+    const over = spent >= budget;
+    if (over !== this.overBudget) {
+      this.overBudget = over;
+      this.deps.log?.(
+        over
+          ? `[pool] spent $${spent.toFixed(2)} in the last hour, the hourly budget of $${budget}: signed-out visitors are asked to sign in until it has room again`
+          : `[pool] the hourly budget of $${budget} has room again: signed-out visitors play on the free credits`,
+      );
+    }
+    return !over;
   }
 
   /** Reads the balance from Opper now (one request at a time). A failed read keeps the last status: Opper still stops the key at zero. */
@@ -93,7 +135,11 @@ export class Pool {
 
   /** A call the pool paid for: keeps the counter moving between refreshes, and asks Opper again once it reaches zero. */
   spent(costUsd: number | null): void {
-    if (costUsd === null || !Number.isFinite(costUsd) || costUsd <= 0 || this.status.remainingUsd === null) return;
+    if (costUsd === null || !Number.isFinite(costUsd) || costUsd <= 0) return;
+    const minute = Math.floor(this.deps.now() / MINUTE_MS);
+    this.spentByMinute.set(minute, (this.spentByMinute.get(minute) ?? 0) + costUsd);
+    this.checkBudget();
+    if (this.status.remainingUsd === null) return;
     this.status = { ...this.status, remainingUsd: Math.max(0, this.status.remainingUsd - costUsd) };
     if (this.status.remainingUsd === 0) void this.refresh();
   }
@@ -108,15 +154,28 @@ export class Pool {
 export function poolFromEnv(env: Record<string, string | undefined>, opperUrl: string, log: (line: string) => void): Pool | undefined {
   const apiKey = env.OPPER_POOL_API_KEY?.trim();
   if (!apiKey) return undefined;
-  const pool = new Pool({ apiKey, opperUrl, fetch, now: () => Date.now(), log });
+  const budgetUsdPerHour = positiveFromEnv(env, 'POOL_BUDGET_USD_PER_HOUR', DEFAULT_POOL_BUDGET_USD_PER_HOUR, log);
+  const pool = new Pool({ apiKey, opperUrl, fetch, now: () => Date.now(), log, budgetUsdPerHour });
   void pool.refresh();
   return pool;
 }
 
+/** A positive number from the environment, else `fallback` (with a warning when the value is not one). */
+export function positiveFromEnv(env: Record<string, string | undefined>, name: string, fallback: number, warn: (line: string) => void): number {
+  const raw = env[name]?.trim();
+  if (!raw) return fallback;
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) return n;
+  warn(`[pool] ${name} must be a positive number, got ${JSON.stringify(raw.slice(0, 40))}; using ${fallback}`);
+  return fallback;
+}
+
 /**
  * Fair use of the pool, per visitor (IP address): a request rate that fits a real game, so a script can't drain it in
- * minutes. One limiter for every game, so a visitor's allowance is the same however many games they open. Kept in
- * memory, so each server counts on its own; the pool's own balance is the hard limit.
+ * minutes. One limiter for every game, so a visitor's allowance is the same however many games they open. On top, an
+ * IPv6 /48 (what one site is usually given) gets four visitors' worth, and every visitor together shares one global
+ * allowance, so many addresses can't drain it either. Kept in memory, so each server counts on its own; the hourly
+ * budget and the pool's own balance are the hard limits.
  */
 export interface LimitSettings {
   /** Requests per second, sustained, and the burst on top. A game against four AI ghosts makes about four a second. */
@@ -125,27 +184,48 @@ export interface LimitSettings {
 }
 
 export const DEFAULT_LIMITS: LimitSettings = { ratePerSec: 8, burst: 40 };
-export type LimitVerdict = 'ok' | 'rate';
+/** Every signed-out visitor together: about ten games against four AI ghosts at once. */
+export const DEFAULT_GLOBAL_LIMITS: LimitSettings = { ratePerSec: 40, burst: 120 };
+/** An IPv6 /48 gets this many visitors' allowance. */
+const NETWORK_FACTOR = 4;
+/** `rate`: this visitor (or their network) sends too fast; `busy`: every visitor together does. */
+export type LimitVerdict = 'ok' | 'rate' | 'busy';
 const MAX_TRACKED = 50_000;
 
+type Bucket = { tokens: number; at: number };
+
+/** POOL_GLOBAL_RATE_PER_SEC and POOL_GLOBAL_BURST, else DEFAULT_GLOBAL_LIMITS. */
+export function globalLimitsFromEnv(env: Record<string, string | undefined>, warn: (line: string) => void): LimitSettings {
+  return {
+    ratePerSec: positiveFromEnv(env, 'POOL_GLOBAL_RATE_PER_SEC', DEFAULT_GLOBAL_LIMITS.ratePerSec, warn),
+    burst: positiveFromEnv(env, 'POOL_GLOBAL_BURST', DEFAULT_GLOBAL_LIMITS.burst, warn),
+  };
+}
+
 export class VisitorLimits {
-  private readonly buckets = new Map<string, { tokens: number; at: number }>();
+  private readonly buckets = new Map<string, Bucket>();
+  private readonly global: Bucket;
+  private globalBusy = false;
 
   private readonly settings: LimitSettings;
+  private readonly network: LimitSettings;
+  private readonly globalSettings: LimitSettings;
   private readonly now: () => number;
+  private readonly log: (line: string) => void;
 
-  constructor(settings: LimitSettings = DEFAULT_LIMITS, now: () => number = () => Date.now()) {
+  constructor(settings: LimitSettings = DEFAULT_LIMITS, now: () => number = () => Date.now(), globalSettings: LimitSettings = DEFAULT_GLOBAL_LIMITS, log: (line: string) => void = () => {}) {
     this.settings = settings;
+    this.network = { ratePerSec: settings.ratePerSec * NETWORK_FACTOR, burst: settings.burst * NETWORK_FACTOR };
+    this.globalSettings = globalSettings;
     this.now = now;
+    this.log = log;
+    this.global = { tokens: globalSettings.burst, at: now() };
   }
 
-  /** Takes one request from the visitor's allowance, or says it is sending too fast. */
-  take(visitor: string): LimitVerdict {
-    const now = this.now();
-    const key = visitorKey(visitor);
-    const b = this.buckets.get(key) ?? { tokens: this.settings.burst, at: now };
-    b.tokens = Math.min(this.settings.burst, b.tokens + ((now - b.at) / 1000) * this.settings.ratePerSec);
-    b.at = now;
+  /** The tracked bucket for `key`, refilled to now and moved to the end (most recently seen). */
+  private bucket(key: string, settings: LimitSettings, now: number): Bucket {
+    const b = this.buckets.get(key) ?? { tokens: settings.burst, at: now };
+    refill(b, settings, now);
     // Most recently seen last (a Map keeps insertion order), so a full table drops the visitors idle longest, not all.
     this.buckets.delete(key);
     this.buckets.set(key, b);
@@ -153,10 +233,53 @@ export class VisitorLimits {
       if (this.buckets.size <= MAX_TRACKED) break;
       this.buckets.delete(old);
     }
-    if (b.tokens < 1) return 'rate';
-    b.tokens -= 1;
+    return b;
+  }
+
+  /**
+   * Takes one request from the visitor's allowance, their /48's and the global one, or says which is spent. A refused
+   * request takes nothing, so one visitor sending too fast does not use up everybody else's allowance.
+   */
+  take(visitor: string): LimitVerdict {
+    const now = this.now();
+    const own = this.bucket(visitorKey(visitor), this.settings, now);
+    const net = networkKey(visitor);
+    const shared = net === null ? null : this.bucket(net, this.network, now);
+    if (own.tokens < 1 || (shared && shared.tokens < 1)) return 'rate';
+    refill(this.global, this.globalSettings, now);
+    if (this.global.tokens < 1) {
+      if (!this.globalBusy) this.log(`[pool] every visitor together is above ${this.globalSettings.ratePerSec} requests a second: signed-out visitors are asked to sign in`);
+      this.globalBusy = true;
+      return 'busy';
+    }
+    if (this.globalBusy) this.log('[pool] the global request rate is back under its limit');
+    this.globalBusy = false;
+    own.tokens -= 1;
+    if (shared) shared.tokens -= 1;
+    this.global.tokens -= 1;
     return 'ok';
   }
+}
+
+function refill(b: Bucket, settings: LimitSettings, now: number): void {
+  b.tokens = Math.min(settings.burst, b.tokens + (Math.max(0, now - b.at) / 1000) * settings.ratePerSec);
+  b.at = now;
+}
+
+/** An IPv6 address's eight groups, without leading zeros, or null for anything else. */
+function ipv6Groups(ip: string): string[] | null {
+  if (!ip.includes(':') || /^(?:::ffff:)?\d{1,3}(?:\.\d{1,3}){3}$/i.test(ip)) return null;
+  const [head = '', tail = ''] = ip.split('%')[0]!.toLowerCase().split('::');
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const full = ip.includes('::') ? [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right] : left;
+  return full.map((h) => h.replace(/^0+(?=.)/, ''));
+}
+
+/** The /48 network an IPv6 address is in, e.g. `2001:db8:1::/48`; null for IPv4. */
+export function networkKey(ip: string): string | null {
+  const groups = ipv6Groups(ip);
+  return groups ? `${groups.slice(0, 3).join(':')}::/48` : null;
 }
 
 /**
@@ -166,12 +289,8 @@ export class VisitorLimits {
 export function visitorKey(ip: string): string {
   const v4 = /^(?:::ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
   if (v4) return v4[1]!;
-  if (!ip.includes(':')) return ip;
-  const [head = '', tail = ''] = ip.split('%')[0]!.toLowerCase().split('::');
-  const left = head ? head.split(':') : [];
-  const right = tail ? tail.split(':') : [];
-  const full = ip.includes('::') ? [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right] : left;
-  return `${full.slice(0, 4).map((h) => h.replace(/^0+(?=.)/, '')).join(':')}::/64`;
+  const groups = ipv6Groups(ip);
+  return groups ? `${groups.slice(0, 4).join(':')}::/64` : ip;
 }
 
 /**

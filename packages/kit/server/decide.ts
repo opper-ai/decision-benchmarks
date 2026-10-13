@@ -1,7 +1,7 @@
 import { clearSessionCookie, crossSite, header, json, sessionFrom, WALLET_URL, type AuthConfig, type HttpRequest, type HttpResponse } from './auth.ts';
 import { signAnswers } from './answers.ts';
 import { endpointFor, TYPESAFE_USD_PER_INPUT_TOKEN, upstreamModel, type Provider, type Target } from './systemone.ts';
-import { clientIp, MAX_QUESTIONS, POOL_EMPTY_MESSAGE, type Pool, type VisitorLimits } from './pool.ts';
+import { clientIp, MAX_QUESTIONS, POOL_BUSY_MESSAGE, POOL_EMPTY_MESSAGE, type Pool, type VisitorLimits } from './pool.ts';
 import type { SessionData } from './session.ts';
 import type { GameServer } from '../shared/game.ts';
 import { DEFAULT_MODEL, isModelId, modelName } from '../shared/models.ts';
@@ -183,12 +183,14 @@ export function rejectDecideRequest(req: HttpRequest, cfg: AuthConfig, devKey: T
 
 /**
  * Fair use of the free credits, checked once per request before its body is read: 429 when a visitor sends faster
- * than a game does. The limiter is shared by every game.
+ * than a game does, and 429 `poolEmpty` (the page asks the visitor to sign in, as when the credits run out) when every
+ * visitor together is above the global rate. The limiter is shared by every game; signed-in players never meet it.
  */
 export function poolLimitRequest(req: HttpRequest, cfg: AuthConfig, devKey: Target | undefined, access: PoolAccess | undefined): HttpResponse | null {
   if (!access || resolveKey(sessionFrom(req, cfg), devKey, cfg.opperUrl, access.pool)?.mode !== 'pool') return null;
   const verdict = access.limits.take(clientIp(req, access.trustedProxies));
   if (verdict === 'rate') return json(429, { error: 'Too many requests for the free credits; slow down a little' }, [], { 'Retry-After': '1' });
+  if (verdict === 'busy') return json(429, { error: POOL_BUSY_MESSAGE, signedOut: true, poolEmpty: true }, [], { 'Retry-After': '5' });
   return null;
 }
 

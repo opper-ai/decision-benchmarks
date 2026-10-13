@@ -4,7 +4,7 @@ import { crossSite, handleCallback, handleLogin, handleLogout, handleMe, json, l
 import { answerKey, answerVerifier } from './answers.ts';
 import { handleDecideRequest, poolLimitRequest, rejectDecideRequest, resolveKey, type DecideContext, type PoolAccess } from './decide.ts';
 import { accountHash, cleanInitials, HighScores, highScoresStore, visitorHash } from './highscores.ts';
-import { clientIp, MAX_POOL_BODY_BYTES, poolFromEnv, trustedProxiesFromEnv, visitorKey, VisitorLimits } from './pool.ts';
+import { clientIp, globalLimitsFromEnv, MAX_POOL_BODY_BYTES, poolFromEnv, trustedProxiesFromEnv, visitorKey, VisitorLimits } from './pool.ts';
 import { issueSeed, seedKey, seedVerifier } from './seeds.ts';
 import { devTargetFromEnv, type Target } from './systemone.ts';
 import { normalizeBasePath } from '../shared/base-path.ts';
@@ -144,7 +144,8 @@ function readBody(req: IncomingMessage, limit: number): Promise<string | null> {
  */
 export function poolAccessFromEnv(env: Record<string, string | undefined>, log: (msg: string) => void): PoolAccess | undefined {
   const pool = poolFromEnv(env, env.OPPER_BASE_URL || 'https://api.opper.ai', log);
-  return pool ? { pool, limits: new VisitorLimits(), trustedProxies: trustedProxiesFromEnv(env) } : undefined;
+  if (!pool) return undefined;
+  return { pool, limits: new VisitorLimits(undefined, undefined, globalLimitsFromEnv(env, log), log), trustedProxies: trustedProxiesFromEnv(env) };
 }
 
 /**
