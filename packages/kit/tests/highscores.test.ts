@@ -159,7 +159,7 @@ describe('HighScores', () => {
   });
 
   it("keeps each game's boards in S3 when HIGHSCORES_BUCKET is set, else in a file", () => {
-    expect(highScoresStore({ HIGHSCORES_BUCKET: 'opper-decision-benchmarks-highscores', AWS_REGION: 'eu-north-1' }, 'snake').where).toBe('s3://opper-decision-benchmarks-highscores/snake/highscores.json');
+    expect(highScoresStore({ HIGHSCORES_BUCKET: 'example-highscores-bucket', AWS_REGION: 'eu-north-1' }, 'snake').where).toBe('s3://example-highscores-bucket/snake/highscores.json');
     expect(highScoresStore({ HIGHSCORES_BUCKET: 'b', HIGHSCORES_PREFIX: '/boards/' }, 'snake').where).toBe('s3://b/boards/snake/highscores.json');
     expect(highScoresStore({ HIGHSCORES_DIR: '/tmp/x' }, 'snake').where).toBe('/tmp/x/snake-highscores.json');
     expect(highScoresStore({}, 'snake').where).not.toBe(highScoresStore({}, 'fighter').where);

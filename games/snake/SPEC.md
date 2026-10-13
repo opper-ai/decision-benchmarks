@@ -55,8 +55,8 @@ claimed result. Fingerprint = hash of seed + choices. Official seeds: `seedFor(i
 
 ## Official runs
 
-`npm run bench -- --game snake --leaderboard` plays 100 games per model on the fixed seeds. Not run in this phase
-(paid). Commit leaderboard.json with no entries (valid contract shape) and the baselines' results in a separate
+`npm run bench -- --game snake --leaderboard` plays 100 games per model on the fixed seeds. Until official runs are
+published, leaderboard.json has no entries (a valid contract shape). The baselines' results go in a separate
 public/baselines.json (same entry shape) that only the game page reads: the hub's model leaderboard must never show
 a baseline as a model.
 

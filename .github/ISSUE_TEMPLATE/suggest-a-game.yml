@@ -8,8 +8,8 @@ body:
       value: |
         We port the games we host onto our own harness and review them like any of our code, so nothing from the
         original repository runs on opper.ai as it is. We ask the author before porting, and credit them on the
-        game's card, in its CREDITS.md and in the launch post. We answer every suggestion here within a week: yes,
-        not now, or no, with the reason.
+        game's card and in its CREDITS.md. We read every suggestion and aim to reply with yes, not now, or no, and
+        the reason.
   - type: input
     id: repo
     attributes:

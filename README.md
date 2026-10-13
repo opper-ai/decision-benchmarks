@@ -51,5 +51,5 @@ Benchmark your own model, or suggest a game: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-AGPL-3.0-or-later (see [LICENSE](LICENSE)), as jevman; the kit is meant to become MIT once its authors agree (see
-[packages/kit/README.md](packages/kit/README.md)). Each game folder keeps its own license.
+AGPL-3.0-or-later (see [LICENSE](LICENSE)), as jevman. Each game folder has its own license: `games/jevman` is
+AGPL-3.0-or-later, `games/snake` and `games/fighter` are MIT.

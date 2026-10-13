@@ -1,4 +1,4 @@
-// The benchmark (docs/specs/2026-10-12-port-to-kit.md): one game is one paused match, assisted track, of the model
+// The benchmark: one game is one paused match, assisted track, of the model
 // under test against one baseline of the gauntlet (greedy, payoff, maximin), from one side. The score is the model's
 // share of the rounds (a drawn round counts half), in percent. The bench plays it (game.ts) and the submissions check
 // replays it with `verifyGauntlet`, on the same stepper, so a match replays exactly as it was played.
