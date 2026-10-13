@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SESSION_COOKIE, STATE_COOKIE } from '../server/auth';
 import { HighScores } from '../server/highscores';
 import { gamePlugin } from '../server/plugin';
-import { authConfigFromEnv, createAuthMiddleware, createGameMiddleware, devKeyFromEnv, MAX_BODY_BYTES, redirectUriFromEnv } from '../server/routes';
+import { authConfigFromEnv, createAuthMiddleware, createGameMiddleware, devKeyFromEnv, EntryLog, MAX_BODY_BYTES, redirectUriFromEnv } from '../server/routes';
 import { sealSession } from '../server/session';
 import { coinBody, coinServer } from './support/test-game';
 
@@ -495,5 +495,39 @@ describe('issued seeds', () => {
   it('answers 404 for a game that issues none, and GET only', () => {
     expect(call(mount({}).handler, 'GET', '/api/seed').res.statusCode).toBe(404);
     expect(call(seededHandler(), 'POST', '/api/seed', JSON_POST).res.statusCode).toBe(405);
+  });
+});
+
+describe('EntryLog (high-score entries per sender)', () => {
+  const HOUR = 3_600_000;
+
+  it("counts a sender's entries over the last hour", () => {
+    const log = new EntryLog();
+    log.add('a', 0);
+    log.add('a', 1000);
+    expect(log.recent('a', 2000)).toEqual([0, 1000]);
+    expect(log.recent('a', HOUR + 500)).toEqual([1000]);
+    expect(log.recent('b', 2000)).toEqual([]);
+  });
+
+  it('forgets senders with nothing left in the hour, so the table does not grow with every address ever seen', () => {
+    const log = new EntryLog();
+    for (let i = 0; i < 1000; i++) log.add(`visitor:${i}`, i);
+    expect(log.size).toBe(1000);
+    log.add('late', HOUR + 500);
+    // Everyone whose last entry is an hour old is gone; the ones from the last half second stay.
+    expect(log.size).toBe(500);
+    log.recent('late', 3 * HOUR);
+    expect(log.size).toBe(0);
+  });
+
+  it('keeps at most `max` senders, dropping the one idle longest', () => {
+    const log = new EntryLog(3);
+    for (const s of ['a', 'b', 'c']) log.add(s, 0);
+    log.add('a', 1);
+    log.add('d', 2);
+    expect(log.size).toBe(3);
+    expect(log.recent('b', 3)).toEqual([]);
+    expect(log.recent('a', 3)).toEqual([0, 1]);
   });
 });

@@ -17,6 +17,52 @@ export const MAX_SCORE_BODY_BYTES = 1536 * 1024;
 /** Entries one account (or, signed out, one address) may send an hour, per game. */
 const SCORE_ENTRIES_PER_HOUR = 20;
 const MAX_LOG_CHARS = 300;
+/** Senders whose recent entries are remembered, per game; past it the one idle longest is forgotten. */
+const MAX_SCORE_SENDERS = 50_000;
+const HOUR_MS = 3_600_000;
+
+/**
+ * High-score entries per sender over the last hour. Senders are kept most recently seen last (a Map keeps insertion
+ * order), so the ones with nothing left in the hour are dropped from the front as they age out, and a full table drops
+ * the sender idle longest, not all.
+ */
+export class EntryLog {
+  private readonly bySender = new Map<string, number[]>();
+  private readonly max: number;
+
+  constructor(max = MAX_SCORE_SENDERS) {
+    this.max = max;
+  }
+
+  get size(): number {
+    return this.bySender.size;
+  }
+
+  /** The sender's entries in the hour before `now`. */
+  recent(sender: string, now: number): number[] {
+    this.prune(now);
+    return (this.bySender.get(sender) ?? []).filter((t) => now - t < HOUR_MS);
+  }
+
+  /** Counts an entry at `now`. */
+  add(sender: string, now: number): void {
+    const times = [...this.recent(sender, now), now];
+    this.bySender.delete(sender);
+    this.bySender.set(sender, times);
+    for (const old of this.bySender.keys()) {
+      if (this.bySender.size <= this.max) break;
+      this.bySender.delete(old);
+    }
+  }
+
+  /** Forgets the senders at the front whose last entry is an hour old. */
+  private prune(now: number): void {
+    for (const [sender, times] of this.bySender) {
+      if (now - (times[times.length - 1] ?? 0) < HOUR_MS) break;
+      this.bySender.delete(sender);
+    }
+  }
+}
 
 export interface RouteLogger {
   info(msg: string, opts?: { timestamp?: boolean }): void;
@@ -212,7 +258,7 @@ export function createGameMiddleware(game: GameServer, env: Record<string, strin
   // Read the boards now, so the first visitor doesn't wait for it (a failure is logged and tried again on use).
   scores?.ready().catch(() => {});
   const unavailable = () => json(503, { error: 'The high scores are not available right now. Try again in a moment.' }, [], { 'Retry-After': '5' });
-  const entriesBy = new Map<string, number[]>();
+  const entries = new EntryLog();
   /** Accounts and addresses with a check running: one at a time each, so nobody can keep the server busy replaying. */
   const checking = new Set<string>();
   const verifyAnswer = answerVerifier(key);
@@ -232,10 +278,9 @@ export function createGameMiddleware(game: GameServer, env: Record<string, strin
     // Who the rate limit counts: the account, else the address.
     const sender = session ? accountHash(session.user, cfg.sessionSecret) : `visitor:${visitor}`;
     const now = Date.now();
-    const recent = (entriesBy.get(sender) ?? []).filter((t) => now - t < 3_600_000);
-    if (recent.length >= SCORE_ENTRIES_PER_HOUR || checking.has(sender)) return send(res, json(429, { error: 'Too many entries for now. Try again later.' }));
+    if (entries.recent(sender, now).length >= SCORE_ENTRIES_PER_HOUR || checking.has(sender)) return send(res, json(429, { error: 'Too many entries for now. Try again later.' }));
     // Every attempt counts (refused ones too), before the body is read.
-    entriesBy.set(sender, [...recent, now]);
+    entries.add(sender, now);
     checking.add(sender);
     readBody(req, MAX_SCORE_BODY_BYTES)
       .then(async (raw) => {
