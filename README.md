@@ -23,6 +23,8 @@ server/main.ts       the service: every registry game at <APP_BASE_PATH>/<slug>/
 scripts/             bench, submissions, build, check-contract
 ```
 
+Original games: jevman is by Johnny Chadda and Felix Wunderlich ([opper-ai/jevman-benchmark](https://github.com/opper-ai/jevman-benchmark)); Jev Fighter is by Jose Sabater ([Jose-Sabater/jev-fighter](https://github.com/Jose-Sabater/jev-fighter)). Each game's CREDITS.md says what changed in the port.
+
 ## Commands
 
 Node 22.18 or later. Install with `npm ci --ignore-scripts`, and copy `.env.example` to `.env` for keys.

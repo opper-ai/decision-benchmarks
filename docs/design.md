@@ -158,7 +158,8 @@ Where building the kit changed or filled in the design above, and why:
   plain Node (no tsx). A game's page takes the shared opper.ai chrome with
   `@import "../../../packages/kit/client/opper-chrome.css"` at the top of its stylesheet.
 - **CI.** `.github/workflows/ci.yml`: typecheck, tests, every game's submissions replayed, the contract checked, the
-  image built and smoke-tested. The deploy job comes with the infrastructure (step 0).
+  image built and smoke-tested. deploy.yml deploys a green push to main only while the repository variable DEPLOY_ENABLED is true, so main can
+  take code before the infrastructure (step 0) exists.
 
 ## Implementation notes (snake, the first game on the kit)
 

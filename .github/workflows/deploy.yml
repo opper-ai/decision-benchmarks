@@ -38,8 +38,10 @@ jobs:
   deploy:
     name: Build image & deploy to ECS
     needs: test
-    # Only a green push to main of the Opper repository deploys; never pull requests or forks.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'opper-ai/decision-benchmarks'
+    # Only a green push to main of the Opper repository deploys; never pull requests or forks. And only once the
+    # infrastructure exists: the repository variable DEPLOY_ENABLED=true turns deploys on. Until then a push to main
+    # runs CI only.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'opper-ai/decision-benchmarks' && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
