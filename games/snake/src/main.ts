@@ -8,8 +8,8 @@ import { createHttpTransport, warmUp, type TransportHooks } from '../../../packa
 import { DECISION_MODELS, DEFAULT_MODEL, isModelId, modelName } from '../../../packages/kit/shared/models.ts';
 import { baselineName, baselineTransport, BASELINE_NAMES, isBaselineId, type BaselineName } from '../shared/baselines.ts';
 import { createGame, moveToward, step, type GameState, type Heading, type Move } from '../shared/engine.ts';
-import { playSnake } from '../shared/play.ts';
-import { BOARD, moveLetter, PLAYER_STEP_MS, type PlayerRecording } from '../shared/player-check.ts';
+import { BOARD, moveLetter, type PlayerRecording } from '../shared/player-check.ts';
+import { DEFAULT_SPEED, isRaceSpeed, RACE_SPEEDS, RealtimeSnake, SPEED_NAMES, SPEED_STEP_MS, startClock, type RaceSpeed } from '../shared/race.ts';
 import { loadDemo, RECORDINGS, type Demo, type DemoEntry } from './recordings.ts';
 import { AI, drawBoard, PLAYER } from './render.ts';
 
@@ -23,11 +23,10 @@ const el = <K extends keyof HTMLElementTagNameMap>(tagName: K, text?: string, cl
   return e;
 };
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
-/** The model's board steps at most this often, so its game can be watched. */
-const AI_MIN_STEP_MS = 120;
 /** Watch replays a recording at this pace. */
 const WATCH_STEP_MS = 90;
 const OPPONENT_KEY = 'snake.opponent';
+const SPEED_KEY = 'snake.speed';
 const KEYS: Record<string, Heading> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
 
 // ---------- the opper.ai chrome: the phone menu, the account, the theme ----------
@@ -261,6 +260,15 @@ const storedOpponent = (() => {
   }
 })();
 let opponent: string = storedOpponent && (isBaselineId(storedOpponent) || (canUseAI && models.includes(storedOpponent as never))) ? storedOpponent : canUseAI ? (me.defaultModel && isModelId(me.defaultModel) ? me.defaultModel : DEFAULT_MODEL) : 'baseline/flood';
+let speed: RaceSpeed = (() => {
+  try {
+    const v = localStorage.getItem(SPEED_KEY);
+    return isRaceSpeed(v) ? v : DEFAULT_SPEED;
+  } catch {
+    return DEFAULT_SPEED;
+  }
+})();
+const stepsASecond = (sp: RaceSpeed) => String(Math.round((1000 / SPEED_STEP_MS[sp]) * 10) / 10);
 const opponentName = (id: string) => (isBaselineId(id) ? baselineName(id) : modelName(id));
 
 function showPicker(): void {
@@ -313,7 +321,29 @@ function showPicker(): void {
     } else tap.append('Race a baseline: they are free.');
     card.append(tap);
   }
-  card.append(el('p', touchScreen ? 'Swipe to steer. Your board moves 8 steps a second.' : 'Arrow keys or WASD to steer. Your board moves 8 steps a second.', 'tap'));
+  const speeds = el('div', undefined, 'speeds');
+  speeds.setAttribute('role', 'radiogroup');
+  speeds.setAttribute('aria-label', 'Speed');
+  speeds.append(el('span', 'Speed', 'speeds-h'));
+  for (const sp of RACE_SPEEDS) {
+    const b = el('button', SPEED_NAMES[sp]);
+    b.type = 'button';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(sp === speed));
+    b.addEventListener('click', () => {
+      speed = sp;
+      try {
+        localStorage.setItem(SPEED_KEY, sp);
+      } catch {
+        // not remembered
+      }
+      showPicker();
+    });
+    speeds.append(b);
+  }
+  card.append(speeds);
+  card.append(el('p', `Both boards move ${stepsASecond(speed)} steps a second. Faster speeds give the AI less time to think.`, 'tap'));
+  card.append(el('p', touchScreen ? 'Swipe to steer.' : 'Arrow keys or WASD to steer.', 'tap'));
   const press = el('button', undefined, 'press');
   press.type = 'button';
   press.append(el('span', '', 'tri'), el('span', 'Press start'));
@@ -363,36 +393,13 @@ for (const area of [tvYou, swipePad]) {
   for (const end of ['pointerup', 'pointercancel', 'pointerleave'] as const) area.addEventListener(end, () => (start = null));
 }
 
-/** Your game: a step every 125 ms with the last keyed direction, until it ends. Resolves with your moves. */
-function playYou(seed: number, mine: number): Promise<{ state: GameState; moves: string }> {
-  return new Promise((resolve) => {
-    let s = createGame(seed);
-    let moves = '';
-    showYou(s);
-    const timer = setInterval(() => {
-      if (mine !== run) {
-        clearInterval(timer);
-        resolve({ state: s, moves });
-        return;
-      }
-      let move: Move = 'straight';
-      while (queued.length) {
-        const m = moveToward(s.heading, queued.shift()!);
-        if (m) {
-          move = m;
-          break;
-        }
-      }
-      s = step(s, move);
-      moves += moveLetter(move);
-      showYou(s);
-      if (s.over) {
-        clearInterval(timer);
-        banner('you', `Game over: ${s.apples} apples`, true);
-        resolve({ state: s, moves });
-      }
-    }, PLAYER_STEP_MS);
-  });
+/** Your next step: the oldest keyed direction that isn't a U-turn, else straight on. */
+function yourMove(s: GameState): Move {
+  while (queued.length) {
+    const m = moveToward(s.heading, queued.shift()!);
+    if (m) return m;
+  }
+  return 'straight';
 }
 
 async function race(id: string): Promise<void> {
@@ -407,7 +414,8 @@ async function race(id: string): Promise<void> {
   notice(null);
   const name = opponentName(id);
   const baseline = isBaselineId(id);
-  track('play_start', { game: 'snake', opponent: id });
+  const sp = speed;
+  track('play_start', { game: 'snake', opponent: id, speed: sp });
   showYou(createGame(0));
   showAi(null, name);
   banner('you', 'Get ready');
@@ -432,44 +440,53 @@ async function race(id: string): Promise<void> {
   }
   banner('you', null);
   banner('ai', null);
-  const ctl = new AbortController();
-  const youDone = playYou(seed, mine);
-  const aiDone = playSnake({
+  // One clock for both boards: each tick steps you, then the AI (with its answer if it is in, else the fallback).
+  const ai = new RealtimeSnake({
     transport: baseline ? baselineTransport(id.slice('baseline/'.length) as BaselineName) : transport,
     seed,
-    model: id,
     ...(baseline ? {} : { requestModel: id }),
     timeoutMs: 2000,
-    minStepMs: AI_MIN_STEP_MS,
-    signal: ctl.signal,
-    onStep: (s) => {
-      if (mine === run) showAi(s);
-    },
-  }).then(
-    (r) => {
-      if (mine === run) banner('ai', `Game over: ${r.result.score} apples`, true);
-      return r;
-    },
-    () => null,
-  );
-  const stopper = setInterval(() => {
-    if (mine !== run) {
-      ctl.abort();
-      clearInterval(stopper);
-    }
-  }, 100);
-  const you = await youDone;
-  if (mine !== run) return;
-  if (!(await Promise.race([aiDone.then(() => true), sleep(0).then(() => false)]))) notice(`${name} is still playing.`, 0);
-  const ai = await aiDone;
-  clearInterval(stopper);
+  });
+  let you = start;
+  let moves = '';
+  let told = false;
+  await new Promise<void>((resolve) => {
+    startClock(SPEED_STEP_MS[sp], () => {
+      if (mine !== run) {
+        ai.stop();
+        resolve();
+        return false;
+      }
+      if (!you.over) {
+        const move = yourMove(you);
+        you = step(you, move);
+        moves += moveLetter(move);
+        showYou(you);
+        if (you.over) banner('you', `Game over: ${you.apples} apples`, true);
+      }
+      if (!ai.over) {
+        ai.tick();
+        showAi(ai.state);
+        if (ai.over) banner('ai', `Game over: ${ai.state.apples} apples`, true);
+      }
+      if (you.over && !ai.over && !told) {
+        told = true;
+        notice(`${name} is still playing.`, 0);
+      }
+      if (you.over && ai.over) {
+        resolve();
+        return false;
+      }
+      return true;
+    });
+  });
   if (mine !== run) return;
   notice(null);
-  track('play_end', { game: 'snake', opponent: id, apples: String(you.state.apples) });
-  showResult(id, you, ai?.result.score ?? null, issued?.token ?? null);
+  track('play_end', { game: 'snake', opponent: id, speed: sp, apples: String(you.apples) });
+  showResult(id, { state: you, moves }, ai.state.apples, issued?.token ?? null, sp, { fallbacks: ai.fallbacks, steps: ai.steps.length });
 }
 
-function showResult(id: string, you: { state: GameState; moves: string }, aiApples: number | null, token: string | null): void {
+function showResult(id: string, you: { state: GameState; moves: string }, aiApples: number | null, token: string | null, sp: RaceSpeed, aiSteps: { fallbacks: number; steps: number }): void {
   mode = 'watch';
   setCta('play');
   swipePad.hidden = true;
@@ -488,6 +505,8 @@ function showResult(id: string, you: { state: GameState; moves: string }, aiAppl
   };
   vs.append(line('You', you.state.apples, youWin && !tie), line(name, aiApples, !youWin && !tie));
   card.append(vs);
+  const late = aiSteps.fallbacks ? ` ${name} was late on ${aiSteps.fallbacks} of ${aiSteps.steps} steps.` : '';
+  card.append(el('p', `${SPEED_NAMES[sp]} speed, ${stepsASecond(sp)} steps a second.${late}`, 'tap'));
   const score = you.state.apples;
   const place = token ? placeFor(boards, BOARD, score) : null;
   if (token && place !== null) {
