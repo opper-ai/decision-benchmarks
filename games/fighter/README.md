@@ -10,9 +10,10 @@ see [CREDITS.md](CREDITS.md).
 
 ## What it measures
 
-**Rounds won against the bots (the baselines).** One benchmark game is one match of the model under test against one of three
-fixed-rule baselines, the strongest ones: **greedy** (the biggest swing if the opponent stands still or repeats itself),
-**payoff** (the best average) and **maximin** (the safest move). The score is the model's share of the rounds, a drawn
+**Rounds won against the bots (the baselines).** One benchmark game is one match of the model under test against one of four
+fixed-rule baselines: **greedy** (the biggest swing if the opponent stands still or repeats itself), **payoff** (the
+best average), **maximin** (the safest move) and **random** (any offered move, drawn from the match's seed, the floor a
+model must clear). The score is the model's share of the rounds, a drawn
 round counting half, in percent; a model's result is the mean over its games.
 
 - **Real time**: the fight runs live at its normal speed (60 frames a second), as when you fight a model on the page,
@@ -23,15 +24,16 @@ round counting half, in percent; a model's result is the mean over its games.
   come in time. So the score is good decisions made in time.
 - **Raw track**: the question gives the situation and the rules; each option is the move's own description (height,
   damage, frames, reach). No payoff rows: the model works out what wins.
-- **The baselines** answer at once, on the frame their fighter can act, and see the opponent with the same reaction
-  delay. They read the full state (on the raw track they work the payoff rows out themselves): they are the opponents,
-  not the test.
-- **Fixed seeds, both sides**: game `i` plays seed `i`. `i % 3` picks the baseline, `floor(i / 3) % 2` the side and
-  `floor(i / 6)` the fight (its start distance and position). The official 102 games are 17 fights, each against every
+- **The baselines** play as they do on the page: asked like a model, they think for 250 ms (counted as 15 frames, so
+  a replay recomputes every move) and see the opponent with the same reaction delay. They read the full state (on the
+  raw track they work the payoff rows out themselves): they are the opponents, not the test.
+- **Fixed seeds, both sides**: game `i` plays seed `i`. `i % 4` picks the baseline, `floor(i / 4) % 2` the side and
+  `floor(i / 8)` the fight (its start distance and position). The official 104 games are 13 fights, each against every
   baseline from both sides; a submission plays at least the first 24.
 
-The baselines' own results on the same games are in [public/baselines.json](public/baselines.json) (maximin about 71%,
-greedy 54%, payoff 25%, guard 7%, random 0%; a baseline answers at once, so the clock costs it nothing). A model below payoff does worse than a script that picks each move's best average outcome.
+The baselines' own results on the same games are in [public/baselines.json](public/baselines.json) (payoff about 77%,
+greedy 67%, maximin 40%, random 16%, guard 7%). A model below random is not deciding anything; one below payoff does
+worse than a script that picks each move's best average outcome.
 
 ## The rules
 
@@ -97,7 +99,7 @@ From the repository root (see [CONTRIBUTING.md](../../CONTRIBUTING.md)):
 node games/fighter/example-endpoint.ts                                        # a model to copy, on :8787
 npm run bench -- --game fighter --endpoint http://localhost:8787 --games 3 --parallel 1   # try it
 npm run bench -- --game fighter --endpoint http://localhost:8787 --parallel 1 \
-  --submit games/fighter/submissions/my-model --name "My Model" --by your-github-handle    # 24 games (--games 102 to match ours)
+  --submit games/fighter/submissions/my-model --name "My Model" --by your-github-handle    # 24 games (--games 104 to match ours)
 npm run submissions -- --game fighter                                         # check it the way CI will
 npm run bench -- --game fighter --model baseline/maximin --games 6            # a baseline as the player: free
 ```

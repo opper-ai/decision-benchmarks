@@ -77,24 +77,81 @@ interface Pending {
 }
 
 /**
- * An instant player's move on this tick (Adapter.instant), or null when its fighter cannot act: asked about what it
- * sees (`view`, read only when it can act), played the same tick, the fallback's move when its answer is not legal.
- * The live match and the benchmark's verifier (shared/gauntlet.ts) both play instant players with this.
+ * A scripted player (Adapter.scripted) in a real-time match, frame by frame and with no clock: asked when its fighter
+ * can act, or ahead by its thinking time (as a model is), its answer arrives `delayTicks` frames after the question
+ * and plays on the first frame its fighter can act from then; a question goes stale and is asked again on the same
+ * rules as a model's. The live match and the benchmark's verifier (shared/gauntlet.ts) both play it with this class,
+ * so its moves can be recomputed from a recording.
  */
-export function instantDecision(s: GameState, i: Side, view: () => GameState, decide: NonNullable<Adapter['instant']>, o: { track: Track; maxTokens?: number }): Decision | null {
-  if (!isActionable(s, i)) return null;
-  const seen = view();
-  const question = buildQuestion(seen, i, { track: o.track, maxTokens: o.maxTokens });
-  if (!question.options.length) return null;
-  const answer = decide(question, seen);
-  let move: MoveId | null = answer.move;
-  let fallback: FallbackReason | null = null;
-  if (!legalMoves(s, i).includes(move)) {
-    fallback = 'illegal';
-    move = fallbackMove(s, i);
+export class ScriptedPlayer {
+  private pending: { question: Question; askedTick: number; readyTick: number; early: boolean; answer: Answer } | null = null;
+  private readonly latencyMs: number;
+  private readonly i: Side;
+  private readonly script: NonNullable<Adapter['scripted']>;
+  private readonly o: { track: Track; maxTokens?: number };
+  readonly cancellations: Replay['cancellations'];
+
+  /** `cancellations` collects its cancelled questions (the match's own list). */
+  constructor(i: Side, script: NonNullable<Adapter['scripted']>, o: { track: Track; maxTokens?: number }, cancellations: Replay['cancellations'] = []) {
+    this.i = i;
+    this.script = script;
+    this.o = o;
+    this.cancellations = cancellations;
+    this.latencyMs = Math.round(script.delayTicks * TICK_MS);
   }
-  if (!move) return null;
-  return { fighter: i, askedTick: s.tick, questionTick: seen.tick, appliedTick: s.tick, move, question, answer, fallback, latencyMs: answer.latencyMs, arrivedTick: s.tick };
+
+  /** Its move this frame (before the step), or null. */
+  take(s: GameState): Decision | null {
+    const p = this.pending;
+    const i = this.i;
+    if (!p || s.tick < p.readyTick || !isActionable(s, i)) return null;
+    this.pending = null;
+    let move: MoveId | null = p.answer.move;
+    let fallback: FallbackReason | null = null;
+    if (!legalMoves(s, i).includes(move)) {
+      fallback = 'illegal';
+      move = fallbackMove(s, i);
+    }
+    if (!move) return null;
+    return { fighter: i, askedTick: p.askedTick, questionTick: p.question.tick, appliedTick: s.tick, move, question: p.question, answer: p.answer, fallback, latencyMs: p.answer.latencyMs, arrivedTick: p.readyTick };
+  }
+
+  /** After each step (and once before the first): stale questions, new ones. `view` is what its fighter sees now. */
+  manage(s: GameState, events: GameEvent[], view: () => GameState): void {
+    const i = this.i;
+    const j = (1 - i) as Side;
+    const p = this.pending;
+    if (p) {
+      const ready = s.tick >= p.readyTick;
+      const gotHit = events.some((e) => (e.kind === 'hit' || e.kind === 'armor') && e.f === j);
+      const oppStarted = events.some((e) => e.kind === 'start' && e.f === j && THREATS.has(e.move));
+      const roundChanged = events.some((e) => e.kind === 'round_end');
+      const stale = !ready ? gotHit || (p.early && oppStarted) : gotHit || oppStarted;
+      if (roundChanged || (stale && !isActionable(s, i) && canRefresh(s, i, this.latencyMs))) {
+        this.cancellations.push({ fighter: i, askedTick: p.askedTick, cancelledTick: s.tick });
+        this.pending = null;
+      }
+    }
+    if (this.pending || (s.round.phase !== 'fight' && s.round.phase !== 'intro') || s.fighters[i].phase === 'ko') return;
+    if (isActionable(s, i)) this.ask(s, view(), false);
+    else {
+      const pred = predictActionable(view(), i, askAhead(this.latencyMs));
+      if (pred) this.ask(s, pred.state, true);
+    }
+  }
+
+  private ask(s: GameState, from: GameState, early: boolean): void {
+    const question = buildQuestion(from, this.i, { track: this.o.track, maxTokens: this.o.maxTokens });
+    if (!question.options.length) return;
+    const answer = { ...this.script.decide(question, from), latencyMs: this.latencyMs };
+    this.pending = { question, askedTick: s.tick, readyTick: s.tick + this.script.delayTicks, early, answer };
+  }
+}
+
+/** True when a question asked now would be answered (in `latencyMs`) before fighter `i` can act. */
+function canRefresh(s: GameState, i: Side, latencyMs: number): boolean {
+  const pred = predictActionable(s, i, ASK_AHEAD_MAX);
+  return pred !== null && pred.ticks * TICK_MS > latencyMs;
 }
 
 const legalHumanMove = (s: GameState, i: Side, w: { move: MoveId } | null): boolean => w !== null && legalMoves(s, i).includes(w.move);
@@ -124,11 +181,17 @@ export class Match {
   private freeSince: [number | null, number | null] = [null, null];
 
   readonly opts: MatchOptions;
+  /** Scripted players (Adapter.scripted), per side. */
+  private readonly scripted: [ScriptedPlayer | null, ScriptedPlayer | null];
 
   constructor(opts: MatchOptions) {
     this.opts = opts;
     this.state = newGame(opts.seed, opts.rules ?? DEFAULT_RULES);
     this.clock = opts.clock ?? realClock;
+    this.scripted = ([0, 1] as const).map((i) => {
+      const script = opts.adapters[i].scripted;
+      return script ? new ScriptedPlayer(i, script, { track: this.track, maxTokens: opts.maxTokens?.[i] }, this.cancellations) : null;
+    }) as [ScriptedPlayer | null, ScriptedPlayer | null];
   }
 
   get track(): Track {
@@ -194,9 +257,7 @@ export class Match {
 
   /** True when a question asked now would be answered before fighter `i` can act. */
   private canRefresh(i: Side): boolean {
-    const lat = this.latency[i] || 300;
-    const pred = predictActionable(this.state, i, ASK_AHEAD_MAX);
-    return pred !== null && pred.ticks * TICK_MS > lat;
+    return canRefresh(this.state, i, this.latency[i] || 300);
   }
 
   private cancel(i: Side): void {
@@ -211,8 +272,13 @@ export class Match {
   private manageQuestions(lastEvents: GameEvent[]): void {
     const s = this.state;
     for (const i of [0, 1] as const) {
-      // Humans are never asked: they press keys. Instant players are asked when they can act (takeInputs).
-      if (this.opts.adapters[i].human || this.opts.adapters[i].instant) continue;
+      // Humans are never asked: they press keys. Scripted players manage their own questions, frame by frame.
+      if (this.opts.adapters[i].human) continue;
+      const scripted = this.scripted[i];
+      if (scripted) {
+        scripted.manage(s, lastEvents, () => this.view(i));
+        continue;
+      }
       const j = (1 - i) as Side;
       const p = this.pending[i];
       // Paused mode asks only about the exact current state, so nothing goes stale.
@@ -260,9 +326,9 @@ export class Match {
         inputs[i] = this.takeHuman(i, human);
         continue;
       }
-      const instant = this.opts.adapters[i].instant;
-      if (instant) {
-        const d = instantDecision(s, i, () => this.view(i), instant, { track: this.track, maxTokens: this.opts.maxTokens?.[i] });
+      const scripted = this.scripted[i];
+      if (scripted) {
+        const d = scripted.take(s);
         if (!d) continue;
         inputs[i] = d.move;
         this.decisions.push(d);

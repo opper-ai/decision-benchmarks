@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jev Fighter: a benchmark for AI decision models | Opper AI</title>
-    <meta name="description" content="Every AI decision model Opper serves fights 102 matches of Jev Fighter, a stick-figure fighting game, picking every move. See which wins the most rounds, watch recorded matches, or fight one yourself." />
+    <meta name="description" content="Every AI decision model Opper serves fights 104 matches of Jev Fighter, a stick-figure fighting game, picking every move. See which wins the most rounds, watch recorded matches, or fight one yourself." />
     <link rel="canonical" href="%VITE_APP_URL%" />
     <link rel="icon" href="https://opper.ai/favicon.ico" sizes="48x48 96x96 192x192" />
     <link rel="icon" href="https://opper.ai/images/icon-dark.png" media="(prefers-color-scheme: light)" />
@@ -14,14 +14,14 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Opper AI" />
     <meta property="og:title" content="Jev Fighter: a benchmark for AI decision models | Opper AI" />
-    <meta property="og:description" content="Every AI decision model Opper serves fights 102 matches of Jev Fighter, a stick-figure fighting game, picking every move. See which wins the most rounds, watch recorded matches, or fight one yourself." />
+    <meta property="og:description" content="Every AI decision model Opper serves fights 104 matches of Jev Fighter, a stick-figure fighting game, picking every move. See which wins the most rounds, watch recorded matches, or fight one yourself." />
     <meta property="og:url" content="%VITE_APP_URL%" />
     <meta property="og:image" content="%VITE_APP_URL%poster.png" />
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="720" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Jev Fighter: a benchmark for AI decision models | Opper AI" />
-    <meta name="twitter:description" content="Every AI decision model Opper serves fights 102 matches of Jev Fighter, a stick-figure fighting game, picking every move. See which wins the most rounds, watch recorded matches, or fight one yourself." />
+    <meta name="twitter:description" content="Every AI decision model Opper serves fights 104 matches of Jev Fighter, a stick-figure fighting game, picking every move. See which wins the most rounds, watch recorded matches, or fight one yourself." />
     <meta name="twitter:image" content="%VITE_APP_URL%poster.png" />
     <!-- The theme before the first paint, as on opper.ai: the visitor's choice there (same origin), else the system's. -->
     <script>
@@ -95,7 +95,7 @@
 
       <section id="leaderboard" class="section" aria-labelledby="leaderboard-title">
         <div class="oc"><h2 id="leaderboard-title" class="font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Leaderboard</h2></div>
-        <p id="leaderboard-sub" class="sub">102 matches per model against three fixed-rule baselines: the share of rounds it wins.</p>
+        <p id="leaderboard-sub" class="sub">104 matches per model against four fixed-rule baselines: the share of rounds it wins.</p>
         <div class="tablecard"><div class="table-scroll"><table class="lbt" id="leaderboard-table"></table></div></div>
         <p class="foot">=1 means tied: those means are within each other's margin of error (two standard errors). The vs columns are the share of rounds won against each baseline. Late moves are the share of the model's moves the fallback made, because its answer took over 2 s (or was unusable), so its fighter blocked. Run by @opper-ai means we played the games through Opper. Self-reported models were benchmarked by whoever submitted them, named under Run by: CI replayed every game they sent in to check its score, and the timing (late moves, latency) and cost are as they reported. Baselines are simple scripts, shown for reference and never ranked.</p>
       </section>
@@ -112,7 +112,7 @@
           <li class="step">
             <span class="n">02</span>
             <h3>Run the benchmark</h3>
-            <p>One command plays the matches under the leaderboard's rules: the same fixed seeds, live in real time, on the raw track, against all three baselines from both sides.</p>
+            <p>One command plays the matches under the leaderboard's rules: the same fixed seeds, live in real time, on the raw track, against all four baselines from both sides.</p>
           </li>
           <li class="step">
             <span class="n">03</span>
@@ -131,10 +131,10 @@
         <dl class="spec">
           <div><dt>The fight</dt><dd>Two stick figures, best of 3 rounds of 60 seconds. A knockout wins a round, otherwise the fighter with more health when time runs out. Strikes beat throws, throws beat blocks, blocks beat strikes.</dd></div>
           <div><dt>Decisions</dt><dd>Every time its fighter is about to be free to act, the model gets the situation, seen as it was a moment ago (about human reaction time), and its legal moves in shuffled order, and picks one. A late, missing or unusable answer makes the fighter block: the game never plays well on a model's behalf.</dd></div>
-          <div><dt>Opponents</dt><dd>Three fixed-rule baselines, the strongest we have. Greedy takes the biggest swing if the opponent stands still or repeats itself, payoff picks the move with the best average, and maximin the safest one. They answer at once and work out each move's payoffs from the fight itself.</dd></div>
+          <div><dt>Opponents</dt><dd>Four fixed-rule baselines. Greedy takes the biggest swing if the opponent stands still or repeats itself, payoff picks the move with the best average, maximin the safest one, and random any offered move (from the match's seed). They think for 250 ms, as when you fight them here, and work out each move's payoffs from the fight itself.</dd></div>
           <div><dt>Live, raw</dt><dd>The fight runs in real time at its normal speed, as when you fight a model here, and never waits. The model is asked ahead, its answer plays as soon as it arrives and its fighter can act, and an answer that takes over 2 s is dropped: its fighter blocks. Each option is just the move's own description (damage, speed, reach), so the model has to work out what wins, in time.</dd></div>
-          <div><dt>Games</dt><dd>102 matches on fixed seeds: 17 fights, each against all three baselines and from both sides. Every match is recorded and replays exactly, so any result can be checked.</dd></div>
-          <div><dt>Score</dt><dd>The share of rounds the model wins, a drawn round counting half: the mean over its 102 matches, with a 95% margin of error (two standard errors). Models within each other's margin are tied.</dd></div>
+          <div><dt>Games</dt><dd>104 matches on fixed seeds: 13 fights, each against all four baselines and from both sides. Every match is recorded and replays exactly, so any result can be checked.</dd></div>
+          <div><dt>Score</dt><dd>The share of rounds the model wins, a drawn round counting half: the mean over its 104 matches, with a 95% margin of error (two standard errors). Models within each other's margin are tied.</dd></div>
         </dl>
       </section>
     </main>

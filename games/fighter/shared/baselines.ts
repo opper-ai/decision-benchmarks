@@ -23,6 +23,12 @@ export const BASELINE_INFO: Record<BaselineId, string> = {
   'baseline/maximin': 'Best worst case: the move whose worst outcome is least bad.',
 };
 
+/**
+ * How long a baseline thinks in a real-time match: about a fast classifier's answer. The page's baselines wait this
+ * long; the benchmark's answer this many milliseconds' worth of frames after they are asked (shared/gauntlet.ts).
+ */
+export const BASELINE_THINK_MS = 250;
+
 const sleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (!ms) return resolve();
@@ -76,7 +82,8 @@ function nearness(q: Question, view: GameState | undefined, id: MoveId): number 
 export function baselineAnswer(id: BaselineId, asked: Question, view?: GameState): { move: MoveId; probabilities: Partial<Record<MoveId, number>> } {
   // A baseline reads the payoff rows whatever the track: on the raw track it works out the assisted question (the same
   // options, with their payoffs) from the state, so it plays the same on both. It is an opponent, not the test.
-  const q = asked.track === 'raw' && view ? buildQuestion(view, asked.fighter, { track: 'assisted' }) : asked;
+  const reads = id !== 'baseline/random' && id !== 'baseline/guard';
+  const q = reads && asked.track === 'raw' && view ? buildQuestion(view, asked.fighter, { track: 'assisted' }) : asked;
   const ids = q.options.map((o) => o.id);
   if (id === 'baseline/random') {
     const [r] = rand(((view?.seed ?? 1) ^ Math.imul(q.tick + 7, 2246822519) ^ (q.fighter ? 0x51ed : 0)) >>> 0);

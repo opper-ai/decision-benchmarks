@@ -1,17 +1,17 @@
 // The benchmark: one game is one live match (real time, raw track) of the model under test against one baseline of the
-// gauntlet (greedy, payoff, maximin), from one side. The fight runs on the wall clock at its normal speed, as on the
-// page: the model is asked ahead, its answer plays when it arrives, and the fallback (block) plays for an answer that
-// misses the deadline. The baselines answer at once, on the tick their fighter can act. The score is the model's share
+// gauntlet (greedy, payoff, maximin, random), from one side. The fight runs on the wall clock at its normal speed, as
+// on the page: the model is asked ahead, its answer plays when it arrives, and the fallback (block) plays for an answer
+// that misses the deadline. The baselines think as on the page (250 ms), counted in frames so they replay exactly. The score is the model's share
 // of the rounds (a drawn round counts half), in percent. The bench plays it (game.ts) with shared/match.ts, the live
 // match driver; the submissions check replays it with `verifyGauntlet`, which recomputes every baseline move.
 import type { GameResult, Verdict } from '../../../packages/kit/shared/game.ts';
 import { mean } from '../../../packages/kit/shared/stats.ts';
 import type { Adapter } from './adapter.ts';
-import { baselineAnswer, baselineName, isBaseline, type BaselineId } from './baselines.ts';
+import { BASELINE_THINK_MS, baselineAnswer, baselineName, isBaseline, type BaselineId } from './baselines.ts';
 import { DEFAULT_RULES, ENGINE_VERSION, hashState, isActionable, legalMoves, newGame, step, type GameState, type Inputs, type RoundResult, type Rules, type Side } from './engine/engine.ts';
 import { isMoveId, type MoveId } from './engine/moves.ts';
 import { fallbackMove } from './fallback.ts';
-import { CHECKPOINT_EVERY, instantClock, instantDecision, Match, realClock, type Clock } from './match.ts';
+import { CHECKPOINT_EVERY, instantClock, Match, realClock, ScriptedPlayer, TICK_MS, type Clock } from './match.ts';
 import { modelInfo } from './models.ts';
 import type { Track } from './question.ts';
 import type { BenchInfo, Decision, FallbackReason, FighterMeta, Replay } from './replay.ts';
@@ -21,8 +21,8 @@ import { Perception } from './view.ts';
  * Bump when anything a score depends on changes: the engine (ENGINE_VERSION), the track, the mode, the deadline, the
  * gauntlet, the seeds or the question format. tests/bench-version.test.ts pins them.
  */
-export const BENCH_VERSION = 2;
-export const GAUNTLET = ['baseline/greedy', 'baseline/payoff', 'baseline/maximin'] as const;
+export const BENCH_VERSION = 3;
+export const GAUNTLET = ['baseline/greedy', 'baseline/payoff', 'baseline/maximin', 'baseline/random'] as const;
 export type GauntletId = (typeof GAUNTLET)[number];
 export const BENCH_MODE = 'realtime';
 export const BENCH_TRACK: Track = 'raw';
@@ -34,6 +34,8 @@ export const DEADLINE_MS = 2000;
 /** The engine version and rules the benchmark plays. */
 export const BENCH_ENGINE = ENGINE_VERSION;
 export const BENCH_RULES: Rules = DEFAULT_RULES;
+/** A baseline's thinking time in frames: the page's BASELINE_THINK_MS (15 frames at 60 per second). */
+export const BOT_DELAY_TICKS = Math.round(BASELINE_THINK_MS / TICK_MS);
 export const SIDE_COLORS = ['#E07B45', '#1FA3B3'] as const;
 
 export interface MatchSpec {
@@ -47,29 +49,34 @@ export interface MatchSpec {
 /** Fight k's engine seed, spread out so neighbouring fights start differently. */
 export const engineSeedFor = (k: number): number => (Math.imul(k + 1, 0x9e3779b1) ^ 0x5bd1e995) >>> 0;
 
+const N = GAUNTLET.length;
+
 /**
- * What bench seed `seed` plays: seed % 3 picks the baseline, floor(seed / 3) % 2 the side, floor(seed / 6) the fight.
- * Game i plays seed i, so 102 games are 17 fights x 3 baselines x 2 sides.
+ * What bench seed `seed` plays: seed % 4 picks the baseline, floor(seed / 4) % 2 the side, floor(seed / 8) the fight.
+ * Game i plays seed i, so 104 games are 13 fights x 4 baselines x 2 sides.
  */
 export function matchSpec(seed: number): MatchSpec {
   if (!Number.isSafeInteger(seed) || seed < 0) throw new Error('a bench seed is a whole number of at least 0');
-  return { opponent: GAUNTLET[seed % 3]!, side: (Math.floor(seed / 3) % 2) as Side, engineSeed: engineSeedFor(Math.floor(seed / 6)) };
+  return { opponent: GAUNTLET[seed % N]!, side: (Math.floor(seed / N) % 2) as Side, engineSeed: engineSeedFor(Math.floor(seed / (2 * N))) };
 }
 
 /** A benchmark recording: the replay, with what match it was. */
 export type GauntletRecording = Replay & { bench: BenchInfo };
 
-/** A baseline as the benchmark plays it: instant, deciding on the tick its fighter can act, about what it sees. */
+/**
+ * A baseline as the benchmark plays it: asked like a model (ahead, about what it will see), it answers BOT_DELAY_TICKS
+ * frames later, as the page's baselines do after BASELINE_THINK_MS. Counted in frames, so a replay recomputes it.
+ */
 export function benchBaseline(id: BaselineId): Adapter {
-  const instant = (q: Parameters<typeof baselineAnswer>[1], view: GameState) => ({ ...baselineAnswer(id, q, view), latencyMs: 0, costUsd: 0 });
+  const decide = (q: Parameters<typeof baselineAnswer>[1], view: GameState) => ({ ...baselineAnswer(id, q, view), latencyMs: BASELINE_THINK_MS, costUsd: 0 });
   return {
     id,
     kind: 'baseline',
     async warmUp() {},
     async decide(q, _signal, view) {
-      return instant(q, view!);
+      return decide(q, view!);
     },
-    instant,
+    scripted: { decide, delayTicks: BOT_DELAY_TICKS },
   };
 }
 
@@ -100,14 +107,14 @@ export function benchMatch(o: { seed: number; adapters: [Adapter, Adapter]; figh
 
 /**
  * Plays bench seed `seed`: `adapter` is the model under test (`model` is the id the recording names), on the wall
- * clock (`clock`, for tests). A baseline under test answers at once like the opponent, so its match needs no clock.
+ * clock (`clock`, for tests). A baseline under test is scripted like the opponent, so its match needs no clock.
  */
 export async function playGauntlet(o: { seed: number; model: string; adapter: Adapter; signal?: AbortSignal; clock?: Clock }): Promise<GauntletRecording> {
   const spec = matchSpec(o.seed);
   const adapters: Adapter[] = [];
   adapters[spec.side] = o.adapter;
   adapters[1 - spec.side] = benchBaseline(spec.opponent);
-  const instant = Boolean(o.adapter.instant);
+  const instant = Boolean(o.adapter.scripted);
   const match = benchMatch({ seed: spec.engineSeed, adapters: adapters as [Adapter, Adapter], fighters: fightersFor(spec, o.model), clock: instant ? instantClock : o.clock, paced: !instant });
   const stop = () => match.stop();
   if (o.signal?.aborted) throw new Error('the match was stopped');
@@ -255,7 +262,8 @@ function verify(rec: unknown, seed: number): Verdict<FighterResult> {
   // The match, tick by tick: the model's moves from the recording, the baseline's recomputed.
   const s = newGame(spec.engineSeed, BENCH_RULES);
   const perception = new Perception();
-  const bot = benchBaseline(spec.opponent).instant!;
+  const bot = new ScriptedPlayer(opp, benchBaseline(spec.opponent).scripted!, { track: BENCH_TRACK });
+  bot.manage(s, [], () => perception.view(s, opp));
   const ourTheirs: Decision[] = [];
   const checkpoints: Replay['checkpoints'] = [];
   let k = 0;
@@ -278,14 +286,15 @@ function verify(rec: unknown, seed: number): Verdict<FighterResult> {
     } else if (d && d.arrivedTick! <= s.tick && d.appliedTick > s.tick && isActionable(s, side)) {
       return fail(`decision ${k + 1}: its answer was in at tick ${d.arrivedTick} and the fighter could act at tick ${s.tick}, but it was applied at tick ${d.appliedTick}`);
     }
-    const ours = instantDecision(s, opp, () => perception.view(s, opp), bot, { track: BENCH_TRACK });
+    const ours = bot.take(s);
     if (ours) {
       inputs[opp] = ours.move;
       ourTheirs.push(ours);
     }
     perception.record(s, inputs);
-    step(s, inputs);
+    const events = step(s, inputs);
     if (s.tick % CHECKPOINT_EVERY === 0) checkpoints.push({ tick: s.tick, hash: hashState(s) });
+    bot.manage(s, events, () => perception.view(s, opp));
   }
   if (k !== mine.length) return fail(`the recording has ${mine.length - k} model decisions the match never applied (after it ended, or not in tick order)`);
   if (ourTheirs.length !== theirs.length || ourTheirs.some((d, n) => d.move !== theirs[n]!.move || d.appliedTick !== theirs[n]!.appliedTick)) return fail(`${spec.opponent} does not play what the recording says`);

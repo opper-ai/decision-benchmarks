@@ -21,11 +21,11 @@ export interface Adapter {
   /** A human player: no questions, the match reads this whenever the fighter is free to act. */
   human?: HumanInput;
   /**
-   * A player that answers at once (the benchmark's baselines): never asked ahead, the match asks it on the tick its
-   * fighter can act, about what it sees then, and plays the answer that same tick. Deterministic, so a recording's
-   * moves for it can be recomputed.
+   * A scripted player on a fixed thinking time (the benchmark's baselines): asked as a model is (ahead, by its
+   * latency, refreshed when stale), but its answer comes exactly `delayTicks` frames after it was asked, computed by
+   * `decide`, with no clock. Deterministic, so a recording's moves for it can be recomputed (ScriptedPlayer).
    */
-  instant?: (q: Question, view: GameState) => Answer;
+  scripted?: { decide: (q: Question, view: GameState) => Answer; delayTicks: number };
 }
 
 export interface HumanInput {

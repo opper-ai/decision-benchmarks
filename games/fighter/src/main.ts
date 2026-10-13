@@ -116,6 +116,7 @@ async function page(): Promise<void> {
       { label: 'vs greedy', key: 'vsGreedy', format: pct },
       { label: 'vs payoff', key: 'vsPayoff', format: pct },
       { label: 'vs maximin', key: 'vsMaximin', format: pct },
+      { label: 'vs random', key: 'vsRandom', format: pct },
     ],
   });
 

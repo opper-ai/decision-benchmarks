@@ -1,5 +1,6 @@
 import type { TransportHooks } from '../../../../packages/kit/client/transport.ts';
 import type { Adapter } from '../../shared/adapter.ts';
+import { BASELINE_THINK_MS } from '../../shared/baselines.ts';
 import { Match } from '../../shared/match.ts';
 import { DEFAULT_OPPONENT, MODELS, modelInfo } from '../../shared/models.ts';
 import type { Track } from '../../shared/question.ts';
@@ -194,7 +195,7 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
     track: s.track,
     deadlineMs: s.deadline,
     // Baselines run here in the browser; in real time they "think" like a fast classifier.
-    adapters: plans.map((p) => p.adapter(s.mode === 'realtime' ? 250 : 0)) as [Adapter, Adapter],
+    adapters: plans.map((p) => p.adapter(s.mode === 'realtime' ? BASELINE_THINK_MS : 0)) as [Adapter, Adapter],
     maxTokens: [modelInfo(s.left).contextTokens, modelInfo(s.right).contextTokens],
     fighters: meta,
   });

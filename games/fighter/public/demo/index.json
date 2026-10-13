@@ -3,17 +3,17 @@
     {
       "file": "luna-vs-jev.fight.json.gz",
       "title": "Luna vs Jev",
-      "note": "GPT-6 Luna Decisions vs Jev 1.13, both decision models, live on the benchmark's settings (real time, raw track, 2 s deadline). Luna wins, 2-1 in rounds, every round a knockout."
+      "note": "GPT-6 Luna Decisions vs Jev 1.13, both decision models, live on the benchmark's settings (real time, raw track, 2 s deadline). Luna wins, 2-0 in rounds, both by knockout."
     },
     {
       "file": "jev-vs-payoff.fight.json.gz",
       "title": "Jev vs Payoff baseline",
-      "note": "Jev 1.13 vs the payoff baseline, live. Payoff wins, 2-0 in rounds (one on time, one by knockout). A benchmark match (bench seed 1): Jev is the player under test."
+      "note": "Jev 1.13 vs the payoff baseline, live. Payoff wins, 2-0 in rounds, both by knockout. A benchmark match (bench seed 1): Jev is the player under test."
     },
     {
       "file": "jev-vs-maximin.fight.json.gz",
       "title": "Jev vs Maximin baseline",
-      "note": "Jev 1.13 vs the maximin baseline, live. Maximin wins, 2-0 in rounds (one on time, one by knockout). A benchmark match (bench seed 2): Jev is the player under test."
+      "note": "Jev 1.13 vs the maximin baseline, live. Maximin wins, 2-1 in rounds (Jev takes the first on time, then two knockouts). A benchmark match (bench seed 2): Jev is the player under test."
     },
     {
       "file": "jev-vs-greedy.fight.json.gz",

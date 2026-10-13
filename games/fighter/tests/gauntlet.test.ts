@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import game from '../game.ts';
-import { benchBaseline, benchMatch, DEADLINE_MS, engineSeedFor, fightersFor, GAUNTLET, matchSpec, roundShare, verifyGauntlet, type GauntletRecording } from '../shared/gauntlet.ts';
+import { BOT_DELAY_TICKS, benchBaseline, benchMatch, DEADLINE_MS, engineSeedFor, fightersFor, GAUNTLET, matchSpec, roundShare, verifyGauntlet, type GauntletRecording } from '../shared/gauntlet.ts';
 import { baselineAnswer } from '../shared/baselines.ts';
 import { isActionable } from '../shared/engine/engine.ts';
 import { instantClock } from '../shared/match.ts';
@@ -9,25 +9,40 @@ import { FakeClock } from './support/fake.ts';
 import { fakeModel, playGame } from './support/gauntlet.ts';
 
 describe('the gauntlet', () => {
-  it('cycles the baseline, then the side, then the fight, so 102 games are 17 fights against every baseline from both sides', () => {
-    expect([0, 1, 2, 3, 4, 5, 6].map((i) => matchSpec(game.rules.seedFor(i)))).toMatchObject([
+  it('cycles the baseline, then the side, then the fight, so 104 games are 13 fights against every baseline from both sides', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => matchSpec(game.rules.seedFor(i)))).toMatchObject([
       { opponent: 'baseline/greedy', side: 0 },
       { opponent: 'baseline/payoff', side: 0 },
       { opponent: 'baseline/maximin', side: 0 },
+      { opponent: 'baseline/random', side: 0 },
       { opponent: 'baseline/greedy', side: 1 },
       { opponent: 'baseline/payoff', side: 1 },
       { opponent: 'baseline/maximin', side: 1 },
+      { opponent: 'baseline/random', side: 1 },
       { opponent: 'baseline/greedy', side: 0, engineSeed: engineSeedFor(1) },
     ]);
     const specs = Array.from({ length: game.rules.officialGames }, (_, i) => matchSpec(game.rules.seedFor(i)));
     const fights = new Set(specs.map((s) => s.engineSeed));
-    expect(fights.size).toBe(17);
+    expect(fights.size).toBe(13);
     for (const f of fights) {
       expect(specs.filter((s) => s.engineSeed === f).map((s) => `${s.opponent}@${s.side}`).sort()).toEqual(GAUNTLET.flatMap((o) => [`${o}@0`, `${o}@1`]).sort());
     }
-    expect(game.rules.minGames % 6).toBe(0);
+    expect(game.rules.minGames % 8).toBe(0);
     expect(() => matchSpec(-1)).toThrow();
     expect(() => matchSpec(1.5)).toThrow();
+  });
+
+  it('lets the baselines think for 250 ms, as on the page, counted in frames', () => {
+    expect(BOT_DELAY_TICKS).toBe(15);
+    const spec = matchSpec(0);
+    const match = benchMatch({ seed: spec.engineSeed, adapters: [benchBaseline('baseline/greedy'), benchBaseline('baseline/random')], fighters: fightersFor({ ...spec, opponent: 'baseline/random' }, 'baseline/greedy'), clock: instantClock, paced: false });
+    for (let t = 0; t < 1200 && !match.over; t++) match.tickOnce();
+    expect(match.decisions.length).toBeGreaterThan(10);
+    for (const d of match.decisions) {
+      expect(d.latencyMs).toBe(250);
+      expect(d.arrivedTick).toBe(d.askedTick + BOT_DELAY_TICKS);
+      expect(d.appliedTick).toBeGreaterThanOrEqual(d.arrivedTick!);
+    }
   });
 
   it('scores the share of rounds won, a drawn round counting half, in percent', () => {
