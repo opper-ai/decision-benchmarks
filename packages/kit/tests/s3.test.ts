@@ -76,12 +76,12 @@ describe('credentialsFromEnv', () => {
 
 describe('s3Store', () => {
   const creds = async () => EXAMPLE;
-  const store = (fetch: typeof globalThis.fetch) => s3Store({ bucket: 'opper-jevman-benchmark-highscores-eu-north', key: 'highscores.json', region: 'eu-north-1', credentials: creds, fetch });
+  const store = (fetch: typeof globalThis.fetch) => s3Store({ bucket: 'example-highscores-bucket', key: 'highscores.json', region: 'eu-north-1', credentials: creds, fetch });
 
   it('reads the object with its version, and a missing one as no boards yet', async () => {
     const fetch = vi.fn(async (url: string) => (url.endsWith('/highscores.json') ? new Response('{"mixed":[]}', { headers: { etag: '"abc"' } }) : new Response('', { status: 500 })));
     expect(await store(fetch as never).load()).toEqual({ text: '{"mixed":[]}', version: '"abc"' });
-    expect(fetch.mock.calls[0]![0]).toBe('https://opper-jevman-benchmark-highscores-eu-north.s3.eu-north-1.amazonaws.com/highscores.json');
+    expect(fetch.mock.calls[0]![0]).toBe('https://example-highscores-bucket.s3.eu-north-1.amazonaws.com/highscores.json');
     expect(await store((async () => new Response('<Error><Code>NoSuchKey</Code></Error>', { status: 404 })) as never).load()).toBeNull();
   });
 
@@ -97,7 +97,7 @@ describe('s3Store', () => {
     expect(await store(fetch as never).save('{"mixed":[]}', '"abc"')).toBe('"new"');
     const [url, init] = fetch.mock.calls[0]! as unknown as [string, RequestInit & { headers: Record<string, string> }];
     expect(init.headers['if-match']).toBe('"abc"');
-    expect(url).toBe('https://opper-jevman-benchmark-highscores-eu-north.s3.eu-north-1.amazonaws.com/highscores.json');
+    expect(url).toBe('https://example-highscores-bucket.s3.eu-north-1.amazonaws.com/highscores.json');
     expect(init.method).toBe('PUT');
     expect(init.body).toBe('{"mixed":[]}');
     expect(init.headers['content-type']).toBe('application/json');

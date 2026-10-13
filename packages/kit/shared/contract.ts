@@ -1,6 +1,6 @@
 /**
- * The files every game serves below https://opper.ai/decision-benchmarks/<slug>/ for the hub (opper-website), as
- * agreed in docs/design.md: game.json, leaderboard.json, community.json, /api/highscores and poster.png. The hub only
+ * The files every game serves below https://opper.ai/decision-benchmarks/<slug>/ for the hub on opper.ai, as
+ * described in docs/design.md: game.json, leaderboard.json, community.json, /api/highscores and poster.png. The hub only
  * reads these and renders them as text, so their shape is the whole contract. `npm run check-contract` validates
  * every game's files with the functions below, and CI runs it.
  */

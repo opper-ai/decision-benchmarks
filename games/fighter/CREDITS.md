@@ -13,8 +13,6 @@ keyboard controls, and the fight, replay, stats, timeline and pose views, with c
 
 ## What changed in the port
 
-Recorded in [docs/specs/2026-10-12-port-to-kit.md](docs/specs/2026-10-12-port-to-kit.md):
-
 - **The benchmark** is the kit's `GameDefinition` (`game.ts`): paused, assisted, against the greedy, payoff and maximin
   baselines from both sides on fixed seeds, scored by round-win share. A synchronous stepper (`shared/gauntlet.ts`) plays
   a match for the bench and replays it for the submissions check, which recomputes every baseline move.

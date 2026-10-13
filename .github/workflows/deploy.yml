@@ -1,9 +1,8 @@
 name: Deploy
 
 # A push to main of opper-ai/decision-benchmarks: the whole CI (ci.yml) first, then the image goes to ECR and the
-# decision-benchmarks ECS service rolls to it, as opper-ai/jevman-benchmark does. Auth is OIDC into the deploy role
-# (Terraform: opper-ai/terraform environments/eu-north/decision-benchmarks.tf), so there are no long-lived AWS keys.
-# Its ARN is the AWS_DEPLOY_ROLE_ARN repository secret.
+# decision-benchmarks ECS service rolls to it. Auth is OIDC into the deploy role (part of the infrastructure, managed in
+# Opper's Terraform), so there are no long-lived AWS keys. Its ARN is the AWS_DEPLOY_ROLE_ARN repository secret.
 
 on:
   push:
@@ -104,8 +103,8 @@ jobs:
           image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
       # The action only registers the task definition and updates the service. Its built-in stability waiter is
-      # off (media-studio saw it spin silently for 30 minutes on an already-stable service); the next step polls
-      # rolloutState instead, bounded and with progress.
+      # off (it can wait silently for a long time with no progress output); the next step polls rolloutState
+      # instead, bounded and with progress.
       - name: Deploy to ECS
         id: deploy
         uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de # v2.6.3
