@@ -3,7 +3,8 @@ import { createServer, request, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createApp, type App, type MountedGame } from '../server/app';
+import { createHash } from 'node:crypto';
+import { createApp, htmlCsp, inlineScriptHashes, SVG_CSP, type App, type MountedGame } from '../server/app';
 import { Pool, VisitorLimits } from '../server/pool';
 import { coinServer } from './support/test-game';
 
@@ -93,6 +94,35 @@ describe('production server', () => {
     const demo = await fetch(`${url}/coin/demo/jev-demo.json`);
     expect(demo.headers.get('content-type')).toBe('application/json; charset=utf-8');
     expect(await demo.json()).toEqual({ version: 1 });
+  });
+
+  it("sends a page a Content-Security-Policy that allows its own inline scripts by hash, and an SVG one that runs nothing", async () => {
+    const url = await start();
+    const theme = 'document.documentElement.dataset.t = "1";';
+    writeFileSync(join(dist, 'coin', 'index.html'), `<!doctype html><script>${theme}</script><script type="module" src="/x.js"></script><title>coin game</title>`);
+    writeFileSync(join(dist, 'coin', 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const page = await fetch(`${url}/coin/`);
+    const csp = page.headers.get('content-security-policy')!;
+    const hash = `'sha256-${createHash('sha256').update(theme).digest('base64')}'`;
+    expect(csp).toContain(`script-src 'self' ${hash};`);
+    for (const d of ["object-src 'none'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'", "worker-src 'self' blob:"]) expect(csp).toContain(d);
+    expect(csp).not.toMatch(/script-src[^;]*unsafe/); // scripts never get unsafe-inline
+    expect(Number(page.headers.get('content-length'))).toBe((await page.arrayBuffer()).byteLength);
+    // An edited page gets the hashes of what it now holds.
+    writeFileSync(join(dist, 'coin', 'index.html'), '<!doctype html><script>other()</script><title>coin game, longer</title>');
+    expect((await fetch(`${url}/coin/`)).headers.get('content-security-policy')).not.toContain(hash);
+    const svg = await fetch(`${url}/coin/logo.svg`);
+    expect(svg.headers.get('content-type')).toBe('image/svg+xml');
+    expect(svg.headers.get('content-security-policy')).toBe(SVG_CSP);
+    expect(SVG_CSP).toMatch(/^sandbox; default-src 'none'/);
+    const json = await fetch(`${url}/coin/leaderboard.json`);
+    expect(json.headers.get('content-security-policy')).toBeNull();
+  });
+
+  it('hashes inline scripts only, once each', () => {
+    const html = '<script>a()</script><SCRIPT type="text/javascript">a()</SCRIPT><script src="/b.js"></script><script async src=/c.js>ignored</script><script>\n b()\n</script>';
+    expect(inlineScriptHashes(html)).toHaveLength(2);
+    expect(htmlCsp('<p>no scripts</p>')).toContain("script-src 'self';");
   });
 
   it('serves the leaderboard page at a clean URL, and its results', async () => {

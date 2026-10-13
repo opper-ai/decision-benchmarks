@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { extname, join, resolve, sep } from 'node:path';
@@ -57,6 +58,48 @@ const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
 };
+
+/**
+ * An SVG opened on its own (not as an <img>) runs no script and loads nothing: a game's SVG is only ever a picture.
+ * The inline styles keep it drawing as it should.
+ */
+export const SVG_CSP = "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:";
+
+/** The SHA-256 sources of a page's inline scripts (`<script>` without src), for its script-src. */
+export function inlineScriptHashes(html: string): string[] {
+  const hashes = new Set<string>();
+  for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
+    if (/\bsrc\s*=/i.test(m[1]!)) continue;
+    hashes.add(`'sha256-${createHash('sha256').update(m[2]!, 'utf8').digest('base64')}'`);
+  }
+  return [...hashes];
+}
+
+/**
+ * The Content-Security-Policy for one of the games' pages. Scripts: the page's own files, Plausible's script and the
+ * page's two inline scripts (the theme and Plausible's queue), by hash, so a script injected into the page doesn't run.
+ * Styles: the page's files, plus inline styles (the opper.ai header and footer copies carry style attributes, and the
+ * games set some). Images: the page's own, data and blob URLs, and opper.ai's (the icons, the backgrounds and the
+ * footer's compliance badges). Data (the game's JSON, sounds, /api/*, Plausible's events): this origin only. Video
+ * export (fighter) runs mediabunny's workers from blob URLs and previews the clip from one. Sign-in leaves the page by
+ * navigation (<base>/auth/login, then Opper), which CSP does not limit.
+ */
+export function htmlCsp(html: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' ${inlineScriptHashes(html).join(' ')}`.trimEnd(),
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://opper.ai",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "media-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
 
 /** After SIGTERM: keep serving this long so the load balancer stops sending traffic, then wait for open requests. */
 export const SHUTDOWN_DRAIN_MS = 5000;
@@ -124,14 +167,30 @@ export function createApp(opts: AppOptions): App {
     const info = await stat(file).catch(() => null);
     if (!info?.isFile()) return notFound(res);
     const hashed = path.startsWith('/assets/');
+    const ext = extname(file);
+    // A page is read whole (a few tens of KB) for the hashes of its inline scripts, once per version of the file.
+    const page = ext === '.html' ? await readPage(file, info) : null;
     res.writeHead(200, {
-      'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream',
-      'Content-Length': info.size,
+      'Content-Type': TYPES[ext] ?? 'application/octet-stream',
+      'Content-Length': page ? page.body.length : info.size,
       'Cache-Control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache',
       ...SECURITY_HEADERS,
+      ...(page ? { 'Content-Security-Policy': page.csp } : ext === '.svg' ? { 'Content-Security-Policy': SVG_CSP } : {}),
     });
     if (req.method === 'HEAD') return void res.end();
+    if (page) return void res.end(page.body);
     createReadStream(file).pipe(res);
+  }
+
+  const pages = new Map<string, { version: string; body: Buffer; csp: string }>();
+  async function readPage(file: string, info: { mtimeMs: number; size: number }): Promise<{ body: Buffer; csp: string }> {
+    const version = `${info.mtimeMs}:${info.size}`;
+    const known = pages.get(file);
+    if (known?.version === version) return known;
+    const body = await readFile(file);
+    const page = { version, body, csp: htmlCsp(body.toString('utf8')) };
+    pages.set(file, page);
+    return page;
   }
 
   function notFound(res: http.ServerResponse): void {
