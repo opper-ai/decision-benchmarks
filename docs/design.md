@@ -127,9 +127,9 @@ below). The games ported onto the kit:
 
 ## License
 
-jevman's code is AGPL-3.0-or-later (authors: Johnny Chadda, Felix Wunderlich, Jose Sabater). Its authors agreed to
-relicense the harness extracted from it as MIT (2026-10-13), so the root LICENSE (the kit, the service, the scripts) is
-MIT. `games/jevman` keeps jevman's AGPL LICENSE, as its own repository; `games/fighter` and `games/snake` are MIT.
+jevman's code is AGPL-3.0-or-later (authors: Johnny Chadda, Felix Wunderlich, Jose Sabater). The root LICENSE and the
+kit stay AGPL until all three agree to MIT; then the kit is relicensed in one commit. `games/fighter` keeps its MIT
+LICENSE; `games/snake` is MIT.
 
 ## Implementation notes (phase 1, the kit and Pac-Man on it)
 
