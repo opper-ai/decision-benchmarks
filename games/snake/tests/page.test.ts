@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { validateLeaderboard } from '../../../packages/kit/shared/contract';
 import { leaderboardRows } from '../../../packages/kit/client/leaderboard';
 import { demoFrom, RECORDINGS } from '../src/recordings';
+import { DECISION_MODELS } from '../../../packages/kit/shared/models';
+import { BENCH_VERSION } from '../shared/recording';
 
 const pub = (f: string) => JSON.parse(readFileSync(new URL(`../public/${f}`, import.meta.url), 'utf8'));
 const entry = (model: string, mean: number, stdError: number, extra: Record<string, unknown> = {}) => ({ model, name: model, games: 100, metric: { mean, stdError, best: mean * 2 }, meanLatencyMs: 300, fallbackRate: 0.01, costPerGame: 0.01, via: 'systemone', ...extra });
@@ -27,10 +29,17 @@ describe("the page's leaderboard", () => {
 });
 
 describe('the committed files', () => {
-  it('has an official leaderboard with no entries until the official run, and baselines in the same shape, kept out of it', () => {
+  it('has an official leaderboard of decision models only (100 games each, a skipped model unranked), and baselines in the same shape, kept out of it', () => {
     const lb = pub('leaderboard.json');
     expect(validateLeaderboard(lb, 'snake')).toEqual([]);
-    expect(lb.entries).toEqual([]);
+    expect(lb.benchVersion).toBe(BENCH_VERSION);
+    const listed = new Set<string>(DECISION_MODELS.map((m) => m.id));
+    expect(lb.entries.length).toBeGreaterThan(0);
+    for (const e of lb.entries as { model: string; games: number }[]) {
+      expect(listed.has(e.model), e.model).toBe(true);
+      expect(e.games).toBe(100);
+    }
+    for (const s of lb.skipped as { model: string }[]) expect(lb.entries.some((e: { model: string }) => e.model === s.model)).toBe(false);
     const bl = pub('baselines.json');
     expect(validateLeaderboard(bl, 'snake')).toEqual([]);
     expect(bl.entries.map((e: { model: string; games: number }) => [e.model, e.games])).toEqual([['baseline/flood', 100], ['baseline/greedy', 100], ['baseline/random', 100]]);
