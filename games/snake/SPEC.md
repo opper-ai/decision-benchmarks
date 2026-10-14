@@ -29,7 +29,7 @@ absolute direction (`up`, `right`, `down`, `left`), without the reverse: always 
   is how the service's request check reads it back.
 - Instructions explain the rules once, with the board's legend, and say "Pick the direction the head moves next (it
   cannot reverse)." No relative wording (turn left, keep heading, ahead) anywhere.
-- Option criteria state facts, never the answer, jevman style: `Go up: Next cell: empty. Distance to the apple after
+- Option criteria state facts, never the answer, JevMan style: `Go up: Next cell: empty. Distance to the apple after
   the move: 5. Cells reachable from there: 40 (the snake is 4 long after the move).` A deadly move says plainly that it
   ends the game: `Go left: Next cell: the wall. The game ends.` No option is labelled "safe" or "best".
 - The options' order is shuffled every step, deterministically from what the request shows (the step, the head and
@@ -70,9 +70,9 @@ claimed result. Fingerprint = hash of seed + choices. Official seeds: `seedFor(i
 
 A replay proves the moves and the score, not the timing: whether a step was answered in time is as the bench
 recorded it. For our official runs we run the bench; for a submission CI can't prove the timing, which is why
-submissions are labelled self-reported (as on jevman).
+submissions are labelled self-reported (as on JevMan).
 
-## Page (games/snake/index.html, jevman-style: dark, arcade, Opper chrome from the kit)
+## Page (games/snake/index.html, JevMan-style: dark, arcade, Opper chrome from the kit)
 
 - Hero: the board playing the top model's recorded game (Watch = recordings only), model chips to switch recordings.
 - Play: you (arrow keys / swipe) on the left board, a model of your choice on the right board, same seed; both start
@@ -114,14 +114,14 @@ a baseline as a model.
   still bill it), so the bench counts it at the mean cost of that game's answered calls. The fingerprint is the SHA-256 of the seed and the
   moves.
 - **Seeds and sizes.** `seedFor(i)` is `Math.imul(i + 1, 0x9e3779b1) >>> 1` (golden-ratio steps, 31 bits). A
-  submission needs at least 24 games (100 to match ours), as on jevman.
+  submission needs at least 24 games (100 to match ours), as on JevMan.
 - **Baselines.** The kit gained `GameDefinition.baselines`: the bench plays `--model baseline/<name>` without a key
   and refuses to put a baseline on the official leaderboard or in a submission. `public/baselines.json` is written
   with `npm run bench -- --game snake --models baseline/random,baseline/greedy,baseline/flood --leaderboard --out
   games/snake/public/baselines.json`. The random baseline draws from a hash of the board, so it replays too.
 - **Request check.** The service reads the board back from the request's state, rebuilds the request with our own
   wording, and refuses any body that differs from it in any way (fields, questions, text, key).
-- **Page.** The page follows opper.ai's theme (light or dark, as jevman does); the arcade cabinets are black in both.
+- **Page.** The page follows opper.ai's theme (light or dark, as JevMan does); the arcade cabinets are black in both.
   Watch has a chip for every ranked model, in leaderboard order, the top one playing first; each plays that
   model's official game whose apples are closest to its mean (on a tie, the lowest seed), gzipped as the bench wrote
   it (public/demo/<model>.json.gz, listed in src/recordings.ts). A model the leaderboard skips gets no chip. Before

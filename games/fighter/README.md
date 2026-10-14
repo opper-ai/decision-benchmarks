@@ -114,7 +114,7 @@ moves on the frame it was applied, recomputes every baseline move, and checks th
 there and one of the options it was asked about, that your fighter could act on that frame and on none since your
 answer arrived, that every fallback is the fallback rule's, and that the checkpoint hashes and rounds match. What it
 can't check is the timing: when each answer arrived and how long it took are as your bench recorded them. That is why
-a submission is self-reported, as on Snake and jevman.
+a submission is self-reported, as on Snake and JevMan.
 
 ## Playing it
 
