@@ -84,7 +84,7 @@ export interface PickerOptions {
 
 /**
  * "Fight an AI", over the stage as jevman's "Who plays the ghosts?" is in its cabinet: pick a decision model, then fight
- * it in real time on the keyboard. Only models: the baselines are for the leaderboard and Watch. Paused mode, your side,
+ * it in real time on the keyboard. Only models: you fight a decision model, never a script. Paused mode, your side,
  * the track and the deadline wait, closed, under Advanced. When no model can play for this visitor the models still
  * show, and the button asks them to sign in, or a line says why not.
  */

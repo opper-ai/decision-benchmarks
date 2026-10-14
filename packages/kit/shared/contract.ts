@@ -25,6 +25,11 @@ export interface GameInfo {
   author: { github: string; originalRepo?: string };
   license: string;
   metric: Metric;
+  /**
+   * false: a game to play against the models, not a benchmark. The hub lists it but never ranks it, whatever results
+   * files it serves. Absent: a benchmark.
+   */
+  benchmark?: false;
   /** Set at build time from the newest results file (ISO date). */
   updatedAt: string;
 }
@@ -109,6 +114,7 @@ export function validateGameInfo(v: unknown, slug?: string): string[] {
   else if (v.author.originalRepo !== undefined && !(typeof v.author.originalRepo === 'string' && /^https:\/\/\S+$/.test(v.author.originalRepo))) out.push('author.originalRepo must be an https URL');
   if (!text(v.license, 40)) out.push('license must be text');
   out.push(...metricProblems(v.metric, 'metric'));
+  if (v.benchmark !== undefined && v.benchmark !== false) out.push('benchmark must be false, or left out for a benchmark');
   if (!isoDate(v.updatedAt)) out.push('updatedAt must be a date');
   return out;
 }

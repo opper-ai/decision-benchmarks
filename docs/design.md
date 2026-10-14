@@ -99,7 +99,7 @@ The hub at `opper.ai/decision-benchmarks` lists the games and only reads these f
 
 | File | Shape |
 |---|---|
-| `game.json` | `{ slug, name, tagline, category: 'Arcade'\|'Puzzle'\|'Fighting'\|'Strategy', author: { github, originalRepo? }, license, metric: { name, unit, higherIsBetter }, updatedAt }`. Our own games have `author.github: "opper-ai"` and no `originalRepo`. `updatedAt` is set at build time from the newest results: the official run, or a newer accepted submission. |
+| `game.json` | `{ slug, name, tagline, category: 'Arcade'\|'Puzzle'\|'Fighting'\|'Strategy', author: { github, originalRepo? }, license, metric: { name, unit, higherIsBetter }, benchmark?: false, updatedAt }`. Our own games have `author.github: "opper-ai"` and no `originalRepo`. `benchmark: false` marks a game to play against the models rather than a benchmark (Jev Fighter): the hub lists it but never ranks it. `updatedAt` is set at build time from the newest results: the official run, or a newer accepted submission. |
 | `leaderboard.json` | `{ generatedAt, game, benchVersion, metric, entries: Entry[], skipped: { model, reason }[] }`. `Entry = { model, name, games, metric: { mean, stdError, best }, meanLatencyMs: number\|null, fallbackRate, costPerGame: number\|null, via: 'systemone'\|'chat-adapter', extra? }`, best first. |
 | `community.json` | the same, with entries that add `by, url?, selfReported: true`. Not committed: built from `submissions/` at build time. |
 | `api/highscores` | `{ order: string[], boards: { <board>: [{ initials, score, at }] } }`; 404 for a game without high scores. |

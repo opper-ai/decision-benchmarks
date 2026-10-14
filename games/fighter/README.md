@@ -1,9 +1,14 @@
 # Jev Fighter
 
-Stick figures fight; decision models pick every move. A 2D fighting game built as a benchmark: a deterministic engine,
-exact replays, and one question per decision whose options are the fighter's legal moves. Served at
-[opper.ai/decision-benchmarks/fighter](https://opper.ai/decision-benchmarks/fighter/): fight the models yourself, watch
-recorded matches, and see how every decision model Opper serves ranks.
+Stick figures fight; decision models pick every move. A 2D fighting game with a deterministic engine, exact replays,
+and one question per decision whose options are the fighter's legal moves. Served at
+[opper.ai/decision-benchmarks/fighter](https://opper.ai/decision-benchmarks/fighter/): fight a decision model yourself
+(are you better than it?), or watch two models fight.
+
+**Not a benchmark on the page.** The score below (rounds won against four fixed-rule bots) didn't generalize: a
+model's rank here said little about how it decides elsewhere. So the page shows no leaderboard, its `game.json` says
+`"benchmark": false` (the hub on opper.ai lists the game but never ranks it), and Watch plays only decision models
+against each other. The bench and the submissions check below still run, for whoever wants the numbers.
 
 Ported from [Jose-Sabater/jev-fighter](https://github.com/Jose-Sabater/jev-fighter) (MIT) onto this repository's kit:
 see [CREDITS.md](CREDITS.md).

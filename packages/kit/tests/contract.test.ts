@@ -23,6 +23,8 @@ describe('the hub contract', () => {
   it('accepts well formed files', () => {
     expect(validateGameInfo(info, 'snake')).toEqual([]);
     expect(validateGameInfo({ ...info, author: { github: 'johnny', originalRepo: 'https://github.com/johnny/game' } })).toEqual([]);
+    // A game to play, not a benchmark: the hub lists it, never ranks it.
+    expect(validateGameInfo({ ...info, benchmark: false })).toEqual([]);
     expect(validateLeaderboard(board, 'snake')).toEqual([]);
     expect(validateCommunity(community, 'snake')).toEqual([]);
     expect(validateHighScores({ order: ['all'], boards: { all: [{ initials: 'ABC', score: 3, at: '2026-10-12T00:00:00.000Z' }] } })).toEqual([]);
@@ -35,6 +37,7 @@ describe('the hub contract', () => {
     expect(validateGameInfo({ ...info, author: { github: 'opper-ai', originalRepo: 'javascript:alert(1)' } })).toEqual([expect.stringMatching(/originalRepo/)]);
     expect(validateGameInfo({ ...info, metric: { name: 'x' } }).length).toBe(2);
     expect(validateGameInfo({ ...info, updatedAt: 'yesterday' })).toEqual([expect.stringMatching(/updatedAt/)]);
+    expect(validateGameInfo({ ...info, benchmark: true })).toEqual([expect.stringMatching(/benchmark/)]);
     expect(validateGameInfo(null)).toEqual(['game.json must be an object']);
   });
 

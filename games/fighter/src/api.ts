@@ -1,7 +1,7 @@
 // What the page reads and calls, all on the game's own path: the account (/api/me), model answers through the kit's
 // transport (/api/decide and /api/warm: the free credits, your Opper sign-in, or a local key, never a key in the
-// browser) and the recorded matches for Watch (demo/). The kit's leaderboard module reads the result files. Matches
-// played here are never uploaded: the player can download theirs.
+// browser) and the recorded matches for Watch (demo/). Matches played here are never uploaded: the player can download
+// theirs.
 import { fetchMe, type Me } from '../../../packages/kit/client/auth.ts';
 import { appPath } from '../../../packages/kit/client/paths.ts';
 import { createHttpTransport, warmUp, type TransportHooks } from '../../../packages/kit/client/transport.ts';
