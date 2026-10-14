@@ -23,7 +23,7 @@ export function transportAdapter(model: string, transport: Transport, o: Transpo
     warmUp: o.warmUp ?? (async () => {}),
     async decide(q: Question, signal: AbortSignal): Promise<Answer> {
       const started = now();
-      // The match aborts a question it no longer wants (late, or stale): the call is cancelled, not left running.
+      // The match aborts a question it no longer wants (late, or a new round): the call is cancelled, not left running.
       const res = await transport(toSystemOne(q, model), { signal });
       const offered = q.options.map((o) => o.id);
       const parsed = parseChoice(res.answers[QUESTION_NAME], offered);

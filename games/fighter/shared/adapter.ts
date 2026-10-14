@@ -22,7 +22,7 @@ export interface Adapter {
   human?: HumanInput;
   /**
    * A scripted player on a fixed thinking time (the benchmark's baselines): asked as a model is (ahead, by its
-   * latency, refreshed when stale), but its answer comes exactly `delayTicks` frames after it was asked, computed by
+   * latency, one question at a time), but its answer comes exactly `delayTicks` frames after it was asked, computed by
    * `decide`, with no clock. Deterministic, so a recording's moves for it can be recomputed (ScriptedPlayer).
    */
   scripted?: { decide: (q: Question, view: GameState) => Answer; delayTicks: number };

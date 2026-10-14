@@ -30,8 +30,6 @@ export const ASK_AHEAD_MAX = 120;
 /** Ticks ahead to ask a model whose answers take `latencyMs`, so they land about when it can act. */
 export const askAhead = (latencyMs: number) => Math.max(ASK_AHEAD_TICKS, Math.min(ASK_AHEAD_MAX, Math.ceil(latencyMs / TICK_MS) + 8));
 export const CHECKPOINT_EVERY = 600;
-/** Opponent moves that make an early question stale. */
-const THREATS = new Set<MoveId>(['jab', 'straight', 'low_kick', 'high_kick', 'uppercut', 'sweep', 'throw', 'jump_kick', 'special', 'jab_straight', 'low_kick_sweep', 'jump', 'backdash']);
 
 export interface Clock {
   now(): number;
@@ -79,8 +77,8 @@ interface Pending {
 /**
  * A scripted player (Adapter.scripted) in a real-time match, frame by frame and with no clock: asked when its fighter
  * can act, or ahead by its thinking time (as a model is), its answer arrives `delayTicks` frames after the question
- * and plays on the first frame its fighter can act from then; a question goes stale and is asked again on the same
- * rules as a model's. The live match and the benchmark's verifier (shared/gauntlet.ts) both play it with this class,
+ * and plays on the first frame its fighter can act from then (the fallback's move if it is no longer legal), kept
+ * whatever happens meanwhile, on the same rules as a model's. The live match and the benchmark's verifier (shared/gauntlet.ts) both play it with this class,
  * so its moves can be recomputed from a recording.
  */
 export class ScriptedPlayer {
@@ -116,21 +114,14 @@ export class ScriptedPlayer {
     return { fighter: i, askedTick: p.askedTick, questionTick: p.question.tick, appliedTick: s.tick, move, question: p.question, answer: p.answer, fallback, latencyMs: p.answer.latencyMs, arrivedTick: p.readyTick };
   }
 
-  /** After each step (and once before the first): stale questions, new ones. `view` is what its fighter sees now. */
+  /** After each step (and once before the first): a new round drops the question in flight; then a new one if none. `view` is what its fighter sees now. */
   manage(s: GameState, events: GameEvent[], view: () => GameState): void {
     const i = this.i;
-    const j = (1 - i) as Side;
     const p = this.pending;
-    if (p) {
-      const ready = s.tick >= p.readyTick;
-      const gotHit = events.some((e) => (e.kind === 'hit' || e.kind === 'armor') && e.f === j);
-      const oppStarted = events.some((e) => e.kind === 'start' && e.f === j && THREATS.has(e.move));
-      const roundChanged = events.some((e) => e.kind === 'round_end');
-      const stale = !ready ? gotHit || (p.early && oppStarted) : gotHit || oppStarted;
-      if (roundChanged || (stale && !isActionable(s, i) && canRefresh(s, i, this.latencyMs))) {
-        this.cancellations.push({ fighter: i, askedTick: p.askedTick, cancelledTick: s.tick });
-        this.pending = null;
-      }
+    // An answer on its way is kept whatever happens meanwhile (as a model's is); only a new round drops it.
+    if (p && events.some((e) => e.kind === 'round_end')) {
+      this.cancellations.push({ fighter: i, askedTick: p.askedTick, cancelledTick: s.tick });
+      this.pending = null;
     }
     if (this.pending || (s.round.phase !== 'fight' && s.round.phase !== 'intro') || s.fighters[i].phase === 'ko') return;
     if (isActionable(s, i)) this.ask(s, view(), false);
@@ -146,12 +137,6 @@ export class ScriptedPlayer {
     const answer = { ...this.script.decide(question, from), latencyMs: this.latencyMs };
     this.pending = { question, askedTick: s.tick, readyTick: s.tick + this.script.delayTicks, early, answer };
   }
-}
-
-/** True when a question asked now would be answered (in `latencyMs`) before fighter `i` can act. */
-function canRefresh(s: GameState, i: Side, latencyMs: number): boolean {
-  const pred = predictActionable(s, i, ASK_AHEAD_MAX);
-  return pred !== null && pred.ticks * TICK_MS > latencyMs;
 }
 
 const legalHumanMove = (s: GameState, i: Side, w: { move: MoveId } | null): boolean => w !== null && legalMoves(s, i).includes(w.move);
@@ -255,11 +240,6 @@ export class Match {
     );
   }
 
-  /** True when a question asked now would be answered before fighter `i` can act. */
-  private canRefresh(i: Side): boolean {
-    return canRefresh(this.state, i, this.latency[i] || 300);
-  }
-
   private cancel(i: Side): void {
     const p = this.pending[i];
     if (!p) return;
@@ -279,19 +259,15 @@ export class Match {
         scripted.manage(s, lastEvents, () => this.view(i));
         continue;
       }
-      const j = (1 - i) as Side;
       const p = this.pending[i];
       // Paused mode asks only about the exact current state, so nothing goes stale.
       if (p && this.opts.mode === 'paused') {
         if (lastEvents.some((e) => e.kind === 'round_end')) this.cancel(i);
       } else if (p) {
-        const gotHit = lastEvents.some((e) => (e.kind === 'hit' || e.kind === 'armor') && e.f === j);
-        const oppStarted = lastEvents.some((e) => e.kind === 'start' && e.f === j && THREATS.has(e.move));
-        const roundChanged = lastEvents.some((e) => e.kind === 'round_end');
-        // Refresh a stale question only if a new answer can arrive before the fighter can act;
-        // a slow model otherwise acts on what it already decided (the cost of thinking slowly).
-        const stale = !p.settled ? gotHit || (p.early && oppStarted) : gotHit || oppStarted;
-        if (roundChanged || (stale && !isActionable(s, i) && this.canRefresh(i))) {
+        // Real time: one question in flight, and an answer on its way is never dropped because the fight moved on
+        // (a hit, an attack starting): it plays on the first frame the fighter can act once it is in, if still legal
+        // (else the fallback). Only a new round, or the deadline, ends it.
+        if (lastEvents.some((e) => e.kind === 'round_end')) {
           this.cancel(i);
         } else if (!p.settled && this.clock.now() - p.askedAt > this.opts.deadlineMs) {
           p.controller.abort();

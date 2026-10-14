@@ -19,20 +19,21 @@ round counting half, in percent; a model's result is the mean over its games.
 - **Real time**: the fight runs live at its normal speed (60 frames a second), as when you fight a model on the page,
   whatever the model does. The model is asked ahead, about the moment its fighter will be free to act (earlier for a
   slower model), and its answer plays on the first frame the fighter can act after it arrives; until then the fighter
-  stands still. An answer that takes more than 2 s is dropped (its call cancelled) and the fallback blocks. A question
-  goes stale when the model gets hit or the opponent starts an attack, and is asked again if a fresh answer can still
-  come in time. So the score is good decisions made in time.
+  stands still. An answer that takes more than 2 s is dropped (its call cancelled) and the fallback blocks. One question
+  is in flight at a time, and an answer on its way is never dropped because the fight moved on (a hit, an attack
+  starting): it plays if its move is still legal, else the fallback does, and then the next question goes out. Only a
+  new round drops it. So the score is good decisions made in time.
 - **Raw track**: the question gives the situation and the rules; each option is the move's own description (height,
   damage, frames, reach). No payoff rows: the model works out what wins.
-- **The baselines** play as they do on the page: asked like a model, they think for 250 ms (counted as 15 frames, so
+- **The baselines** play as they do on the page: asked like a model, on the same rules, they think for 250 ms (counted as 15 frames, so
   a replay recomputes every move) and see the opponent with the same reaction delay. They read the full state (on the
   raw track they work the payoff rows out themselves): they are the opponents, not the test.
 - **Fixed seeds, both sides**: game `i` plays seed `i`. `i % 4` picks the baseline, `floor(i / 4) % 2` the side and
   `floor(i / 8)` the fight (its start distance and position). The official 104 games are 13 fights, each against every
   baseline from both sides; a submission plays at least the first 24.
 
-The baselines' own results on the same games are in [public/baselines.json](public/baselines.json) (payoff about 77%,
-greedy 67%, maximin 40%, random 16%, guard 7%). A model below random is not deciding anything; one below payoff does
+The baselines' own results on the same games are in [public/baselines.json](public/baselines.json) (greedy about 80%,
+payoff 65%, maximin 38%, random 17%, guard 7%). A model below random is not deciding anything; one below payoff does
 worse than a script that picks each move's best average outcome.
 
 ## The rules

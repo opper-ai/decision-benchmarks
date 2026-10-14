@@ -35,7 +35,7 @@ describe('the bench version', () => {
   it('names the benchmark that results were played on', () => {
     // If this fails, the benchmark changed and old results are no longer comparable: bump BENCH_VERSION in
     // shared/gauntlet.ts (older submissions then drop off until re-run) and pin the new hash here.
-    expect({ version: BENCH_VERSION, hash: benchmarkHash() }).toEqual({ version: 3, hash: '57d04a39' });
+    expect({ version: BENCH_VERSION, hash: benchmarkHash() }).toEqual({ version: 4, hash: '57d04a39' });
     expect(game.benchVersion).toBe(BENCH_VERSION);
   });
 });

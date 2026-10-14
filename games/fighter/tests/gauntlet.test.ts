@@ -159,6 +159,17 @@ describe('a recorded benchmark match', async () => {
     expect(verifyGauntlet(early, seed)).toMatchObject({ ok: false, error: expect.stringMatching(/timeout before/) });
   });
 
+  it('keeps a question in flight whatever happens, and refuses one dropped before a new round', () => {
+    // The live match only drops a question when a round ends; the verifier holds a recording to that.
+    const ends = new Set(recording.result.rounds.map((x) => x.tick));
+    expect(recording.cancellations.length).toBeLessThanOrEqual(2 * recording.result.rounds.length);
+    const dropped = copy();
+    const d = mine(dropped).find((x) => x.appliedTick > 200)!;
+    dropped.cancellations.push({ fighter: 0, askedTick: d.askedTick, cancelledTick: d.askedTick + 1 });
+    expect(ends.has(d.askedTick + 1)).toBe(false);
+    expect(verifyGauntlet(dropped, seed)).toMatchObject({ ok: false, error: expect.stringMatching(/only a new round drops one/) });
+  });
+
   it('refuses a changed result, checkpoint or length', () => {
     const result = copy();
     result.result.rounds[0]!.winner = result.result.rounds[0]!.winner === 0 ? 1 : 0;

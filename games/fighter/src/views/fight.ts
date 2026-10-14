@@ -250,7 +250,7 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
         if (!b?.thinking && (!b || performance.now() - b.since > 500)) stage.renderer.bubbles[i] = { thinking: true, since: p.askedAt, top: [] };
         else if (b?.thinking && b.since !== p.askedAt) b.since = p.askedAt;
       } else if (b?.thinking) {
-        // The question was cancelled (the fighter got hit) or answered.
+        // The question was answered, or dropped (a new round).
         stage.renderer.bubbles[i] = null;
       }
     }

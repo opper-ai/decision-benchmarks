@@ -21,7 +21,7 @@ import { Perception } from './view.ts';
  * Bump when anything a score depends on changes: the engine (ENGINE_VERSION), the track, the mode, the deadline, the
  * gauntlet, the seeds or the question format. tests/bench-version.test.ts pins them.
  */
-export const BENCH_VERSION = 3;
+export const BENCH_VERSION = 4;
 export const GAUNTLET = ['baseline/greedy', 'baseline/payoff', 'baseline/maximin', 'baseline/random'] as const;
 export type GauntletId = (typeof GAUNTLET)[number];
 export const BENCH_MODE = 'realtime';
@@ -266,6 +266,8 @@ function verify(rec: unknown, seed: number): Verdict<FighterResult> {
   bot.manage(s, [], () => perception.view(s, opp));
   const ourTheirs: Decision[] = [];
   const checkpoints: Replay['checkpoints'] = [];
+  // Ticks right after a round ended: the only moments a question in flight may be dropped.
+  const roundEnds = new Set<number>();
   let k = 0;
   while (s.round.phase !== 'over') {
     if (s.tick > r.ticks! + 1) return fail(`the match lasts longer than the recording's ${r.ticks} ticks`);
@@ -293,9 +295,13 @@ function verify(rec: unknown, seed: number): Verdict<FighterResult> {
     }
     perception.record(s, inputs);
     const events = step(s, inputs);
+    if (events.some((e) => e.kind === 'round_end')) roundEnds.add(s.tick);
     if (s.tick % CHECKPOINT_EVERY === 0) checkpoints.push({ tick: s.tick, hash: hashState(s) });
     bot.manage(s, events, () => perception.view(s, opp));
   }
+  if (!Array.isArray(r.cancellations)) return fail('a recording lists its cancelled questions (cancellations)');
+  const dropped = (r.cancellations as unknown[]).find((c) => !isObj(c) || (c.fighter === side && !roundEnds.has(c.cancelledTick as number)));
+  if (dropped) return fail(`a question of the model's was dropped at tick ${String(isObj(dropped) ? dropped.cancelledTick : '?')}: only a new round drops one`);
   if (k !== mine.length) return fail(`the recording has ${mine.length - k} model decisions the match never applied (after it ended, or not in tick order)`);
   if (ourTheirs.length !== theirs.length || ourTheirs.some((d, n) => d.move !== theirs[n]!.move || d.appliedTick !== theirs[n]!.appliedTick)) return fail(`${spec.opponent} does not play what the recording says`);
   if (!checkpoints.length || checkpoints[checkpoints.length - 1]!.tick !== s.tick) checkpoints.push({ tick: s.tick, hash: hashState(s) });
