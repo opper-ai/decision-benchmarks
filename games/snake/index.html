@@ -102,12 +102,17 @@
             </button>
             <div id="save-menu" class="save-menu" hidden></div>
           </div>
+          <!-- The cabinet's bottom strip, as on jevman: Play while watching, New game while your game is paused. -->
+          <div class="arcade-bottom">
+            <button id="play-cta" class="play-cta" type="button"><span class="tri" aria-hidden="true"></span><span id="play-label">Play</span></button>
+          </div>
+          <!-- Phones, while you play: a strip to swipe on, so the thumb needn't cover the board (the whole cabinet takes
+               swipes). The lit arrow faces your last swipe. -->
+          <div class="swipe-pad" id="swipe-pad" hidden>
+            <span class="swipe-compass" aria-hidden="true"><i data-dir="up"></i><i data-dir="left"></i><span class="head"></span><i data-dir="right"></i><i data-dir="down"></i></span>
+            <span class="swipe-label">Swipe here to steer</span>
+          </div>
         </div>
-        <div class="arcade-bottom">
-          <button id="play-cta" class="play-cta" type="button"><span class="tri" aria-hidden="true"></span><span id="play-label">Play</span></button>
-        </div>
-        <!-- Phones: a strip to swipe on, so the thumb needn't cover the board. -->
-        <div class="swipe-pad" id="swipe-pad" hidden><span class="swipe-label">Swipe here to steer</span></div>
         <p id="notice" class="notice-line" role="status" hidden></p>
         <div class="watch" id="watch">
           <span class="watch-label">Watch</span>

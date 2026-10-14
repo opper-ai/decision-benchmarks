@@ -183,6 +183,7 @@ function openScores(): void {
   closeSave();
   board.classList.add('dim');
   tv.classList.add('scores-open');
+  setCta();
   renderScores();
   overlay.querySelector<HTMLElement>('.x')?.focus({ preventScroll: true });
   // Fresh scores: someone may have entered theirs since the page opened.
@@ -243,6 +244,7 @@ function closeScores(): void {
   overlay.replaceChildren();
   board.classList.remove('dim');
   tv.classList.remove('scores-open');
+  setCta();
   syncSave();
 }
 const hiCell = $('.arcade-top .mid');
@@ -263,6 +265,7 @@ const waiting = () => paused || scoresOpen;
 function setPaused(p: boolean): void {
   paused = p;
   tv.classList.toggle('paused', p);
+  setCta();
 }
 /** A step's wait, and on through a pause. False once another loop took over the board. */
 async function waitFor(mine: number, ms: number): Promise<boolean> {
@@ -409,8 +412,8 @@ function renderChips(): void {
       if (logo) b.append(logo);
       b.append(e.name);
       b.addEventListener('click', () => {
-        // Your game runs: the chips wait until it ends (Stop ends it).
-        if (live || (mode === 'watch' && e.model === watching.model)) return;
+        // Mid-game too: a chip ends your game and plays its recording.
+        if (mode === 'watch' && e.model === watching.model) return;
         watching = e;
         void watch();
       });
@@ -421,9 +424,13 @@ function renderChips(): void {
   syncSave();
 }
 
+/**
+ * The button in the cabinet's bottom strip, as jevman's: Play while watching; New game while your game is paused; else
+ * out of the way (your game, its game-over card, the high scores have their own).
+ */
 function setCta(): void {
-  playCta.classList.toggle('stop', live);
-  playLabel.textContent = live ? 'Stop' : 'Play';
+  playCta.hidden = scoresOpen || (mode === 'play' && !(live && paused));
+  playLabel.textContent = live ? 'New game' : 'Play';
 }
 
 async function watch(): Promise<void> {
@@ -472,6 +479,7 @@ let queued: Heading[] = [];
 const steer = (h: Heading) => {
   if (!live || waiting()) return;
   if (queued.length < 2) queued.push(h);
+  swipePad.dataset.dir = h;
 };
 /** Your next step: the oldest keyed direction that isn't a U-turn, else straight on. */
 function yourMove(s: GameState): Move {
@@ -498,13 +506,13 @@ async function play(): Promise<void> {
   palette = PLAYER;
   setCta();
   queued = [];
+  delete swipePad.dataset.dir;
   renderChips();
   plateLabel.textContent = 'You';
   showHighScore();
   track('play_start', { game: 'snake' });
   show(null);
   banner('Get ready');
-  notice(touchScreen ? 'Swipe to steer. A tap on the board pauses.' : 'Arrow keys or WASD to steer. P or a click on the board pauses.', 0);
   const issued = await fetchSeed();
   if (mine !== run) return;
   const seed = issued?.seed ?? Math.floor(Math.random() * 2 ** 31);
@@ -631,7 +639,7 @@ function showResult(you: { state: GameState; moves: string }, token: string | nu
 }
 
 tag(playCta, 'click_play', { source: 'board' });
-playCta.addEventListener('click', () => void (live ? watch() : play()));
+playCta.addEventListener('click', () => void play());
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
@@ -650,23 +658,37 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault();
   steer(h);
 });
-/** Swipes on the board or the strip under it, while you play. */
-for (const area of [board, swipePad]) {
-  let start: { x: number; y: number } | null = null;
-  area.addEventListener('pointerdown', (e) => {
-    start = live ? { x: e.clientX, y: e.clientY } : null;
+/**
+ * Phones, as on jevman: swipe anywhere on the cabinet (the board, the strips above and below it, the pad) while you
+ * play, steering as soon as the finger has moved far enough, like a joystick. Never on a card over the board, which
+ * must still scroll.
+ */
+let touchStart: { x: number; y: number } | null = null;
+tv.addEventListener(
+  'touchstart',
+  (e) => {
     swiped = false;
-  });
-  area.addEventListener('pointermove', (e) => {
-    if (!start) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    if (Math.hypot(dx, dy) < 24) return;
+    if (!live || (e.target instanceof Element && e.target.closest('#overlay'))) return void (touchStart = null);
+    const t = e.touches[0]!;
+    touchStart = { x: t.clientX, y: t.clientY };
+  },
+  { passive: true },
+);
+tv.addEventListener(
+  'touchmove',
+  (e) => {
+    if (!touchStart) return;
+    const t = e.touches[0]!;
+    const dx = t.clientX - touchStart.x;
+    const dy = t.clientY - touchStart.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
     swiped = true;
     steer(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
-    start = { x: e.clientX, y: e.clientY };
-  });
-  for (const end of ['pointerup', 'pointercancel', 'pointerleave'] as const) area.addEventListener(end, () => (start = null));
-}
+    touchStart = { x: t.clientX, y: t.clientY }; // a second swipe in the same touch turns again
+    e.preventDefault(); // no page scroll while steering
+  },
+  { passive: false },
+);
+tv.addEventListener('touchend', () => (touchStart = null), { passive: true });
 
 void watch();

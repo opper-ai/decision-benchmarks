@@ -15,8 +15,8 @@
   box-shadow: inset 0 0 0 3px #000, inset 0 0 0 5px var(--j-maze), 0 22px 46px -26px rgba(0, 0, 0, 0.7);
 }
 .tv { width: min(440px, 100%); }
-/* Your game: the board takes swipes, not scrolls. */
-.tv.you .board { touch-action: none; user-select: none; -webkit-user-select: none; }
+/* Your game: the whole cabinet takes swipes, not scrolls (as jevman's card). */
+.tv.you { touch-action: none; user-select: none; -webkit-user-select: none; }
 /* The cabinet's top strip: who plays over the apples, the players' high score in the middle, the steps on the right. */
 .arcade-top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 12px; padding: 2px 4px 0; }
 .arcade-top .cell { display: grid; gap: 2px; min-width: 0; }
@@ -49,14 +49,27 @@
   .overlay:not([hidden]) { position: fixed; z-index: 70; display: flex; flex-direction: column; padding: 16px; background: rgba(0, 0, 0, 0.88); overscroll-behavior: contain; }
   .overlay > .card { margin: auto; width: 100%; max-width: 400px; flex: none; }
 }
-.arcade-bottom { display: flex; justify-content: center; min-height: 44px; }
+/* The cabinet's bottom strip: Play (or New game while paused) in the middle, as jevman's. */
+.arcade-bottom { display: flex; justify-content: center; align-items: center; min-height: 44px; padding: 0 4px; }
 /* Play, in the arcade's own look: yellow on black. */
 .play-cta { display: inline-flex; align-items: center; gap: 10px; border: 2px solid var(--j-arc-yellow); border-radius: 4px; background: #000; color: var(--j-arc-yellow); padding: 13px 18px; font: 11px/1 var(--j-pixel); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; box-shadow: 0 8px 22px -12px rgba(0, 0, 0, 0.7); transition: background 120ms, color 120ms; }
 .play-cta:hover { background: var(--j-arc-yellow); color: #000; }
 /* The triangle drawn, not typed: the pixel font has no ▶. */
 .play-cta .tri, .arc .press .tri { flex: none; width: 0; height: 0; font-size: 0; border-left: 8px solid currentColor; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
-.play-cta.stop .tri { border: 0; width: 9px; height: 9px; background: currentColor; }
-.swipe-pad { display: flex; align-items: center; justify-content: center; width: min(440px, 100%); height: 88px; border: 2px solid var(--j-maze); border-radius: 6px; background: #000; touch-action: none; user-select: none; -webkit-user-select: none; }
+/* Phones, while you play: a strip in the cabinet to swipe on, as jevman's (the whole cabinet takes swipes, but on the
+   board the thumb covers the snake). A snake's head between four arrows; the lit arrow faces your last swipe. */
+.swipe-pad { display: flex; align-items: center; justify-content: center; gap: 16px; height: 96px; border: 2px solid var(--j-maze); border-radius: 4px; background: #000; }
+.swipe-compass { display: grid; grid-template-columns: repeat(3, 16px); grid-template-rows: repeat(3, 16px); place-items: center; }
+.swipe-compass i { width: 0; height: 0; border: 6px solid transparent; transition: border-color 120ms; }
+.swipe-compass [data-dir='up'] { grid-column: 2; grid-row: 1; border-top-width: 0; border-bottom-color: var(--j-maze); }
+.swipe-compass [data-dir='left'] { grid-column: 1; grid-row: 2; border-left-width: 0; border-right-color: var(--j-maze); }
+.swipe-compass [data-dir='right'] { grid-column: 3; grid-row: 2; border-right-width: 0; border-left-color: var(--j-maze); }
+.swipe-compass [data-dir='down'] { grid-column: 2; grid-row: 3; border-bottom-width: 0; border-top-color: var(--j-maze); }
+.swipe-compass .head { grid-column: 2; grid-row: 2; width: 12px; height: 12px; border-radius: 2px; background: #86efac; box-shadow: inset 0 0 0 2px #22c55e; }
+.swipe-pad[data-dir='up'] [data-dir='up'] { border-bottom-color: var(--j-arc-yellow); }
+.swipe-pad[data-dir='left'] [data-dir='left'] { border-right-color: var(--j-arc-yellow); }
+.swipe-pad[data-dir='right'] [data-dir='right'] { border-left-color: var(--j-arc-yellow); }
+.swipe-pad[data-dir='down'] [data-dir='down'] { border-top-color: var(--j-arc-yellow); }
 .swipe-label { color: #fff; font: 10px/1.8 var(--j-pixel); text-transform: uppercase; }
 /* Save: the watched game's highlight, in the board's corner (shown on hover, always on touch screens); its menu in the arcade's look. */
 .save-btn {
