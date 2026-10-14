@@ -13,6 +13,7 @@ import { clipName, exportClip, exportSupported } from '../export.ts';
 import { OUTCOME_COLORS } from '../theme.ts';
 import { fullscreenButton } from './fullscreen.ts';
 import { activityDrawer } from './panel.ts';
+import { clipLink, videoButton, type Clip } from './save.ts';
 import { floorLabel, ICONS, menuTool, stageShell, toolButton } from './shell.ts';
 
 export interface ReplayOptions {
@@ -23,6 +24,8 @@ export interface ReplayOptions {
   cta?: HTMLElement;
   /** What the floor says is on: a recording, or the match the visitor just played. */
   kind?: 'replay' | 'yours';
+  /** A recorded match's highlight, made ahead (public/clips), to save as a video or a GIF. */
+  clip?: Clip | null;
 }
 
 /**
@@ -66,7 +69,20 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
     return b;
   });
   const speedMenu = menuTool(speedBtn, h('div', { 'aria-label': 'Speed' }, ...speedOpts));
-  const clipTool = toolButton('Save a clip', ICONS.clip);
+  // Save: the highlight as a video or a GIF (made ahead for a recorded match; for the match just played, its video is
+  // made here), or a clip of your own choosing (the export panel under the stage).
+  const saveBtn = toolButton('Save a video or a GIF', ICONS.download);
+  const customClip = h('button.tmenu-opt', { type: 'button', role: 'menuitem' }, h('span.tmenu-icon', { html: ICONS.scissors }), h('span', null, 'Custom clip…'));
+  const saveMenu = menuTool(
+    saveBtn,
+    h(
+      'div',
+      { 'aria-label': 'Save' },
+      h('p.tmenu-title', null, opts.clip ? 'Its best 18 seconds' : 'Your match'),
+      ...(opts.clip ? [clipLink(opts.clip, 'mp4', 'floor'), clipLink(opts.clip, 'gif', 'floor')] : [videoButton(r, 'floor')]),
+      customClip,
+    ),
+  );
   const timeEl = h('span.time');
   const timeline = new Timeline(r, player.events, (t) => seek(t));
 
@@ -234,21 +250,21 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
   const { box, tools } = stageShell(stageHost, floorLabel(opts.kind === 'yours' ? 'Your match' : 'Replay', r.fighters), opts.cta ?? null);
   const fs = fullscreenButton(box);
   fs.el.className = 'tbtn';
-  tools.append(playTool, thoughtsTool, speedMenu.el, soundTool(), clipTool, fs.el);
+  tools.append(playTool, thoughtsTool, speedMenu.el, soundTool(), saveMenu.el, fs.el);
 
   // Export: the clip settings open under the stage.
   const exportPanel = h('div.export', { hidden: true });
-  clipTool.addEventListener('click', () => {
+  const toggleExport = () => {
     // The export settings sit under the stage, out of sight in fullscreen.
     fs.exit();
     exportPanel.hidden = !exportPanel.hidden;
-    clipTool.setAttribute('aria-expanded', String(!exportPanel.hidden));
     if (!exportPanel.hidden) {
       setPlaying(false);
       fillExport();
       exportPanel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
-  });
+  };
+  customClip.addEventListener('click', toggleExport);
   function fillExport(): void {
     if (!exportSupported()) {
       exportPanel.replaceChildren(h('p.fnote', null, 'This browser cannot encode video. Use a recent Chrome, Edge or Safari.'));
@@ -320,7 +336,7 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
       }
     });
     exportPanel.replaceChildren(
-      h('div.export-head', null, h('p.kicker', null, 'Save a clip'), h('button.linkish', { type: 'button', onclick: () => clipTool.click() }, 'Close')),
+      h('div.export-head', null, h('p.kicker', null, 'Save a clip'), h('button.linkish', { type: 'button', onclick: () => toggleExport() }, 'Close')),
       h('div.export-row', null, h('label', null, 'Range', range), h('label', null, 'Size', size), h('label', null, 'Frame rate', fps)),
       h('div.export-row', null, h('label.check', null, sfx, ' Sound effects'), h('label.check', null, mus, ' Music'), h('label.check', null, bub, ' Thought bubbles')),
       h('div.export-row', null, go, h('span.fnote', null, 'Rendered frame by frame in your browser, usually faster than real time.')),
@@ -368,7 +384,8 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
     ...['hit', 'traded', 'punished', 'blocked', 'whiffed', 'defended'].map((o) => h('span', null, h('span.sq', { style: { background: OUTCOME_COLORS[o] } }), o === 'punished' ? 'got hit' : o)),
     h('span', null, h('span.sq.ko'), 'KO'),
   );
-  const saveRecording = h('button.fbtn', { type: 'button', title: 'The whole match as a gzipped JSON recording', onclick: () => void downloadReplay(r) }, h('span.ico', { html: ICONS.download }), 'Recording', h('span.ext', null, '.fight.json.gz'));
+  // The match as data (it replays exactly, so anyone can check the result): for developers, so the quietest.
+  const rawRecording = h('button.linkish.raw', { type: 'button', title: 'The whole match as a gzipped JSON recording: it replays exactly', onclick: () => void downloadReplay(r) }, 'Raw recording (.fight.json.gz)');
   let copyLink: HTMLElement | null = null;
   if (opts.link) {
     const href = new URL(opts.link, location.href).href;
@@ -401,7 +418,7 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
       'div.drawer-cols',
       null,
       mainEl,
-      h('aside.drawer-side', null, h('div.side-block', null, h('p.kicker', null, 'What the colors mean'), legend), h('div.side-block', null, h('p.kicker', null, 'Save and share'), h('div.save-btns', null, saveRecording, copyLink))),
+      h('aside.drawer-side', null, h('div.side-block', null, h('p.kicker', null, 'What the colors mean'), legend), h('div.side-block', null, h('p.kicker', null, 'Save and share'), h('div.save-btns', null, ...(opts.clip ? [clipLink(opts.clip, 'mp4', 'activity', 'pill'), clipLink(opts.clip, 'gif', 'activity', 'pill')] : [videoButton(r, 'activity', 'pill')]), copyLink, rawRecording))),
     ),
   );
 
@@ -427,6 +444,7 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
     audio.hold(false);
     fs.destroy();
     speedMenu.destroy();
+    saveMenu.destroy();
     window.removeEventListener('keydown', onKey);
     host.removeEventListener('pointerdown', onPointer);
     stage.destroy();
