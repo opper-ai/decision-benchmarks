@@ -50,6 +50,11 @@ the dev server (see `.env.example`).
 
 Benchmark your own model, or suggest a game: [CONTRIBUTING.md](CONTRIBUTING.md).
 
+Building your own game or bot on decision models? What we learned making these games (when a decision model is the
+right tool, how to write the question, timing and fallbacks, testing every model, measuring fairly) is an agent skill:
+[`guides/decision-models`](https://github.com/opper-ai/opper-skills/tree/main/guides/decision-models) in
+opper-ai/opper-skills (`npx skills add opper-ai/opper-skills/guides/decision-models`).
+
 ## License
 
 AGPL-3.0-or-later (see [LICENSE](LICENSE)), as JevMan. Each game folder has its own license: `games/snake` and
