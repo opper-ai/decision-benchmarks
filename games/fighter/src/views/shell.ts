@@ -54,12 +54,14 @@ export function menuTool(btn: HTMLButtonElement, menu: HTMLElement): { el: HTMLE
  * The stage as both views show it (a recording, a live fight), after jevman's cabinet: the paper stage, and on its floor
  * (the band under the ground line) who is on at the left, the page's one primary button in the middle and the tools at
  * the right. The tools show while the pointer is over the stage or it is paused, and always on a touch screen. On a
- * phone the floor is too short for them: the tools and the button move under the stage. `box` is what goes fullscreen.
+ * phone the floor is too short for them: the tools and the button move under the stage. `box` is what goes fullscreen;
+ * `frame` holds the stage and its floor, for what covers both (a match's result).
  */
-export function stageShell(fstage: HTMLElement, label: Node | null, cta: HTMLElement | null): { box: HTMLElement; tools: HTMLElement } {
+export function stageShell(fstage: HTMLElement, label: Node | null, cta: HTMLElement | null): { box: HTMLElement; frame: HTMLElement; tools: HTMLElement } {
   const tools = h('div.tools', { role: 'toolbar', 'aria-label': 'Playback' });
-  const box = h('div.stage-box', null, h('div.stage-frame', null, fstage, h('div.floor-ui', null, h('div.floor-label', null, label), h('div.floor-cta', null, cta), tools)));
-  return { box, tools };
+  const frame = h('div.stage-frame', null, fstage, h('div.floor-ui', null, h('div.floor-label', null, label), h('div.floor-cta', null, cta), tools));
+  const box = h('div.stage-box', null, frame);
+  return { box, frame, tools };
 }
 
 /** "● REPLAY  Luna vs Jev": what the floor says is on. */

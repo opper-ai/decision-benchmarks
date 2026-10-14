@@ -13,8 +13,9 @@ let made: HTMLElement | null = null;
  */
 export function soundTool(): HTMLElement {
   if (made) return made;
+  // Each a row with a small switch at its end, so on and off read at a glance.
   const option = (key: 'sound' | 'music', label: string, icon: string) => {
-    const b = h('button.tmenu-opt', { type: 'button', role: 'menuitemcheckbox', 'aria-checked': String(audio.settings[key]) }, h('span.tmenu-icon', { html: icon }), h('span', null, label));
+    const b = h('button.tmenu-opt', { type: 'button', role: 'menuitemcheckbox', 'aria-checked': String(audio.settings[key]) }, h('span.tmenu-icon', { html: icon }), h('span', null, label), h('span.tmenu-switch', { 'aria-hidden': 'true' }));
     b.addEventListener('click', () => audio.set({ [key]: !audio.settings[key] }));
     audio.onChange(() => b.setAttribute('aria-checked', String(audio.settings[key])));
     return b;

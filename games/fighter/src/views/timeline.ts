@@ -1,7 +1,7 @@
 import type { GameEvent } from '../../shared/engine/engine.ts';
 import type { Decision, Replay } from '../../shared/replay.ts';
 
-import { NAVY, OUTCOME_COLORS as OUTCOME_COLOR } from '../theme.ts';
+import { OUTCOME_COLORS as OUTCOME_COLOR } from '../theme.ts';
 
 /**
  * The scrubber: a decision marker per fighter row coloured by outcome, round and KO marks, and a playhead.
@@ -51,22 +51,27 @@ export class Timeline {
     }
     const c = this.ctx;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Activity is in the page's theme (only the stage is paper in both): the card behind is the canvas's CSS background,
+    // and the ink (the rounds' bands, the quiet moves, the playhead) its CSS color.
     c.clearRect(0, 0, W, H);
+    const ink = getComputedStyle(this.el).color;
     const X = (t: number) => (t / Math.max(1, this.r.ticks)) * W;
-    c.fillStyle = '#ffffff';
-    c.fillRect(0, 0, W, H);
     const rowH = (H - 10) / 2;
     const rows = [4, 6 + rowH];
     // Rounds.
-    c.fillStyle = 'rgba(27,46,64,0.04)';
+    c.fillStyle = ink;
+    c.globalAlpha = 0.05;
     this.r.result.rounds.forEach((rd, k) => k % 2 === 0 && c.fillRect(X(k ? this.r.result.rounds[k - 1].tick : 0), 0, X(rd.tick) - X(k ? this.r.result.rounds[k - 1].tick : 0), H));
+    c.globalAlpha = 1;
     const draw = (d: Decision) => {
       const x = X(d.appliedTick);
       const y = rows[d.fighter];
-      c.fillStyle = OUTCOME_COLOR[d.outcome ?? 'neutral'];
       const important = d.outcome && d.outcome !== 'neutral';
+      c.fillStyle = important ? OUTCOME_COLOR[d.outcome!]! : ink;
+      c.globalAlpha = important ? 1 : 0.14;
       const w = important ? 3 : 1.5;
       c.fillRect(x - w / 2, y + (important ? 0 : rowH * 0.3), w, important ? rowH : rowH * 0.4);
+      c.globalAlpha = 1;
       if (d.fallback) {
         c.strokeStyle = '#C2255C';
         c.lineWidth = 1;
@@ -89,7 +94,7 @@ export class Timeline {
       }
     }
     // Playhead.
-    c.fillStyle = NAVY;
+    c.fillStyle = ink;
     c.fillRect(X(this.head) - 1, 0, 2, H);
   }
 }

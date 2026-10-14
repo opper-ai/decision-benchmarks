@@ -25,14 +25,14 @@ export function statsView(r: Replay, events: GameEvent[]): HTMLElement {
     h('h3', null, 'Move mix'),
     h('div.mix-grid', null, ...st.map((f, i) => moveMix(f, colors[i]))),
     h('h3', null, 'Calibration'),
-    h('p.note', null, 'Descriptive only: confidence in the chosen move against whether that exchange was won (the model was asked how likely each move is to be the best choice, not whether it wins, so this is not a forecast score). Exchanges where nothing happened are left out.'),
+    h('p.fnote', null, 'Descriptive only: confidence in the chosen move against whether that exchange was won (the model was asked how likely each move is to be the best choice, not whether it wins, so this is not a forecast score). Exchanges where nothing happened are left out.'),
     calibrationChart(st, colors),
   );
 }
 
 function statTable(st: [FighterStats, FighterStats], colors: string[]): HTMLElement {
   const rows: [string, (f: FighterStats) => string][] = [
-    ['Result', (f) => `${f.result} (${f.roundsWon} rounds)`],
+    ['Result', (f) => `${f.result} (${f.roundsWon} ${f.roundsWon === 1 ? 'round' : 'rounds'})`],
     ['Damage dealt / taken', (f) => `${f.dealt} / ${f.taken}`],
     ['Decisions', (f) => String(f.decisions)],
     ['Latency p50 / p95', (f) => `${Math.round(f.latency.p50)} / ${Math.round(f.latency.p95)} ms`],

@@ -47,7 +47,7 @@ function loadSetup(): Setup {
   return fallback;
 }
 
-/** A model's mark in the picker: its initial on a tint per maker (there are no logos yet). */
+/** The mark of a model without a maker's logo (logos.ts) in the picker: its initial on a tint per maker. */
 const TINTS = ['#f5d6ea', '#fde3c8', '#dbe9f7', '#dcefef', '#e8e3f3', '#d9eee2', '#e2f0d6', '#f8e3d6', '#e3e8ee'];
 function tint(key: string): string {
   let n = 0;
@@ -66,7 +66,7 @@ const KEYS: [string[], string][] = [
   [['Space'], 'special'],
 ];
 
-/** Your keys, in one line: in the picker and under the stage while you fight. */
+/** Your keys, in one line, under the stage while you fight. */
 export function keysStrip(): HTMLElement {
   return h('div.keys-strip', { 'aria-label': 'Your keys' }, ...KEYS.map(([keys, what]) => h('span', null, ...keys.map((k) => h('kbd', null, k)), ` ${what}`)));
 }
@@ -252,7 +252,7 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
   const lat: [number[], number[]] = [[], []];
 
   // A live match cannot pause (the models answer in real time), so its stage takes no clicks; it can go fullscreen.
-  const { box, tools } = stageShell(stageHost, floorLabel('Live', meta, true), o.cta);
+  const { box, frame, tools } = stageShell(stageHost, floorLabel('Live', meta, true), o.cta);
   const fs = fullscreenButton(box);
   fs.el.className = 'tbtn';
   tools.append(soundTool(), fs.el);
@@ -260,7 +260,8 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
   const body = h(
     'div.drawer-body',
     null,
-    h('div.drawer-head', null, h('div.dtabs', null, h('span.dtab', { 'aria-selected': 'true' }, 'Decisions, newest first')), status),
+    // One list while the match lasts: a heading, not a tab that looks pressable.
+    h('div.drawer-head', null, h('p.kicker', null, 'Decisions, newest first'), status),
     h('div.drawer-main.panel-body', null, feed),
   );
   const viewer = h('div.viewer');
@@ -314,7 +315,8 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
     if (floorTag?.lastChild) floorTag.lastChild.textContent = 'Final';
     const again = h('button.fight-go.big', { type: 'button', onclick: o.again }, h('span.tri', { 'aria-hidden': 'true' }), 'Fight again');
     const winner = replay.result.winner;
-    stageHost.append(
+    // Over the stage and its floor; on a phone, whose 4:3 stage is too short for it, under the stage (style.css).
+    frame.append(
       h(
         'div.stage-cover.end',
         null,
