@@ -107,7 +107,11 @@ canvas.stage { display: block; width: 100%; height: 100%; }
 /* A tool's menu (sound, speed), opening above it. */
 .tool-menu { position: relative; display: inline-flex; }
 .tmenu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 5; display: grid; gap: 2px; min-width: 150px; padding: 5px; border: 1px solid #d5dde5; border-radius: 12px; background: #ffffff; box-shadow: 0 16px 36px -18px rgba(27, 46, 64, 0.55); }
-.tmenu-opt { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border: 0; border-radius: 8px; background: none; color: #1b2e40; font: 500 13px var(--j-body); text-align: left; white-space: nowrap; }
+.tmenu-opt { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border: 0; border-radius: 8px; background: none; color: #1b2e40; font: 500 13px var(--j-body); text-align: left; white-space: nowrap; text-decoration: none; cursor: pointer; }
+.tmenu-opt:disabled { cursor: progress; }
+/* A menu's heading (the save menu's "Its best 18 seconds"). */
+.tmenu-title { margin: 4px 10px 4px; white-space: nowrap; font: 600 10px/1.2 var(--j-mono); letter-spacing: 0.1em; text-transform: uppercase; color: #7a8794; }
+.tmenu:has(.tmenu-title) { min-width: 220px; }
 .tmenu-opt:hover { background: #f1f4f7; }
 .tmenu-opt small { margin-left: auto; font-size: 12px; color: #677584; }
 .tmenu-opt[role='menuitemradio'][aria-checked='true'] { background: #e3e9f0; font-weight: 600; }
@@ -217,6 +221,8 @@ label.check input { width: 15px; height: 15px; margin: 0; accent-color: var(--j-
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--j-text); margin-right: 6px; vertical-align: -1px; flex: none; }
 strong.warn { color: var(--f-danger); }
 .linkish { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--j-text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); cursor: pointer; }
+/* The raw recording: data for developers checking a replay, so the quietest thing under Save and share. */
+.linkish.raw { font-size: 12px; font-weight: 500; color: var(--j-muted); }
 /* The timeline draws its ink in `color` on its `background` (timeline.ts reads them), so it follows the theme. */
 canvas.timeline { display: block; width: 100%; height: 46px; border: 1px solid var(--j-line); border-radius: 10px; background: var(--j-card); color: var(--j-text); cursor: pointer; touch-action: none; }
 .legend { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--j-muted); }
@@ -233,7 +239,14 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--j-text); }
 .chip-split { flex: none; display: inline-flex; align-items: stretch; border: 1px solid var(--j-strong-line); border-radius: 999px; background: var(--j-soft); overflow: hidden; }
 .chip-split .chip { border: 0; border-radius: 0; background: none; }
-.chip-save { display: grid; place-items: center; padding: 0 11px 0 10px; border-left: 1px solid var(--j-line); color: var(--j-text); }
+.chip-save { display: grid; place-items: center; padding: 0 11px 0 10px; border: 0; border-left: 1px solid var(--j-line); background: none; color: var(--j-text); cursor: pointer; }
+.chip-save[aria-expanded='true'] { background: var(--j-hl); }
+/* The playing chip and its save menu, which opens above it in the page's theme (the stage's menus are paper). */
+.chip-holder { position: relative; display: inline-flex; }
+.chip-holder .tmenu { left: 0; right: auto; border-color: var(--j-line); background: var(--j-card); }
+.chip-holder .tmenu-opt { color: var(--j-text); }
+.chip-holder .tmenu-opt:hover { background: var(--j-soft); }
+.chip-holder .tmenu-title, .chip-holder .tmenu-opt small { color: var(--j-muted); }
 .chip-save:hover { background: var(--j-hl); }
 .chip-save svg { width: 15px; height: 15px; }
 /* The pill clips what reaches outside it, so the two halves draw their focus ring inside. */
@@ -402,6 +415,8 @@ body.tool-page { background: var(--f-paper); }
 }
 /* A phone: the stage is 4:3, and its floor too short for the tools and the button, so they go under it. */
 @media (max-width: 560px) {
+  /* The chips scroll sideways here, which would clip a menu above one: the Save tool under the stage saves instead. */
+  .chip-save { display: none; }
   :root { --f-ar: 1.3333; }
   .fstage { aspect-ratio: 4 / 3; }
   .floor-ui { position: static; height: auto; padding: 12px 0 0; grid-template-columns: minmax(0, 1fr); gap: 12px; }

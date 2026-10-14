@@ -15,7 +15,8 @@ import type { Plan } from './players.ts';
 import { live, pickerCard, type Setup } from './views/fight.ts';
 import { posesView } from './views/poses.ts';
 import { replayView } from './views/replay.ts';
-import { ICONS, stageShell } from './views/shell.ts';
+import { clipFor, clipLink } from './views/save.ts';
+import { ICONS, menuTool, stageShell } from './views/shell.ts';
 import { stillView } from './views/still.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -167,8 +168,12 @@ async function page(): Promise<void> {
   let watching: Demo | null = demos.find((d) => d.file === DEMO.exec(location.hash)?.[1]) ?? demos[0] ?? null;
   const short = (title: string) => title.replace(/ baseline\b/g, '');
 
-  /** A chip per recording, no scores (they would give the result away). The playing one can be downloaded. */
+  /** The playing chip's save menu, rebuilt with the chips. */
+  let chipMenu: { destroy: () => void } | null = null;
+  /** A chip per recording, no scores (they would give the result away). The playing one saves its highlight. */
   function renderChips(): void {
+    chipMenu?.destroy();
+    chipMenu = null;
     chipsEl.replaceChildren(
       ...demos.map((d) => {
         const on = mode === 'watch' && d === watching;
@@ -178,9 +183,14 @@ async function page(): Promise<void> {
           void watch(true);
         });
         const chip = tag(b, 'click_watch', { source: d.file });
-        if (!on) return chip;
-        const save = h('a.chip-save', { href: appPath(`demo/${d.file}`), download: d.file, 'aria-label': `Download this recording (${d.file})`, title: `Download this recording (${d.file})`, html: ICONS.download });
-        return h('span.chip-split', null, chip, tag(save, 'download_recording', { source: d.file }));
+        const clip = clipFor(d.file);
+        if (!on || !clip) return chip;
+        // Its ⤓ opens the highlight to save, a video or a GIF, as jevman's chips do.
+        const name = short(d.title);
+        const dl = h('button.chip-save', { type: 'button', 'aria-label': `Save ${name}'s highlight`, title: 'Save its highlight: a video or a GIF', html: ICONS.download }) as HTMLButtonElement;
+        const holder = h('span.chip-holder', null, h('span.chip-split', null, chip, dl));
+        chipMenu = menuTool(dl, h('div', { 'aria-label': `Save ${name}'s highlight` }, h('p.tmenu-title', null, 'Its best 18 seconds'), clipLink(clip, 'mp4', 'chips'), clipLink(clip, 'gif', 'chips')), holder);
+        return holder;
       }),
     );
   }
@@ -209,7 +219,7 @@ async function page(): Promise<void> {
       placeholder("This recording didn't load.");
       return;
     }
-    const v = replayView(viewer, r, { link: `#/watch/${d.file}`, music, cta });
+    const v = replayView(viewer, r, { link: `#/watch/${d.file}`, music, cta, clip: clipFor(d.file) });
     cleanup = v;
     pause = v.pause;
   }

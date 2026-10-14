@@ -15,6 +15,7 @@ export const ICONS = {
   link: stroke('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
   prev: stroke('<path d="M6 5v14M18 5 8 12l10 7z"/>'),
   next: stroke('<path d="M18 5v14M6 5l10 7-10 7z"/>'),
+  scissors: stroke('<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/>'),
 };
 
 /** A square tool button for the stage's floor. */
@@ -23,10 +24,11 @@ export function toolButton(label: string, html: string): HTMLButtonElement {
 }
 
 /**
- * A tool that opens a small menu above it (sound, speed): its button opens and closes it, a click elsewhere or Esc
- * closes it. `destroy` drops the page-wide listener.
+ * A tool that opens a small menu above it (sound, speed, save): its button opens and closes it, a click elsewhere, Esc
+ * or picking an item closes it. `wrap`, when given, already holds the button (a Watch chip's ⤓ sits in its chip); the
+ * menu goes in it. `destroy` drops the page-wide listener.
  */
-export function menuTool(btn: HTMLButtonElement, menu: HTMLElement): { el: HTMLElement; close: () => void; destroy: () => void } {
+export function menuTool(btn: HTMLButtonElement, menu: HTMLElement, wrap?: HTMLElement): { el: HTMLElement; close: () => void; destroy: () => void } {
   menu.classList.add('tmenu');
   menu.setAttribute('role', 'menu');
   btn.setAttribute('aria-haspopup', 'menu');
@@ -36,7 +38,13 @@ export function menuTool(btn: HTMLButtonElement, menu: HTMLElement): { el: HTMLE
   };
   open(false);
   btn.addEventListener('click', () => open(menu.hidden !== false));
-  const el = h('span.tool-menu', null, btn, menu);
+  const el = wrap ?? h('span.tool-menu', null, btn);
+  el.classList.add('tool-menu');
+  el.append(menu);
+  // A download or an action closes the menu once picked; a switch (sound's) keeps it open.
+  menu.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('a, [role="menuitem"], [role="menuitemradio"]')) setTimeout(() => open(false));
+  });
   const outside = (e: PointerEvent) => {
     if (!el.contains(e.target as Node)) open(false);
   };

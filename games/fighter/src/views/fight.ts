@@ -6,7 +6,7 @@ import { Match } from '../../shared/match.ts';
 import { DEFAULT_OPPONENT, MODELS, modelInfo } from '../../shared/models.ts';
 import type { Track } from '../../shared/question.ts';
 import type { FighterMeta, Replay } from '../../shared/replay.ts';
-import { downloadReplay, type Me } from '../api.ts';
+import type { Me } from '../api.ts';
 import { audio } from '../audio.ts';
 import { h, money } from '../dom.ts';
 import { getKeyboard } from '../input.ts';
@@ -18,7 +18,8 @@ import { soundTool } from './audio-toggles.ts';
 import { decisionCard, topMoves } from './decisions.ts';
 import { fullscreenButton } from './fullscreen.ts';
 import { activityDrawer } from './panel.ts';
-import { floorLabel, ICONS, stageShell } from './shell.ts';
+import { videoButton } from './save.ts';
+import { floorLabel, stageShell } from './shell.ts';
 
 export const COLORS = [SIDES[0].deep, SIDES[1].deep] as const;
 const STORE = 'fighter.setup';
@@ -330,9 +331,9 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
             null,
             again,
             h('button.fbtn.big', { type: 'button', onclick: () => o.watch(replay) }, 'Watch the replay'),
-            h('button.fbtn.big', { type: 'button', title: 'The whole match as a gzipped JSON recording (.fight.json.gz)', onclick: () => void downloadReplay(replay) }, h('span.ico', { html: ICONS.download }), 'Download'),
+            videoButton(replay, 'end-card', 'big'),
           ),
-          h('p.fnote', null, 'This match stays in your browser: download it to keep it. ', h('button.linkish', { type: 'button', onclick: o.change }, 'Change opponent')),
+          h('p.fnote', null, "This match isn't saved anywhere: save its video to keep it. ", h('button.linkish', { type: 'button', onclick: o.change }, 'Change opponent')),
         ),
       ),
     );

@@ -121,12 +121,14 @@ a submission is self-reported, as on Snake and jevman.
 **Play**: you at the keyboard against a decision model (on the free credits, then on your own Opper account once you
 sign in), or any two fighters, baselines included, in real time or paused. Keys: A D walk (hold back to block high,
 double-tap to dash), W jump, S block low, U I O punches, J K L kicks, H throw, Y jump kick, Space special. A match you
-play stays in your browser: watch it with its stats, export a clip, or download it.
+play stays in your browser: watch it with its stats, or save its best 18 seconds as a video, made in your browser.
 
 **Watch**: recorded matches (public/demo/: GPT-6 Luna against Jev, and Jev against each baseline, all played live on
 the benchmark's settings, recorded with scripts/record-demo.ts), with every
 decision, the question it answered, a timeline and per-fighter stats. Click the stage, then Space plays and pauses,
-arrows step, `[` `]` jump between decisions.
+arrows step, `[` `]` jump between decisions. Each recording's highlight, its 18 seconds with the most damage dealt,
+saves as a video (MP4) or its best 10 seconds as a GIF (public/clips/, made with scripts/clips.ts), to share; any
+stretch of it as a custom clip.
 
 ## Layout
 
@@ -137,9 +139,11 @@ shared/engine/     the deterministic simulation (integer math, 60 ticks per seco
 shared/            questions, perception, baselines, fallback, the live match driver, the benchmark (gauntlet.ts),
                    replays, stats
 src/               the page: renderer, sound, keyboard, the fight, replay, stats and leaderboard views, clip export
-public/            game.json, poster.png, leaderboard.json, baselines.json, demo/, audio/
+public/            game.json, poster.png, leaderboard.json, baselines.json, demo/, clips/, logos/, audio/
 tests/             engine, questions, matches, the benchmark and its verifier, the request check, submissions
 scripts/           record-demo.ts: records a match for Watch (a benchmark game, or two decision models)
+                   clips.ts: renders each Watch recording's highlight to public/clips (MP4 and GIF; needs ffmpeg and
+                   `npm i --no-save @napi-rs/canvas`); run it again after recording a match
 ```
 
 The sounds and music were generated with ElevenLabs models through Opper's audio API.
