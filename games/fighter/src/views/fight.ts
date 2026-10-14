@@ -1,5 +1,6 @@
 import type { TransportHooks } from '../../../../packages/kit/client/transport.ts';
 import type { Adapter } from '../../shared/adapter.ts';
+import { BASELINE_THINK_MS } from '../../shared/baselines.ts';
 import { Match } from '../../shared/match.ts';
 import { DEFAULT_OPPONENT, MODELS, modelInfo } from '../../shared/models.ts';
 import type { Track } from '../../shared/question.ts';
@@ -34,10 +35,11 @@ export interface Setup {
 const known = (id: unknown): id is string => id === HUMAN || MODELS.some((m) => m.id === id);
 
 function loadSetup(): Setup {
-  const fallback: Setup = { left: HUMAN, right: DEFAULT_OPPONENT, mode: 'realtime', deadline: 0, track: 'assisted' };
+  // The benchmark's settings: real time, raw track, the 2 s deadline (deadline 0 = automatic).
+  const fallback: Setup = { left: HUMAN, right: DEFAULT_OPPONENT, mode: 'realtime', deadline: 0, track: 'raw' };
   try {
     const s = JSON.parse(localStorage.getItem(STORE) ?? 'null') as Partial<Setup> | null;
-    if (s && known(s.left) && known(s.right)) return { ...fallback, ...s, mode: s.mode === 'paused' ? 'paused' : 'realtime', track: s.track === 'raw' ? 'raw' : 'assisted', deadline: Number(s.deadline) || 0 };
+    if (s && known(s.left) && known(s.right)) return { ...fallback, ...s, mode: s.mode === 'paused' ? 'paused' : 'realtime', track: s.track === 'assisted' ? 'assisted' : 'raw', deadline: Number(s.deadline) || 0 };
   } catch {
     // storage blocked
   }
@@ -72,8 +74,8 @@ export function pickerCard(o: PickerOptions): HTMLElement {
   const track = h(
     'select',
     { id: 'track' },
-    h('option', { value: 'assisted', selected: setup.track !== 'raw' }, 'Assisted: options show payoffs'),
-    h('option', { value: 'raw', selected: setup.track === 'raw' }, 'Raw: situation and rules only'),
+    h('option', { value: 'raw', selected: setup.track !== 'assisted' }, 'Raw: situation and rules only'),
+    h('option', { value: 'assisted', selected: setup.track === 'assisted' }, 'Assisted: options show payoffs'),
   ) as HTMLSelectElement;
   const start = h('button.fight-go', { type: 'button' }, 'Fight');
   const billing = h('p.fnote.billing');
@@ -135,7 +137,7 @@ export function pickerCard(o: PickerOptions): HTMLElement {
       null,
       h('summary', null, 'Advanced'),
       h('div.fields', null, h('label.field', { for: 'track' }, 'Track', track), h('label.field', { for: 'deadline' }, 'Answer deadline (ms)', deadline)),
-      h('p.fnote', null, "Assisted shows each move's payoff against the opponent's likely answers (the benchmark's track). Raw gives only the situation and the rules, a harder test."),
+      h('p.fnote', null, "Raw gives only the situation and the rules (the benchmark's track, with real time and the 2 s deadline). Assisted adds each move's payoff against the opponent's likely answers, an easier test."),
     ),
     warn,
     h('div.go-row', null, start),
@@ -153,7 +155,7 @@ export function pickerCard(o: PickerOptions): HTMLElement {
       right: right.value,
       mode: paused ? 'paused' : 'realtime',
       deadline: Number(deadline.value) > 0 ? Math.min(MAX_DEADLINE_MS, Math.max(300, Number(deadline.value))) : paused ? MAX_DEADLINE_MS : 2000,
-      track: track.value === 'raw' ? 'raw' : 'assisted',
+      track: track.value === 'assisted' ? 'assisted' : 'raw',
     };
     try {
       localStorage.setItem(STORE, JSON.stringify({ ...s, deadline: Number(deadline.value) > 0 ? s.deadline : 0 }));
@@ -193,7 +195,7 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
     track: s.track,
     deadlineMs: s.deadline,
     // Baselines run here in the browser; in real time they "think" like a fast classifier.
-    adapters: plans.map((p) => p.adapter(s.mode === 'realtime' ? 250 : 0)) as [Adapter, Adapter],
+    adapters: plans.map((p) => p.adapter(s.mode === 'realtime' ? BASELINE_THINK_MS : 0)) as [Adapter, Adapter],
     maxTokens: [modelInfo(s.left).contextTokens, modelInfo(s.right).contextTokens],
     fighters: meta,
   });
@@ -248,7 +250,7 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
         if (!b?.thinking && (!b || performance.now() - b.since > 500)) stage.renderer.bubbles[i] = { thinking: true, since: p.askedAt, top: [] };
         else if (b?.thinking && b.since !== p.askedAt) b.since = p.askedAt;
       } else if (b?.thinking) {
-        // The question was cancelled (the fighter got hit) or answered.
+        // The question was answered, or dropped (a new round).
         stage.renderer.bubbles[i] = null;
       }
     }

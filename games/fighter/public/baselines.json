@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-12T15:46:52.323Z",
+  "generatedAt": "2026-10-14T08:02:51.289Z",
   "game": "fighter",
-  "benchVersion": 1,
+  "benchVersion": 4,
   "metric": {
     "name": "Rounds won vs bots",
     "unit": "%",
@@ -9,103 +9,108 @@
   },
   "entries": [
     {
-      "model": "baseline/maximin",
-      "name": "Maximin baseline",
-      "games": 102,
-      "metric": {
-        "mean": 71.242,
-        "stdError": 2.807,
-        "best": 100
-      },
-      "meanLatencyMs": 0,
-      "fallbackRate": 0,
-      "costPerGame": null,
-      "via": "systemone",
-      "extra": {
-        "vsGreedy": 70.6,
-        "vsPayoff": 93.1,
-        "vsMaximin": 50,
-        "matchWinShare": 76.5
-      }
-    },
-    {
       "model": "baseline/greedy",
       "name": "Greedy baseline",
-      "games": 102,
+      "games": 104,
       "metric": {
-        "mean": 54.248,
-        "stdError": 3.558,
+        "mean": 79.928,
+        "stdError": 2.679,
         "best": 100
       },
-      "meanLatencyMs": 0,
-      "fallbackRate": 0,
+      "meanLatencyMs": 250,
+      "fallbackRate": 0.001,
       "costPerGame": null,
       "via": "systemone",
       "extra": {
         "vsGreedy": 50,
-        "vsPayoff": 83.3,
-        "vsMaximin": 29.4,
-        "matchWinShare": 53.9
+        "vsPayoff": 73.6,
+        "vsMaximin": 100,
+        "vsRandom": 96.2,
+        "matchWinShare": 80.8
       }
     },
     {
       "model": "baseline/payoff",
       "name": "Payoff baseline",
-      "games": 102,
+      "games": 104,
       "metric": {
-        "mean": 24.51,
-        "stdError": 2.388,
+        "mean": 64.503,
+        "stdError": 3.376,
         "best": 100
       },
-      "meanLatencyMs": 0,
+      "meanLatencyMs": 250,
       "fallbackRate": 0,
       "costPerGame": null,
       "via": "systemone",
       "extra": {
-        "vsGreedy": 16.7,
+        "vsGreedy": 26.4,
         "vsPayoff": 50,
-        "vsMaximin": 6.9,
-        "matchWinShare": 19.6
+        "vsMaximin": 81.6,
+        "vsRandom": 100,
+        "matchWinShare": 67.3
       }
     },
     {
-      "model": "baseline/guard",
-      "name": "Guard baseline",
-      "games": 102,
+      "model": "baseline/maximin",
+      "name": "Maximin baseline",
+      "games": 104,
       "metric": {
-        "mean": 6.733,
-        "stdError": 1.088,
-        "best": 40
+        "mean": 38.261,
+        "stdError": 3.469,
+        "best": 100
       },
-      "meanLatencyMs": 0,
-      "fallbackRate": 0,
-      "costPerGame": null,
-      "via": "systemone",
-      "extra": {
-        "vsGreedy": 0,
-        "vsPayoff": 15.3,
-        "vsMaximin": 4.9,
-        "matchWinShare": 0
-      }
-    },
-    {
-      "model": "baseline/random",
-      "name": "Random baseline",
-      "games": 102,
-      "metric": {
-        "mean": 0.327,
-        "stdError": 0.327,
-        "best": 33.33
-      },
-      "meanLatencyMs": 0,
+      "meanLatencyMs": 250,
       "fallbackRate": 0.001,
       "costPerGame": null,
       "via": "systemone",
       "extra": {
         "vsGreedy": 0,
-        "vsPayoff": 1,
-        "vsMaximin": 0,
-        "matchWinShare": 0
+        "vsPayoff": 18.4,
+        "vsMaximin": 50,
+        "vsRandom": 84.6,
+        "matchWinShare": 37.5
+      }
+    },
+    {
+      "model": "baseline/random",
+      "name": "Random baseline",
+      "games": 104,
+      "metric": {
+        "mean": 17.307,
+        "stdError": 2.951,
+        "best": 100
+      },
+      "meanLatencyMs": 250,
+      "fallbackRate": 0.005,
+      "costPerGame": null,
+      "via": "systemone",
+      "extra": {
+        "vsGreedy": 3.8,
+        "vsPayoff": 0,
+        "vsMaximin": 15.4,
+        "vsRandom": 50,
+        "matchWinShare": 14.4
+      }
+    },
+    {
+      "model": "baseline/guard",
+      "name": "Guard baseline",
+      "games": 104,
+      "metric": {
+        "mean": 6.795,
+        "stdError": 1.295,
+        "best": 50
+      },
+      "meanLatencyMs": 250,
+      "fallbackRate": 0,
+      "costPerGame": null,
+      "via": "systemone",
+      "extra": {
+        "vsGreedy": 0,
+        "vsPayoff": 22.1,
+        "vsMaximin": 5.1,
+        "vsRandom": 0,
+        "matchWinShare": 1.9
       }
     }
   ],
