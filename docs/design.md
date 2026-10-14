@@ -18,7 +18,8 @@ packages/kit/
   bench/       node: the bench CLI (--game --model(s) --endpoint --format systemone|chat --games --submit --name --by),
                official runs -> leaderboard.json, submissions -> community.json
 games/
-  registry.ts           the games the service, the bench and the build serve: jevman, snake, fighter
+  registry.ts           the games the service, the bench and the build serve: snake, fighter; MOVED: games that live
+                        elsewhere on opper.ai (jevman), whose old paths here redirect there
   <slug>/
     game.ts             GameDefinition: the bench and the submissions check
     game.server.ts      GameServer: what the service needs (Node-safe imports only)
@@ -162,16 +163,16 @@ to main runs the same CI and then deploys (`deploy.yml`), when deploys are enabl
 
 ## The games
 
+jevman, the Pac-Man benchmark the kit was extracted from, is not here: it stays in its own repository
+([opper-ai/jevman-benchmark](https://github.com/opper-ai/jevman-benchmark)) at `opper.ai/jevman-benchmark/`, the URL
+its links point to, and the hub lists it there. `MOVED` in `games/registry.ts` sends `<APP_BASE_PATH>/jevman/...` there
+with a permanent redirect.
+
 | Game | Mode | Metric | Official games | License |
 |---|---|---|---|---|
-| jevman | real time | Score (points) | 100 | AGPL-3.0-or-later |
 | snake | real time (275 ms a step) | Apples | 100 | MIT |
 | fighter | real time (live speed, 2 s deadline) | Rounds won vs bots (%) | 104 | MIT |
 
-- **jevman** (Pac-Man, Arcade): the game the kit was extracted from. A model steers Pac-Man in real time against the
-  scripted ghosts until game over or 300 s; the score is the game's points. Players play Pac-Man against ghosts
-  played by models, with a high-score board per ghost lineup. Its results files are in the contract shape, and
-  `shared/leaderboard.ts` turns them back into jevman's own shape for its page.
 - **snake** (Arcade, ours): a model steers a snake on a seeded 16 x 16 board, one `choice` per step (the direction the
   head moves next, every direction but the reverse offered, in a shuffled order), in real time: the snake steps every 275 ms for every model, and a step whose answer is not in by the tick is
   played by a fallback that never steers toward the apple, so the score is decision quality and speed together.
@@ -190,5 +191,5 @@ to main runs the same CI and then deploys (`deploy.yml`), when deploys are enabl
 ## License
 
 The repository root, including the kit and the service, is AGPL-3.0-or-later (see [LICENSE](../LICENSE)). Each game
-folder has its own LICENSE: `games/jevman` is AGPL-3.0-or-later, `games/snake` and `games/fighter` are MIT. Each game's
+folder has its own LICENSE: `games/snake` and `games/fighter` are MIT. Each game's
 CREDITS.md names its authors and says what changed in the port.
