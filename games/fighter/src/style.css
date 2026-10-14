@@ -286,7 +286,13 @@ svg.calib { max-width: 320px; }
 .tile { display: flex; align-items: center; gap: 10px; min-width: 0; height: 52px; padding: 0 12px; border: 1px solid var(--j-line); border-radius: 12px; background: var(--j-card); color: var(--j-text); text-align: left; }
 .tile:hover { background: var(--j-soft); }
 .tile[aria-checked='true'] { border-color: var(--j-text); box-shadow: inset 0 0 0 1px var(--j-text); background: var(--j-soft); }
-.tile .mark { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 8px; color: #1b2e40; font: 700 13px/1 var(--j-display); }
+.tile .mark { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 8px; overflow: hidden; color: #1b2e40; font: 700 13px/1 var(--j-display); }
+/* A maker's logo (jevman's): a mark on a quiet square, or an avatar or app icon that fills it. */
+.tile .mark.boxed { background: var(--j-soft); box-shadow: inset 0 0 0 1px var(--j-line); }
+.tile .mark.boxed .logo { width: 18px; height: 18px; object-fit: contain; }
+.tile .mark.fill .logo { width: 28px; height: 28px; object-fit: cover; }
+.tile .mark.fill .logo.round { border-radius: 50%; }
+html.dark .mono-mark { filter: invert(1); }
 .tile-text { display: grid; gap: 1px; min-width: 0; }
 .tile-text b, .tile-text small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile-text b { font-size: 13px; font-weight: 600; }
@@ -298,9 +304,15 @@ svg.calib { max-width: 320px; }
 .adv-toggle:hover { color: var(--j-text); }
 .adv-toggle .chev { display: grid; transition: transform 0.15s; }
 .adv-toggle[aria-expanded='true'] .chev { transform: rotate(90deg); }
-.adv { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--j-line); border-radius: 12px; background: var(--j-soft); }
-label.field { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--j-muted); }
-.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.adv { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 10px 18px; padding: 14px 16px; border: 1px solid var(--j-line); border-radius: 12px; background: var(--j-soft); }
+.adv-label { font-size: 13px; font-weight: 600; color: var(--j-muted); }
+/* A switch between two or three choices (Advanced's mode, side and track). */
+.seg { justify-self: start; display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--j-track); }
+.seg-opt { height: 30px; padding: 0 14px; border: 0; border-radius: 8px; background: none; color: var(--j-muted); font: 500 13px var(--j-body); white-space: nowrap; }
+.seg-opt:hover { color: var(--j-text); }
+.seg-opt[aria-checked='true'] { background: var(--j-card); color: var(--j-text); font-weight: 600; box-shadow: 0 1px 3px rgba(27, 46, 64, 0.18); }
+.deadline { justify-self: start; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--j-muted); }
+.deadline input { width: 88px; height: 36px; padding: 0 10px; border: 1px solid var(--j-line); border-radius: 10px; background: var(--j-card); color: var(--j-text); font: 500 13px var(--j-mono); }
 .fwarn { font-size: 13.5px; color: var(--j-text); padding: 10px 12px; border-radius: 10px; background: var(--j-backup); }
 
 /* The tools (#/still, #/poses): the stage or the pose sheet alone. */
@@ -338,7 +350,8 @@ body.tool-page { background: var(--f-paper); }
   .watch .chips { width: 100%; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; padding-bottom: 2px; }
   .watch .chips > * { flex: none; }
   .opp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .fields { grid-template-columns: minmax(0, 1fr); }
+  .adv { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .adv-label:not(:first-child) { margin-top: 6px; }
   .fcard { padding: 18px 16px 16px; }
   .end-title { font-size: 38px; }
 }

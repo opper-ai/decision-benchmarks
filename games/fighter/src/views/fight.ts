@@ -10,6 +10,7 @@ import { downloadReplay, type Me } from '../api.ts';
 import { audio } from '../audio.ts';
 import { h, money } from '../dom.ts';
 import { getKeyboard } from '../input.ts';
+import { logoFor } from '../logos.ts';
 import { HUMAN, modelProblem, planFighter, type Plan } from '../players.ts';
 import { Stage } from '../stage.ts';
 import { SIDES } from '../theme.ts';
@@ -94,12 +95,18 @@ export function pickerCard(o: PickerOptions): HTMLElement {
   const savedOpponent = savedSide === 0 ? saved.right : saved.left;
   let opponent = models.some((m) => m.id === savedOpponent) ? savedOpponent : DEFAULT_OPPONENT;
 
+  /** The maker's logo (jevman's), or the model's initial on a tint for a model without one. */
+  const markFor = (id: string, label: string, maker: string) => {
+    const logo = logoFor(id);
+    if (!logo) return h('span.mark', { style: { background: tint(maker || label) }, 'aria-hidden': 'true' }, label.slice(0, 1));
+    return h(logo.classList.contains('round') || logo.classList.contains('square') ? 'span.mark.fill' : 'span.mark.boxed', { 'aria-hidden': 'true' }, logo);
+  };
   const tiles = models.map((m) => {
     const maker = modelMaker(m.id) ?? '';
     const b = h(
       'button.tile',
       { type: 'button', role: 'radio', 'aria-checked': String(m.id === opponent), title: maker ? `${m.label}, by ${maker}` : m.label },
-      h('span.mark', { style: { background: tint(maker || m.label) }, 'aria-hidden': 'true' }, m.label.slice(0, 1)),
+      markFor(m.id, m.label, maker),
       h('span.tile-text', null, h('b', null, m.label), h('small', null, maker)),
     );
     b.addEventListener('click', () => {
@@ -112,22 +119,33 @@ export function pickerCard(o: PickerOptions): HTMLElement {
   const x = h('button.x', { type: 'button', 'aria-label': 'Back to watching', title: 'Back to watching (Esc)', html: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' });
   x.addEventListener('click', o.close);
 
-  // Advanced, closed: paused mode, your side, the track and the deadline (empty = automatic: 2 s, 2.5 s paused).
-  const pausedBox = h('input', { type: 'checkbox', id: 'paused', checked: saved.mode === 'paused' }) as HTMLInputElement;
-  const rightBox = h('input', { type: 'checkbox', id: 'right-side', checked: savedSide === 1 }) as HTMLInputElement;
+  // Advanced, closed: the mode, your side, the track (a switch each) and the deadline (empty = automatic: 2 s, 2.5 s
+  // paused).
+  const choice = <T extends string>(label: string, options: [T, string, string?][], value: T) => {
+    let current = value;
+    const buttons = options.map(([v, text, title]) => {
+      const b = h('button.seg-opt', { type: 'button', role: 'radio', 'aria-checked': String(v === current), title });
+      b.textContent = text;
+      b.addEventListener('click', () => {
+        current = v;
+        buttons.forEach((x, k) => x.setAttribute('aria-checked', String(options[k]![0] === v)));
+      });
+      return b;
+    });
+    return { el: h('div.seg', { role: 'radiogroup', 'aria-label': label }, ...buttons), get: () => current };
+  };
+  const mode = choice('Mode', [['realtime', 'Real time'], ['paused', 'Paused', 'The fight waits for each answer']], saved.mode);
+  const side = choice('Your side', [['left', 'Left'], ['right', 'Right']], savedSide === 1 ? 'right' : 'left');
+  const track = choice('Track', [['raw', 'Raw', 'The situation and the rules only: the benchmark\'s track'], ['assisted', 'Assisted', "Each option shows its payoff against the opponent's likely answers"]], saved.track === 'assisted' ? 'assisted' : 'raw');
   const deadline = h('input', { id: 'deadline', type: 'number', min: 300, max: MAX_DEADLINE_MS, step: 100, placeholder: 'auto', value: saved.deadline || '' }) as HTMLInputElement;
-  const track = h(
-    'select',
-    { id: 'track' },
-    h('option', { value: 'raw', selected: saved.track !== 'assisted' }, 'Raw: situation and rules only'),
-    h('option', { value: 'assisted', selected: saved.track === 'assisted' }, 'Assisted: options show payoffs'),
-  ) as HTMLSelectElement;
+  const row = (label: string, control: HTMLElement, forId?: string) => [h('label.adv-label', forId ? { for: forId } : null, label), control];
   const advPanel = h(
     'div.adv',
     { id: 'pick-advanced', hidden: true },
-    h('label.check', { for: 'paused' }, pausedBox, ' Paused: the fight waits for each answer'),
-    h('label.check', { for: 'right-side' }, rightBox, ' Play on the right'),
-    h('div.fields', null, h('label.field', { for: 'track' }, 'Track', track), h('label.field', { for: 'deadline' }, 'Answer deadline (ms)', deadline)),
+    ...row('Mode', mode.el),
+    ...row('Your side', side.el),
+    ...row('Track', track.el),
+    ...row('Answer deadline', h('span.deadline', null, deadline, 'ms'), 'deadline'),
   );
   const advToggle = h(
     'button.adv-toggle',
@@ -141,16 +159,16 @@ export function pickerCard(o: PickerOptions): HTMLElement {
   });
 
   const begin = () => {
-    const [left, right] = rightBox.checked ? [opponent, HUMAN] : [HUMAN, opponent];
+    const [left, right] = side.get() === 'right' ? [opponent, HUMAN] : [HUMAN, opponent];
     const ps = [planFighter(left, o.me, o.hooks), planFighter(right, o.me, o.hooks)] as [Plan, Plan];
     if (ps.some((p) => p.problem)) return;
-    const paused = pausedBox.checked;
+    const paused = mode.get() === 'paused';
     const s: Setup = {
       left,
       right,
       mode: paused ? 'paused' : 'realtime',
       deadline: Number(deadline.value) > 0 ? Math.min(MAX_DEADLINE_MS, Math.max(300, Number(deadline.value))) : paused ? MAX_DEADLINE_MS : 2000,
-      track: track.value === 'assisted' ? 'assisted' : 'raw',
+      track: track.get(),
     };
     try {
       localStorage.setItem(STORE, JSON.stringify({ ...s, deadline: Number(deadline.value) > 0 ? s.deadline : 0 }));
