@@ -22,7 +22,6 @@ env:
   ECS_SERVICE: opper-eu-north-service-decision-benchmarks
   ECS_TASK_FAMILY: opper-eu-north-decision-benchmarks
   CONTAINER_NAME: decision-benchmarks
-  LOG_GROUP: /opper/eu-north-decision-benchmarks
   # Baked into the clients at build time; the image also sets APP_BASE_PATH for the server.
   APP_BASE_PATH: /decision-benchmarks
   VITE_PUBLIC_URL: https://opper.ai
@@ -151,10 +150,11 @@ jobs:
           echo "::error::${VITE_PUBLIC_URL}${APP_BASE_PATH}/revision never reported $GITHUB_SHA"
           exit 1
 
-  # If the deploy fails, surface why in the run: the service's rollout state and recent events, why the newest
-  # stopped container exited, and the last app log lines. Never fails the run itself (the deploy job already does).
-  # The stopped-task and log sections need ecs:ListTasks, ecs:DescribeTasks, logs:DescribeLogStreams and
-  # logs:GetLogEvents on the deploy role; without them they print the AWS denial.
+  # If the deploy fails, surface why in the run: the service's rollout state and recent events, and why the newest
+  # stopped container exited. App logs stay in CloudWatch, since this repository's run logs are public. Never fails
+  # the run itself (the deploy job already does).
+  # The stopped-task section needs ecs:ListTasks and ecs:DescribeTasks on the deploy role; without them it prints the
+  # AWS denial.
   diagnose:
     name: Diagnose failed deploy
     needs: deploy
@@ -171,7 +171,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Dump ECS rollout, task exit reason and app logs
+      - name: Dump ECS rollout and task exit reason
         run: |
           set +e
           echo "::group::Service rollout state + recent events"
@@ -194,15 +194,4 @@ jobs:
           fi
           echo "::endgroup::"
 
-          echo "::group::Recent app logs"
-          STREAM=$(aws logs describe-log-streams --log-group-name "$LOG_GROUP" \
-            --order-by LastEventTime --descending --max-items 1 \
-            --query 'logStreams[0].logStreamName' --output text 2>&1)
-          if [ -n "$STREAM" ] && [ "$STREAM" != "None" ] && [[ "$STREAM" != *"error"* ]]; then
-            aws logs get-log-events --log-group-name "$LOG_GROUP" --log-stream-name "$STREAM" \
-              --limit 50 --query 'events[].message' --output text
-          else
-            echo "no log stream (or missing logs perms): $STREAM"
-          fi
-          echo "::endgroup::"
           exit 0

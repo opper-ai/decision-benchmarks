@@ -8,4 +8,4 @@ rather than ported to it. The game of Snake itself is a classic with no single a
   (Johnny Chadda, Felix Wunderlich, Jose Sabater), as does the opper.ai chrome in `packages/kit`.
 - Fonts in `public/fonts/`, as on jevman: Wix Madefor Display and Wix Madefor Text (Wix.com, SIL Open Font License
   1.1), Press Start 2P (CodeMan38, SIL Open Font License 1.1) and JetBrains Mono (JetBrains, SIL Open Font License
-  1.1).
+  1.1). The license texts are in `public/fonts/OFL.txt`.

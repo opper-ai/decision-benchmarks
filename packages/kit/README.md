@@ -13,5 +13,5 @@ the bench and the submissions check. See [docs/design.md](../../docs/design.md) 
 
 ## License
 
-AGPL-3.0-or-later (see [LICENSE](../../LICENSE)), as jevman, which the kit was extracted from; authors Johnny Chadda,
+AGPL-3.0-or-later (see [LICENSE](../../LICENSE)), as jevman ([joch/jevman](https://github.com/joch/jevman)), which the kit was extracted from; authors Johnny Chadda,
 Felix Wunderlich and Jose Sabater.
