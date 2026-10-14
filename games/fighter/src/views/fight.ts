@@ -3,7 +3,7 @@ import { modelMaker } from '../../../../packages/kit/shared/models.ts';
 import type { Adapter } from '../../shared/adapter.ts';
 import { BASELINE_THINK_MS } from '../../shared/baselines.ts';
 import { Match } from '../../shared/match.ts';
-import { DEFAULT_OPPONENT, MODELS, modelInfo, type ModelInfo } from '../../shared/models.ts';
+import { DEFAULT_OPPONENT, MODELS, modelInfo } from '../../shared/models.ts';
 import type { Track } from '../../shared/question.ts';
 import type { FighterMeta, Replay } from '../../shared/replay.ts';
 import { downloadReplay, type Me } from '../api.ts';
@@ -23,10 +23,6 @@ export const COLORS = [SIDES[0].deep, SIDES[1].deep] as const;
 const STORE = 'fighter.setup';
 /** A model's answer comes through the game's server, which gives it 2 s; the page waits a little longer. */
 const MAX_DEADLINE_MS = 2500;
-/** The pair "watch two baselines" plays: the two strongest. */
-const BASELINE_PAIR = ['baseline/maximin', 'baseline/greedy'] as const;
-/** The baselines a player can fight instead of a model: the four the benchmark uses. */
-const PLAYABLE_BASELINES = ['baseline/maximin', 'baseline/payoff', 'baseline/greedy', 'baseline/random'];
 
 export interface Setup {
   left: string;
@@ -85,52 +81,40 @@ export interface PickerOptions {
 }
 
 /**
- * "Fight an AI", over the stage as jevman's "Who plays the ghosts?" is in its cabinet: one choice, the opponent, and you
- * fight it in real time. The rest (paused mode, the answer deadline, the track, your side) waits under Advanced. When no
- * model can play for this visitor, an honest line says why, and the free baselines take the models' place.
+ * "Fight an AI", over the stage as jevman's "Who plays the ghosts?" is in its cabinet: pick a decision model, then fight
+ * it in real time on the keyboard. Only models: the baselines are for the leaderboard and Watch. Paused mode, your side,
+ * the track and the deadline wait, closed, under Advanced. When no model can play for this visitor the models still
+ * show, and the button asks them to sign in, or a line says why not.
  */
 export function pickerCard(o: PickerOptions): HTMLElement {
   const saved = loadSetup();
   const problem = modelProblem(o.me);
   const models = MODELS.filter((m) => m.kind === 'systemone');
-  const baselines = PLAYABLE_BASELINES.map((id) => modelInfo(id));
-  let side: 0 | 1 = saved.left !== HUMAN && saved.right === HUMAN ? 1 : 0;
-  const savedOpponent = side === 0 ? saved.right : saved.left;
-  const playable = (id: string) => baselines.some((m) => m.id === id) || (!problem && models.some((m) => m.id === id));
-  let opponent = playable(savedOpponent) ? savedOpponent : problem ? baselines[0]!.id : DEFAULT_OPPONENT;
+  const savedSide: 0 | 1 = saved.left !== HUMAN && saved.right === HUMAN ? 1 : 0;
+  const savedOpponent = savedSide === 0 ? saved.right : saved.left;
+  let opponent = models.some((m) => m.id === savedOpponent) ? savedOpponent : DEFAULT_OPPONENT;
 
-  const radios: HTMLButtonElement[] = [];
-  const pick = (id: string) => {
-    opponent = id;
-    for (const b of radios) b.setAttribute('aria-checked', String(b.dataset.id === id));
-    refresh();
-  };
-  const radio = (b: HTMLButtonElement, id: string) => {
-    b.dataset.id = id;
-    b.setAttribute('aria-checked', String(id === opponent));
-    b.addEventListener('click', () => pick(id));
-    radios.push(b);
-    return b;
-  };
-  const tile = (m: ModelInfo) => {
+  const tiles = models.map((m) => {
     const maker = modelMaker(m.id) ?? '';
-    return radio(
-      h('button.tile', { type: 'button', role: 'radio', title: maker ? `${m.label}, by ${maker}` : m.label }, h('span.mark', { style: { background: tint(maker || m.label) }, 'aria-hidden': 'true' }, m.label.slice(0, 1)), h('span.tile-text', null, h('b', null, m.label), h('small', null, maker))) as HTMLButtonElement,
-      m.id,
+    const b = h(
+      'button.tile',
+      { type: 'button', role: 'radio', 'aria-checked': String(m.id === opponent), title: maker ? `${m.label}, by ${maker}` : m.label },
+      h('span.mark', { style: { background: tint(maker || m.label) }, 'aria-hidden': 'true' }, m.label.slice(0, 1)),
+      h('span.tile-text', null, h('b', null, m.label), h('small', null, maker)),
     );
-  };
-  const baseChip = (m: ModelInfo) => radio(h('button.chip', { type: 'button', role: 'radio' }, m.label.replace(/ baseline$/, '')) as HTMLButtonElement, m.id);
+    b.addEventListener('click', () => {
+      opponent = m.id;
+      tiles.forEach((t, k) => t.setAttribute('aria-checked', String(models[k]!.id === opponent)));
+    });
+    return b;
+  });
 
   const x = h('button.x', { type: 'button', 'aria-label': 'Back to watching', title: 'Back to watching (Esc)', html: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' });
   x.addEventListener('click', o.close);
-  const sub = h('p.fnote');
-  const go = h('button.fight-go.big', { type: 'button' }, h('span.tri', { 'aria-hidden': 'true' }), 'Fight');
-  const pay = h('p.pick-pay');
 
-  // Advanced: closed unless something in it is already set.
+  // Advanced, closed: paused mode, your side, the track and the deadline (empty = automatic: 2 s, 2.5 s paused).
   const pausedBox = h('input', { type: 'checkbox', id: 'paused', checked: saved.mode === 'paused' }) as HTMLInputElement;
-  const rightBox = h('input', { type: 'checkbox', id: 'right-side', checked: side === 1 }) as HTMLInputElement;
-  // Empty = automatic: 2 s in real time, 2.5 s paused.
+  const rightBox = h('input', { type: 'checkbox', id: 'right-side', checked: savedSide === 1 }) as HTMLInputElement;
   const deadline = h('input', { id: 'deadline', type: 'number', min: 300, max: MAX_DEADLINE_MS, step: 100, placeholder: 'auto', value: saved.deadline || '' }) as HTMLInputElement;
   const track = h(
     'select',
@@ -138,19 +122,16 @@ export function pickerCard(o: PickerOptions): HTMLElement {
     h('option', { value: 'raw', selected: saved.track !== 'assisted' }, 'Raw: situation and rules only'),
     h('option', { value: 'assisted', selected: saved.track === 'assisted' }, 'Assisted: options show payoffs'),
   ) as HTMLSelectElement;
-  const advOpen = saved.mode === 'paused' || side === 1 || saved.deadline > 0 || saved.track === 'assisted';
   const advPanel = h(
     'div.adv',
-    { id: 'pick-advanced', hidden: !advOpen },
-    h('label.check', { for: 'paused' }, pausedBox, ' Wait for each answer (paused)'),
-    h('p.fnote', null, 'The fight stops while the AI thinks, so only its choices count, not its speed. The leaderboard is played in real time.'),
+    { id: 'pick-advanced', hidden: true },
+    h('label.check', { for: 'paused' }, pausedBox, ' Paused: the fight waits for each answer'),
     h('label.check', { for: 'right-side' }, rightBox, ' Play on the right'),
     h('div.fields', null, h('label.field', { for: 'track' }, 'Track', track), h('label.field', { for: 'deadline' }, 'Answer deadline (ms)', deadline)),
-    h('p.fnote', null, "Raw gives only the situation and the rules (the benchmark's track, with real time and the 2 s deadline). Assisted adds each move's payoff against the opponent's likely answers, an easier test."),
   );
   const advToggle = h(
     'button.adv-toggle',
-    { type: 'button', 'aria-controls': 'pick-advanced', 'aria-expanded': String(advOpen) },
+    { type: 'button', 'aria-controls': 'pick-advanced', 'aria-expanded': 'false' },
     'Advanced',
     h('span.chev', { html: '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>' }),
   );
@@ -158,12 +139,9 @@ export function pickerCard(o: PickerOptions): HTMLElement {
     advPanel.hidden = !advPanel.hidden;
     advToggle.setAttribute('aria-expanded', String(!advPanel.hidden));
   });
-  rightBox.addEventListener('change', () => {
-    side = rightBox.checked ? 1 : 0;
-    refresh();
-  });
 
-  const begin = (left: string, right: string) => {
+  const begin = () => {
+    const [left, right] = rightBox.checked ? [opponent, HUMAN] : [HUMAN, opponent];
     const ps = [planFighter(left, o.me, o.hooks), planFighter(right, o.me, o.hooks)] as [Plan, Plan];
     if (ps.some((p) => p.problem)) return;
     const paused = pausedBox.checked;
@@ -181,54 +159,41 @@ export function pickerCard(o: PickerOptions): HTMLElement {
     }
     o.start(s, ps);
   };
-  go.addEventListener('click', () => (side === 0 ? begin(HUMAN, opponent) : begin(opponent, HUMAN)));
 
-  function refresh(): void {
-    sub.textContent = `You're on the ${side === 0 ? 'left' : 'right'}, on the keyboard. Your opponent picks every move it makes.`;
-    const isModel = models.some((m) => m.id === opponent);
-    go.toggleAttribute('disabled', isModel && Boolean(problem));
-    pay.replaceChildren();
-    const signInLink = (text: string) => h('button.linkish', { type: 'button', onclick: o.signIn }, text);
-    if (!isModel) pay.append('A baseline follows one fixed rule and runs in your browser: free, no model calls.');
-    else if (o.me.mode === 'player') pay.append(`On your Opper account${o.me.user?.email ? ` (${o.me.user.email})` : ''}.`);
+  // The button and one line under it: who pays, or how to get in, or why no model can play.
+  const go = h('button.fight-go.big', { type: 'button' });
+  const pay = h('p.pick-pay');
+  const signIn = (text: string) => h('button.linkish', { type: 'button', onclick: o.signIn }, text);
+  if (problem && o.me.loginAvailable && o.me.mode !== 'player') {
+    go.append('Sign in to fight');
+    go.addEventListener('click', o.signIn);
+    pay.append(o.poolEmpty || o.me.pool?.open === false ? 'The free credits are used up: fight on your own Opper account.' : 'Fights run on your own Opper account.');
+  } else if (problem) {
+    go.append(h('span.tri', { 'aria-hidden': 'true' }), 'Fight');
+    go.disabled = true;
+    pay.append(o.me.unavailable ? "Couldn't reach the server. Try again in a moment." : 'No model can play on this server right now.');
+  } else {
+    go.append(h('span.tri', { 'aria-hidden': 'true' }), 'Fight');
+    go.addEventListener('click', begin);
+    if (o.me.mode === 'player') pay.append(`On your Opper account${o.me.user?.email ? ` (${o.me.user.email})` : ''}.`);
     else if (o.me.mode === 'dev') pay.append('On the local key from .env.');
-    else if (o.me.mode === 'pool') {
+    else {
       const left = o.me.pool?.remainingUsd;
-      pay.append(`Free while Opper's shared credits last${left !== null && left !== undefined ? ` ($${left.toFixed(2)} left)` : ''}.`);
-      if (o.me.loginAvailable) pay.append(' ', signInLink('Sign in'), ' to play on your own account.');
+      pay.append(`Free while Opper's credits last${left !== null && left !== undefined ? ` ($${left.toFixed(2)} left)` : ''}.`);
+      if (o.me.loginAvailable) pay.append(' ', signIn('Sign in'), ' to use your own.');
     }
   }
 
-  // The honest line when no model can play here: why, the way in, and what is free.
-  let warn: HTMLElement | null = null;
-  if (problem) {
-    warn = h('p.fwarn', { role: 'status' });
-    if (o.me.loginAvailable && o.me.mode !== 'player') {
-      warn.append(o.poolEmpty || o.me.pool?.open === false ? 'The free credits are used up. ' : 'No decision model can play here without an Opper account. ', h('button.linkish', { type: 'button', onclick: o.signIn }, 'Sign in with Opper'), ' to play one on your own account.');
-    } else warn.append(problem);
-  }
-
-  const card = h(
+  return h(
     'div.fcard',
     { role: 'dialog', 'aria-label': 'Fight an AI' },
     x,
-    h('div.pick-head', null, h('p.fcard-title', null, 'Who do you fight?'), sub),
-    warn,
-    problem ? null : h('div.opp-grid', { role: 'radiogroup', 'aria-label': 'Decision models' }, ...models.map(tile)),
-    h(
-      'div.alt-row',
-      { role: 'radiogroup', 'aria-label': 'Baselines' },
-      h('span', null, problem ? 'Fight a baseline instead, free:' : 'Or a baseline, free:'),
-      ...baselines.map(baseChip),
-      problem ? h('button.linkish', { type: 'button', onclick: () => begin(BASELINE_PAIR[0], BASELINE_PAIR[1]) }, 'or watch two baselines fight') : null,
-    ),
-    keysStrip(),
+    h('div.pick-head', null, h('p.fcard-title', null, 'Who do you fight?'), h('p.fnote', null, 'Pick an AI model. It picks every move; you fight it on the keyboard.')),
+    h('div.opp-grid', { role: 'radiogroup', 'aria-label': 'AI models' }, ...tiles),
     h('div.go-row', null, go),
     h('div.pick-foot', null, pay, advToggle),
     advPanel,
   );
-  refresh();
-  return card;
 }
 
 export interface LiveOptions {

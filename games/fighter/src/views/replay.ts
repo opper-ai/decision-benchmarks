@@ -13,7 +13,7 @@ import { clipName, exportClip, exportSupported } from '../export.ts';
 import { OUTCOME_COLORS } from '../theme.ts';
 import { fullscreenButton } from './fullscreen.ts';
 import { activityDrawer } from './panel.ts';
-import { floorLabel, ICONS, stageShell, toolButton } from './shell.ts';
+import { floorLabel, ICONS, menuTool, stageShell, toolButton } from './shell.ts';
 
 export interface ReplayOptions {
   /** The recording's address on this page, for a recorded match (Copy link). */
@@ -50,7 +50,22 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
   playTool.classList.add('tool-play');
   const thoughtsTool = toolButton('Thoughts (T)', ICONS.thoughts);
   thoughtsTool.setAttribute('aria-pressed', 'true');
-  const speedSel = h('select.tsel', { 'aria-label': 'Speed', title: 'Speed' }, ...[0.25, 0.5, 1, 2, 4].map((x) => h('option', { value: x, selected: x === 1 }, `${x}×`))) as HTMLSelectElement;
+  // Speed: a square tool showing the speed, opening the five to pick from.
+  const speedBtn = toolButton('Speed', '1×');
+  speedBtn.classList.add('txt');
+  const speeds: [number, string][] = [[0.25, '¼×'], [0.5, '½×'], [1, '1×'], [2, '2×'], [4, '4×']];
+  const speedOpts = speeds.map(([x, short]) => {
+    const b = h('button.tmenu-opt', { type: 'button', role: 'menuitemradio', 'aria-checked': String(x === 1) }, h('span', null, `${x}×`), x === 1 ? h('small', null, 'normal') : null);
+    b.addEventListener('click', () => {
+      speed = x;
+      stage.tickMs = TICK_MS / x;
+      speedBtn.textContent = short;
+      speedOpts.forEach((o, k) => o.setAttribute('aria-checked', String(speeds[k]![0] === x)));
+      speedMenu.close();
+    });
+    return b;
+  });
+  const speedMenu = menuTool(speedBtn, h('div', { 'aria-label': 'Speed' }, ...speedOpts));
   const clipTool = toolButton('Save a clip', ICONS.clip);
   const timeEl = h('span.time');
   const timeline = new Timeline(r, player.events, (t) => seek(t));
@@ -167,10 +182,6 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
 
   playTool.addEventListener('click', togglePlay);
   thoughtsTool.addEventListener('click', () => setThoughts(!stage.renderer.showBubbles));
-  speedSel.addEventListener('change', () => {
-    speed = Number(speedSel.value);
-    stage.tickMs = TICK_MS / speed;
-  });
   stageHost.addEventListener('click', () => toggle());
 
   let dragging = false;
@@ -223,7 +234,7 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
   const { box, tools } = stageShell(stageHost, floorLabel(opts.kind === 'yours' ? 'Your match' : 'Replay', r.fighters), opts.cta ?? null);
   const fs = fullscreenButton(box);
   fs.el.className = 'tbtn';
-  tools.append(playTool, thoughtsTool, speedSel, soundTool(), clipTool, fs.el);
+  tools.append(playTool, thoughtsTool, speedMenu.el, soundTool(), clipTool, fs.el);
 
   // Export: the clip settings open under the stage.
   const exportPanel = h('div.export', { hidden: true });
@@ -415,6 +426,7 @@ export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {
     audio.scene(false);
     audio.hold(false);
     fs.destroy();
+    speedMenu.destroy();
     window.removeEventListener('keydown', onKey);
     host.removeEventListener('pointerdown', onPointer);
     stage.destroy();

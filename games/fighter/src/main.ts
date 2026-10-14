@@ -106,7 +106,6 @@ async function page(): Promise<void> {
   };
 
   // ---------- the leaderboard ----------
-  const pct = (v: number | string) => `${fmt(Number(v))}%`;
   void loadLeaderboard($<HTMLTableElement>('#leaderboard-table'), appPath, {
     metric: 'Rounds won (mean ± margin)',
     format: (n) => `${fmt(n)}%`,
@@ -115,12 +114,7 @@ async function page(): Promise<void> {
     // Real time: the moves the fallback made (an answer over 2 s, or unusable), and how long answers took.
     fallbacks: 'Late moves',
     latency: 'Mean latency',
-    extra: [
-      { label: 'vs greedy', key: 'vsGreedy', format: pct },
-      { label: 'vs payoff', key: 'vsPayoff', format: pct },
-      { label: 'vs maximin', key: 'vsMaximin', format: pct },
-      { label: 'vs random', key: 'vsRandom', format: pct },
-    ],
+    // The rounds won against each baseline stay in leaderboard.json (extra), off the table: one score per model.
   });
 
   // ---------- the stage: a recording (Watch), the picker, a live fight ----------

@@ -23,6 +23,34 @@ export function toolButton(label: string, html: string): HTMLButtonElement {
 }
 
 /**
+ * A tool that opens a small menu above it (sound, speed): its button opens and closes it, a click elsewhere or Esc
+ * closes it. `destroy` drops the page-wide listener.
+ */
+export function menuTool(btn: HTMLButtonElement, menu: HTMLElement): { el: HTMLElement; close: () => void; destroy: () => void } {
+  menu.classList.add('tmenu');
+  menu.setAttribute('role', 'menu');
+  btn.setAttribute('aria-haspopup', 'menu');
+  const open = (on: boolean) => {
+    menu.hidden = !on;
+    btn.setAttribute('aria-expanded', String(on));
+  };
+  open(false);
+  btn.addEventListener('click', () => open(menu.hidden !== false));
+  const el = h('span.tool-menu', null, btn, menu);
+  const outside = (e: PointerEvent) => {
+    if (!el.contains(e.target as Node)) open(false);
+  };
+  document.addEventListener('pointerdown', outside);
+  el.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || menu.hidden) return;
+    e.stopPropagation();
+    open(false);
+    btn.focus();
+  });
+  return { el, close: () => open(false), destroy: () => document.removeEventListener('pointerdown', outside) };
+}
+
+/**
  * The stage as both views show it (a recording, a live fight), after jevman's cabinet: the paper stage, and on its floor
  * (the band under the ground line) who is on at the left, the page's one primary button in the middle and the tools at
  * the right. The tools show while the pointer is over the stage or it is paused, and always on a touch screen. On a
