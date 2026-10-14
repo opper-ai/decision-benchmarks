@@ -176,7 +176,7 @@ with a permanent redirect.
 - **snake** (Arcade, ours): a model steers a snake on a seeded 16 x 16 board, one `choice` per step (the direction the
   head moves next, every direction but the reverse offered, in a shuffled order), in real time: the snake steps every 275 ms for every model, and a step whose answer is not in by the tick is
   played by a fallback that never steers toward the apple, so the score is decision quality and speed together.
-  Score = apples eaten, until death, 150 steps without an apple or 1000 steps. Players race a model on the same server-issued seed,
+  Score = apples eaten, until death, 150 steps without an apple or 1000 steps. Players play on the models' clock on a server-issued seed,
   and their game is replayed on the server for the high-score board. Rules: `games/snake/SPEC.md`.
 - **fighter** (Jev Fighter, Fighting): a deterministic 2D fighting game. One benchmark game is one live match (real
   time at the game's normal speed, raw track: the situation and the rules, no payoff rows) against one of four
@@ -185,7 +185,8 @@ with a permanent redirect.
   played by a fallback that blocks. The verifier replays the match tick by tick from the recorded ticks each answer
   was applied on, recomputes the baselines' moves and checks every model move's legality where it was applied, the
   fallback rule and the checkpoint hashes; when each answer arrived is as recorded (self-reported in a submission). Its five baselines (`random`, `guard`, `greedy`,
-  `payoff`, `maximin`) are on its page, from `public/baselines.json`. Question design:
+  `payoff`, `maximin`) have their results in `public/baselines.json`. Its page is a game to play, not a benchmark
+  (`game.json`: `benchmark: false`): no leaderboard there or on the hub. Question design:
   `games/fighter/docs/specs/2026-10-06-v2-harness.md`.
 
 ## License

@@ -586,7 +586,7 @@ function showResult(you: { state: GameState; moves: string }, token: string | nu
   const place = token ? placeFor(boards, BOARD, apples) : null;
   if (token && place !== null) {
     const made = el('div', undefined, 'made');
-    made.append(el('p', place === 1 ? 'A new high score' : `Your apples make #${place}`, 'made-title'));
+    made.append(el('p', place === 1 ? "Top of the players' board" : `#${place} on the players' board`, 'made-title'));
     const form = el('form', undefined, 'initials');
     const input = el('input');
     input.maxLength = 3;
@@ -616,13 +616,13 @@ function showResult(you: { state: GameState; moves: string }, token: string | nu
         }
         boards = r.boards;
         showHighScore();
-        status.textContent = r.place ? `You're #${r.place} on the board` : 'Saved, but it no longer makes the top ten';
+        status.textContent = r.place ? `You're #${r.place} on the players' board` : 'Saved, but it no longer makes the top ten';
         form.hidden = true;
       });
     });
     card.append(made);
     queueMicrotask(() => input.focus());
-  } else if (token && apples > 0) card.append(el('p', 'Not enough apples for the top ten this time.', 'tap'));
+  } else if (token && apples > 0) card.append(el('p', boards ? 'Not enough apples for the top ten this time.' : "The high scores aren't available right now, so this game can't go on them.", 'tap'));
   const btns = el('div', undefined, 'over-btns');
   const again = el('button', undefined, 'press');
   again.type = 'button';
@@ -642,6 +642,8 @@ tag(playCta, 'click_play', { source: 'board' });
 playCta.addEventListener('click', () => void play());
 
 window.addEventListener('keydown', (e) => {
+  // Typing initials: every key is the input's (Escape too, so it can't throw away a game not yet entered).
+  if (e.target instanceof Element && e.target.closest('input, textarea')) return;
   if (e.key === 'Escape') {
     if (!drawer.hidden) return setDrawer(false);
     if (scoresOpen) return closeScores();
@@ -650,7 +652,6 @@ window.addEventListener('keydown', (e) => {
     if (mode === 'play') return void watch();
   }
   if (e.altKey || e.ctrlKey || e.metaKey) return;
-  if (e.target instanceof Element && e.target.closest('input, textarea')) return;
   if (e.key === 'p' || e.key === 'P') return togglePause();
   if (!live) return;
   const h = KEYS[e.key];

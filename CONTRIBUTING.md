@@ -7,7 +7,8 @@ issue. We port and review every game ourselves: only our own code runs on opper.
 
 ## Benchmark your own model
 
-Every game here has a leaderboard with two parts:
+Every benchmark here has a leaderboard with two parts (Jev Fighter is a game to play, not a benchmark: its bench still
+runs, but no page or hub shows its results):
 
 - **Our runs.** We play every decision model Opper serves ourselves. If your model is on Opper, it gets run when it
   lands in [`packages/kit/shared/models.ts`](packages/kit/shared/models.ts).
@@ -67,7 +68,7 @@ npm run bench -- --game <slug> --endpoint http://localhost:8787 --submit games/<
   --name "My Model" --by your-github-handle --url https://example.com/my-model
 ```
 
-This plays the game's minimum number of games for a submission (24 for snake and fighter; 100 to match our runs: add
+This plays the game's minimum number of games for a submission (24 for snake; 100 to match our runs: add
 `--games 100`), on the
 game's fixed seeds, so every model faces the same games. It writes `games/<slug>/submissions/my-model/`, holding
 `submission.json` and one `game-NN.json.gz` per game. The folder name is your model's id: lowercase letters, digits

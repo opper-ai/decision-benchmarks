@@ -244,7 +244,7 @@ main { display: block; padding-bottom: 96px; }
 /* ---------- small screens ---------- */
 @media (max-width: 900px) {
   .section { margin-top: 64px; }
-  .tablecard .table-scroll { display: none; }
+  .tablecard:has(.lbl) .table-scroll { display: none; }
   .lbl { display: block; }
 }
 @media (max-width: 520px) { .user-menu .name { display: none; } }

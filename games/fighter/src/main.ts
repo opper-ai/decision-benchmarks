@@ -1,7 +1,7 @@
-// Jev Fighter's page, laid out as every game page is (Snake's, after jevman's): opper.ai's chrome, the hero, the stage
-// playing a recorded match with "Fight an AI" on its floor and Activity folding out under it, a chip per recording, then
-// the Leaderboard, Benchmark your model and Method sections. Watch plays recordings only: no model is called for a
-// visitor who did not ask to fight.
+// Jev Fighter's page: a game to play against the models, not a benchmark. opper.ai's chrome, the hero, the stage
+// playing a recorded match (model against model) with "Fight an AI" on its floor and Activity folding out under it, a
+// chip per recording, then How it works. Watch plays recordings only: no model is called for a visitor who did not ask
+// to fight.
 import { accountNotice, fetchMe, POOL_EMPTY_NOTICE, renderAccount, renderDrawerAccount, signIn, takeAuthError, updatePoolAmount, walletNotice, type AccountView, type Me } from '../../../packages/kit/client/auth.ts';
 import { appPath } from '../../../packages/kit/client/paths.ts';
 import { tag, track, trackClicks } from '../../../packages/kit/client/track.ts';

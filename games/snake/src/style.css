@@ -17,6 +17,9 @@
 .tv { width: min(440px, 100%); }
 /* Your game: the whole cabinet takes swipes, not scrolls (as jevman's card). */
 .tv.you { touch-action: none; user-select: none; -webkit-user-select: none; }
+/* ...but not the cards over the board: the game-over card scrolls on a phone, and Safari types into its initials only
+   where text can be selected. */
+.tv.you .overlay { touch-action: auto; user-select: text; -webkit-user-select: text; }
 /* The cabinet's top strip: who plays over the apples, the players' high score in the middle, the steps on the right. */
 .arcade-top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 12px; padding: 2px 4px 0; }
 .arcade-top .cell { display: grid; gap: 2px; min-width: 0; }

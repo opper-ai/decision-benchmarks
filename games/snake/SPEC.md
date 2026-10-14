@@ -57,8 +57,8 @@ absolute direction (`up`, `right`, `down`, `left`), without the reverse: always 
 ## Baselines (free, `--model baseline/<name>`)
 
 `baseline/random` (uniform over non-deadly moves), `baseline/greedy` (closest to the apple among non-deadly),
-`baseline/flood` (greedy, but never into a region smaller than its length). Shown on the game page for reference, not
-on the official leaderboard.
+`baseline/flood` (greedy, but never into a region smaller than its length). Never on the official leaderboard, and not
+shown on the game page (see "Official runs").
 
 ## Recording and verify
 
