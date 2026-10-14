@@ -33,15 +33,15 @@ absolute direction (`up`, `right`, `down`, `left`), without the reverse: always 
   the move: 5. Cells reachable from there: 40 (the snake is 4 long after the move).` A deadly move says plainly that it
   ends the game: `Go left: Next cell: the wall. The game ends.` No option is labelled "safe" or "best".
 - The options' order is shuffled every step, deterministically from what the request shows (the step, the head and
-  the apple, whose place comes from the seed), so the bench, the page's race and the service's request check
-  (`game.server.ts`, which rebuilds the request and compares it exactly) build the same question. The seed itself is
+  the apple, whose place comes from the seed), so the bench and the service's request check (`game.server.ts`, which
+  rebuilds the request and compares it exactly) build the same question. The seed itself is
   not in the request, so the service could not use it.
 - Keep a question under about 600 tokens.
 - benchVersion 2 asked for `left`/`straight`/`right` in a fixed order with the apple placed relative to the heading;
   weaker models misread it (one answered `left` on almost every step, others walked straight into walls). Version 3
   changes only the wording and the clock.
-- Clock: the game steps every 275 ms (`STEP_MS`, about 3.6 steps a second), the same speed for every model (the
-  race's Normal speed). Each step gives the model 275 ms, plus any time left from the previous step: it is asked
+- Clock: the game steps every 275 ms (`STEP_MS`, about 3.6 steps a second), the same speed for every model (and for
+  you, when you play on the page). Each step gives the model 275 ms, plus any time left from the previous step: it is asked
   early, as soon as its answer for the coming step is in (the board after that step is then known), never more than
   one step ahead. An answer that is in by its step's tick moves the snake. If the tick comes first, the request is
   cancelled (AbortController), the fallback moves the snake, and the next question goes out at that tick. One request
@@ -75,9 +75,9 @@ submissions are labelled self-reported (as on JevMan).
 ## Page (games/snake/index.html, JevMan-style: dark, arcade, Opper chrome from the kit)
 
 - Hero: the board playing the top model's recorded game (Watch = recordings only), model chips to switch recordings.
-- Play: you (arrow keys / swipe) on the left board, a model of your choice on the right board, same seed; both start
-  together on one clock (see "Race speed" below). When both are over, show both scores; enter initials for the board.
-  The seed for a high-score game is issued by the server (/api/snake/seed, signed), not chosen by the client.
+- Play: your own game (arrow keys / swipe) on the board, at the models' clock. At game over, your apples and where
+  they would rank among the models' means; enter initials for the board. The seed for a high-score game is issued by
+  the server (/api/snake/seed, signed), not chosen by the client.
 - High scores: one board `classic` (your apples). Server replays your inputs from the issued seed.
 - Leaderboard section: official + community rows from leaderboard.json/community.json, Run by column, =1 ties,
   "Benchmark your model" link to CONTRIBUTING.md.
@@ -87,8 +87,8 @@ submissions are labelled self-reported (as on JevMan).
 
 `npm run bench -- --game snake --leaderboard` plays 100 games per model on the fixed seeds. Until official runs are
 published, leaderboard.json has no entries (a valid contract shape). The baselines' results go in a separate
-public/baselines.json (same entry shape) that only the game page reads: the hub's model leaderboard must never show
-a baseline as a model.
+public/baselines.json (same entry shape), which neither the game page nor the hub shows: the hub's model leaderboard
+must never show a baseline as a model.
 
 ## As built (where the kit or the build changed this spec, and why)
 
@@ -100,12 +100,11 @@ a baseline as a model.
 - **Player recording.** `{ format: 1, game: 'snake', seedToken, moves }`, `moves` one letter a step (`L`, `S`, `R`).
   The server replays them from the token's seed only; it also refuses a game sent sooner after the seed was issued
   than 80% of its steps take at 8 steps a second, so a game can't be computed and sent at once.
-- **Race speed.** The page races you and the AI in real time on one clock, at a speed the visitor picks: Relaxed
-  (a step every 400 ms), Normal (275 ms, the default) or Fast (125 ms). The AI is asked early, one request at a time,
-  exactly as in the benchmark; an answer that isn't in by its tick is too late, and the benchmark's fallback moves the
-  snake instead. All speeds share one high-score board, and the check above uses the
-  Fast step as its floor, so a game played at a slower speed always passes it. Normal is the benchmark's clock: the
-  AI's side of the race is the benchmark's own real-time player (`RealtimeSnake`, `shared/play.ts`).
+- **Play.** Your own game, on one board, at the models' clock (`STEP_MS`). The page first raced you against a model
+  on a second board, at a speed you picked; Snake has no play-against angle (the two games never meet), so it now
+  plays you alone and compares your apples with the models' means at game over. No model plays for a visitor, so
+  playing needs no sign-in or credits. A click on the board or P pauses (a pause only adds time, so the check above
+  still passes); a hidden tab pauses it too.
 - **Benchmark recording.** As specified, plus `costUsd` per step (the leaderboard's cost column needs it) and
   `result: { score, steps, end }` (`end`: `wall`, `body`, `starved`, `steps` or `full`). A cancelled call's step
   records the time it had (from sending to the tick: 275 ms, or more when it was asked early), so mean latency counts
@@ -125,7 +124,6 @@ a baseline as a model.
   Watch has a chip for every ranked model, in leaderboard order, the top one playing first; each plays that
   model's official game whose apples are closest to its mean (on a tie, the lowest seed), gzipped as the bench wrote
   it (public/demo/<model>.json.gz, listed in src/recordings.ts). A model the leaderboard skips gets no chip. Before
-  the official run Watch played the baselines' recordings; the baselines now show only in the leaderboard, in a group
-  of their own below the ranking. `community.json` is built from `submissions/` at build
-  time, so the page copes with it missing. Play shows every decision model; signed out with no free credits, they are
-  greyed out with a note to sign in, and the baselines (run in the browser, free) can still be raced.
+  the official run Watch played the baselines' recordings; the page no longer shows the baselines at all. `community.json` is built from `submissions/` at build
+  time, so the page copes with it missing. The leaderboard, Watch chips and HIGH SCORE follow jevman's: makers' marks, the
+  players' top ten behind HIGH SCORE, and each recording's highlight (MP4, GIF) to save.

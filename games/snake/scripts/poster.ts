@@ -1,11 +1,12 @@
-// Renders public/poster.png (16:9, for the hub's game card) from a real recorded game: the flood-fill baseline's
-// (scripts/flood.json, Watch's demo before the official run), at the step it has the most apples before it ends.
+// Renders public/poster.png (16:9, for the hub's game card) from a real recorded game: the top model's official game
+// that Watch plays first (public/demo/, src/recordings.ts), at its last step before it ends.
 // Node only, no dependencies: the board is drawn with the page's own renderer into a pixel buffer, the lettering with
 // a small 5 x 7 pixel font, and the PNG encoded with zlib.
 // Run: node games/snake/scripts/poster.ts
 import { readFileSync, writeFileSync } from 'node:fs';
-import { deflateSync } from 'node:zlib';
+import { deflateSync, gunzipSync } from 'node:zlib';
 import { createGame, step, type GameState, type Move } from '../shared/engine.ts';
+import { RECORDINGS } from '../src/recordings.ts';
 import { AI, paintBoard, type Painter } from '../src/render.ts';
 
 const W = 1280;
@@ -42,6 +43,7 @@ const FONT: Record<string, string[]> = {
   D: ['11110', '10001', '10001', '10001', '10001', '10001', '11110'],
   E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
   F: ['11111', '10000', '10000', '11110', '10000', '10000', '10000'],
+  G: ['01111', '10000', '10000', '10111', '10001', '10001', '01111'],
   H: ['10001', '10001', '10001', '11111', '10001', '10001', '10001'],
   I: ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
   K: ['10001', '10010', '10100', '11000', '10100', '10010', '10001'],
@@ -53,6 +55,7 @@ const FONT: Record<string, string[]> = {
   R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
   S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
   T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+  U: ['10001', '10001', '10001', '10001', '10001', '10001', '01110'],
   Y: ['10001', '10001', '01010', '00100', '00100', '00100', '00100'],
   '0': ['01110', '10011', '10101', '10101', '11001', '10001', '01110'],
   '1': ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
@@ -65,6 +68,7 @@ const FONT: Record<string, string[]> = {
   '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
   '9': ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
   ' ': ['00000', '00000', '00000', '00000', '00000', '00000', '00000'],
+  '-': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
 };
 function text(s: string, x: number, y: number, size: number, color: string): void {
   [...s].forEach((ch, n) => {
@@ -74,8 +78,9 @@ function text(s: string, x: number, y: number, size: number, color: string): voi
   });
 }
 
-// The flood-fill baseline's recorded game, at its last step before the end.
-const rec = JSON.parse(readFileSync(new URL('./flood.json', import.meta.url), 'utf8')) as { seed: number; steps: { choice: Move }[] };
+// The top model's recorded game (Watch's first chip), at its last step before the end.
+const top = RECORDINGS[0]!;
+const rec = JSON.parse(gunzipSync(readFileSync(new URL(`../public/${top.path}`, import.meta.url))).toString('utf8')) as { seed: number; steps: { choice: Move }[] };
 let s: GameState = createGame(rec.seed);
 let shown = s;
 for (const st of rec.steps) {
@@ -92,7 +97,8 @@ paintBoard(painter, shown, AI, 36, 56, 36);
 text('SNAKE', 762, 130, 16, '#ffd800');
 text('A DECISION', 762, 300, 7, '#ffffff');
 text('BENCHMARK', 762, 370, 7, '#ffffff');
-text('FLOOD FILL', 762, 500, 5, '#00e5ff');
+// The model's short name ("GPT-6 Luna Decisions" -> "GPT-6 LUNA"), as the cabinet's plate would show it.
+text(top.name.toUpperCase().split(' ').slice(0, 2).join(' '), 762, 500, 5, '#00e5ff');
 text(`${shown.apples} APPLES`, 762, 560, 5, '#8f97ff');
 rect(762, 640, 440, 6, '#2121de');
 

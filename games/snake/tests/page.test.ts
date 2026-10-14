@@ -3,7 +3,9 @@ import { gunzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
 import { validateLeaderboard } from '../../../packages/kit/shared/contract';
 import { leaderboardRows } from '../../../packages/kit/client/leaderboard';
+import { CLIPS } from '../src/clips';
 import { demoFrom, loadDemo, RECORDINGS } from '../src/recordings';
+import { existsSync, statSync } from 'node:fs';
 import game, { seedFor } from '../game';
 import { DECISION_MODELS } from '../../../packages/kit/shared/models';
 import { BENCH_VERSION } from '../shared/recording';
@@ -70,6 +72,19 @@ describe('the committed files', () => {
     const tampered = gz(RECORDINGS[0]!.path);
     tampered.result.score += 1;
     expect(demoFrom(tampered)).toBeNull();
+  });
+
+  it("has every chip's highlight to save, an MP4 and a GIF of the sizes the menu says", () => {
+    expect(Object.keys(CLIPS)).toEqual(RECORDINGS.map((r) => r.model));
+    for (const r of RECORDINGS) {
+      const clip = CLIPS[r.model]!;
+      expect(clip.file, r.model).toBe(r.path.replace(/^demo\//, '').replace(/\.json\.gz$/, ''));
+      for (const format of ['mp4', 'gif'] as const) {
+        const file = new URL(`../public/clips/${clip.file}.${format}`, import.meta.url);
+        expect(existsSync(file), `${clip.file}.${format}`).toBe(true);
+        expect(statSync(file).size).toBe(clip[format]);
+      }
+    }
   });
 
   it('loads a recording gzipped, or unpacked by a server on the way', async () => {
