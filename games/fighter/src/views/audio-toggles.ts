@@ -6,15 +6,38 @@ const NOTE = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"
 
 let made: HTMLElement | null = null;
 
-/** The sound and music switches: one pair for the page, moved into whichever view shows (a recording or a fight). */
-export function audioToggles(): HTMLElement {
+/**
+ * The sound tool on the stage's floor: one speaker that opens the two switches, sound effects and music. One for the
+ * page, moved into whichever view shows (a recording or a fight).
+ */
+export function soundTool(): HTMLElement {
   if (made) return made;
-  const toggle = (key: 'sound' | 'music', label: string, icon: string) => {
-    const b = h('button.fbtn.icon.toggle', { type: 'button', 'aria-pressed': String(audio.settings[key]), 'aria-label': label, title: `${label} on or off`, html: icon });
+  const option = (key: 'sound' | 'music', label: string, icon: string) => {
+    const b = h('button.snd-opt', { type: 'button', role: 'menuitemcheckbox', 'aria-checked': String(audio.settings[key]) }, h('span.snd-icon', { html: icon }), h('span', null, label));
     b.addEventListener('click', () => audio.set({ [key]: !audio.settings[key] }));
-    audio.onChange(() => b.setAttribute('aria-pressed', String(audio.settings[key])));
+    audio.onChange(() => b.setAttribute('aria-checked', String(audio.settings[key])));
     return b;
   };
-  made = h('span.audio-toggles', null, toggle('sound', 'Sound', SPEAKER), toggle('music', 'Music', NOTE));
+  const menu = h('div.snd-menu', { role: 'menu', 'aria-label': 'Sound', hidden: true }, option('sound', 'Sound effects', SPEAKER), option('music', 'Music', NOTE));
+  const btn = h('button.tbtn', { type: 'button', 'aria-label': 'Sound and music', title: 'Sound and music', 'aria-haspopup': 'menu', 'aria-expanded': 'false', html: SPEAKER }) as HTMLButtonElement;
+  const sync = () => btn.classList.toggle('muted', !audio.settings.sound && !audio.settings.music);
+  audio.onChange(sync);
+  sync();
+  const open = (on: boolean) => {
+    menu.hidden = !on;
+    btn.setAttribute('aria-expanded', String(on));
+  };
+  btn.addEventListener('click', () => open(menu.hidden !== false));
+  const wrap = h('span.snd', null, btn, menu);
+  document.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target as Node)) open(false);
+  });
+  wrap.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || menu.hidden) return;
+    e.stopPropagation();
+    open(false);
+    btn.focus();
+  });
+  made = wrap;
   return made;
 }

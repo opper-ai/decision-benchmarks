@@ -1,6 +1,7 @@
 // Jev Fighter's page, laid out as every game page is (Snake's, after jevman's): opper.ai's chrome, the hero, the stage
-// playing a recorded match with a chip per recording, one "Fight an AI" button, then the Leaderboard, Benchmark your
-// model and Method sections. Watch plays recordings only: no model is called for a visitor who did not ask to fight.
+// playing a recorded match with "Fight an AI" on its floor and Activity folding out under it, a chip per recording, then
+// the Leaderboard, Benchmark your model and Method sections. Watch plays recordings only: no model is called for a
+// visitor who did not ask to fight.
 import { accountNotice, fetchMe, POOL_EMPTY_NOTICE, renderAccount, renderDrawerAccount, signIn, takeAuthError, updatePoolAmount, walletNotice, type AccountView, type Me } from '../../../packages/kit/client/auth.ts';
 import { fmt, loadLeaderboard } from '../../../packages/kit/client/leaderboard.ts';
 import { appPath } from '../../../packages/kit/client/paths.ts';
@@ -10,9 +11,11 @@ import type { Replay } from '../shared/replay.ts';
 import { getDemo, getDemos, type Demo } from './api.ts';
 import { audio } from './audio.ts';
 import { h } from './dom.ts';
-import { live, pickerCard } from './views/fight.ts';
+import type { Plan } from './players.ts';
+import { live, pickerCard, type Setup } from './views/fight.ts';
 import { posesView } from './views/poses.ts';
 import { replayView } from './views/replay.ts';
+import { ICONS, stageShell } from './views/shell.ts';
 import { stillView } from './views/still.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -119,8 +122,9 @@ async function page(): Promise<void> {
   // ---------- the stage: a recording (Watch), the picker, a live fight ----------
   const viewer = $('#viewer');
   const overlay = $('#overlay');
-  const cta = $<HTMLButtonElement>('#play-cta');
-  const ctaLabel = $('#play-label');
+  // The page's one primary button: on the stage's floor of whichever view shows, as jevman's PLAY VS AI is in its cabinet.
+  const ctaLabel = h('span', null, 'Fight an AI');
+  const cta = h('button.fight-cta', { type: 'button', id: 'play-cta' }, h('span.tri', { 'aria-hidden': 'true' }), ctaLabel) as HTMLButtonElement;
   const noticeEl = $('#notice');
   const chipsEl = $('#watch-chips');
   let cleanup: () => void = () => {};
@@ -165,22 +169,27 @@ async function page(): Promise<void> {
   let watching: Demo | null = demos.find((d) => d.file === DEMO.exec(location.hash)?.[1]) ?? demos[0] ?? null;
   const short = (title: string) => title.replace(/ baseline\b/g, '');
 
+  /** A chip per recording, no scores (they would give the result away). The playing one can be downloaded. */
   function renderChips(): void {
     chipsEl.replaceChildren(
       ...demos.map((d) => {
-        const b = h('button.chip', { type: 'button', role: 'radio', 'aria-checked': String(mode === 'watch' && d === watching), title: d.note ?? d.title }, h('span', null, short(d.title)));
-        const sub = h('span.sub');
-        void demoFor(d).then((r) => {
-          if (r) sub.textContent = r.result.rounds.filter((x) => x.winner === 0).length + '-' + r.result.rounds.filter((x) => x.winner === 1).length;
-        });
-        b.append(sub);
+        const on = mode === 'watch' && d === watching;
+        const b = h('button.chip', { type: 'button', role: 'radio', 'aria-checked': String(on), title: d.note ?? d.title }, on ? h('span.chip-dot', { 'aria-hidden': 'true' }) : null, h('span', null, short(d.title)));
         b.addEventListener('click', () => {
           watching = d;
           void watch(true);
         });
-        return tag(b, 'click_watch', { source: d.file });
+        const chip = tag(b, 'click_watch', { source: d.file });
+        if (!on) return chip;
+        const save = h('a.chip-save', { href: appPath(`demo/${d.file}`), download: d.file, 'aria-label': `Download this recording (${d.file})`, title: `Download this recording (${d.file})`, html: ICONS.download });
+        return h('span.chip-split', null, chip, tag(save, 'download_recording', { source: d.file }));
       }),
     );
+  }
+
+  /** The stage with a line in place of a match (loading, or none to show), and the button on its floor all the same. */
+  function placeholder(text: string): void {
+    viewer.replaceChildren(h('div.viewer', null, stageShell(h('div.fstage.empty', null, h('p', null, text)), null, cta).box));
   }
 
   /** Plays the chosen recording on the stage; `music` once the visitor picked it (not on page load). */
@@ -191,7 +200,7 @@ async function page(): Promise<void> {
     renderChips();
     const d = watching;
     switchTo(() => {
-      viewer.replaceChildren(h('div.viewer-loading', null, d ? 'Loading the match...' : 'No recorded matches yet.'));
+      placeholder(d ? 'Loading the match...' : 'No recorded matches yet.');
       return () => {};
     });
     if (!d) return;
@@ -199,10 +208,10 @@ async function page(): Promise<void> {
     const r = await demoFor(d);
     if (mine !== run) return;
     if (!r) {
-      viewer.replaceChildren(h('div.viewer-loading', null, "This recording didn't load."));
+      placeholder("This recording didn't load.");
       return;
     }
-    const v = replayView(viewer, r, { link: `#/watch/${d.file}`, music });
+    const v = replayView(viewer, r, { link: `#/watch/${d.file}`, music, cta });
     cleanup = v;
     pause = v.pause;
   }
@@ -212,44 +221,43 @@ async function page(): Promise<void> {
     setCta('fight');
     renderChips();
     switchTo(() => {
-      const v = replayView(viewer, r, { note: 'The match you just played. It is not saved anywhere: download it to keep it.' });
+      const v = replayView(viewer, r, { cta, kind: 'yours' });
       pause = v.pause;
       return v;
     });
+    notice("The match you just played. It isn't saved anywhere: download it from Activity to keep it.");
+  }
+
+  function startFight(setup: Setup, plans: [Plan, Plan]): void {
+    track('play_start', { game: 'fighter', opponent: `${setup.left} vs ${setup.right}` });
+    mode = 'fight';
+    setCta('stop');
+    renderChips();
+    notice(null);
+    switchTo(() =>
+      live(viewer, setup, plans, {
+        cta,
+        // The match just played: replayed here, kept nowhere else.
+        watch: (r) => watchLast(r),
+        again: () => startFight(setup, plans),
+        change: () => openPicker(),
+        ended: () => {
+          setCta('fight');
+          track('play_end', { game: 'fighter', opponent: `${setup.left} vs ${setup.right}` });
+        },
+      }),
+    );
+    viewer.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   function openPicker(): void {
     // The recording pauses under the picker (its play button carries on).
     pause();
-    const card = pickerCard({
-      me,
-      hooks,
-      signIn,
-      poolEmpty: account.kind === 'pool-empty',
-      close: closePicker,
-      start: (setup, plans) => {
-        track('play_start', { game: 'fighter', opponent: `${setup.left} vs ${setup.right}` });
-        mode = 'fight';
-        setCta('stop');
-        renderChips();
-        notice(null);
-        switchTo(() =>
-          live(viewer, setup, plans, {
-            // The match just played: replayed here, kept nowhere else.
-            watch: (r) => watchLast(r),
-            again: () => openPicker(),
-            ended: () => {
-              setCta('fight');
-              track('play_end', { game: 'fighter', opponent: `${setup.left} vs ${setup.right}` });
-            },
-          }),
-        );
-        viewer.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      },
-    });
+    const card = pickerCard({ me, hooks, signIn, poolEmpty: account.kind === 'pool-empty', close: closePicker, start: startFight });
     overlay.replaceChildren(card);
     overlay.hidden = false;
     card.querySelector<HTMLElement>('.fight-go:not([disabled])')?.focus({ preventScroll: true });
+    overlay.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
   cta.addEventListener('click', () => {

@@ -74,17 +74,17 @@
       <div class="oc col">
         <section class="hero flex flex-col items-center justify-center text-center gap-8 pt-24 pb-10 md:pt-32 md:pb-12">
           <h1 class="hero-h1 font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Jev Fighter: the benchmark for AI decision models</h1>
-          <p class="hero-sub font-wix font-medium text-left md:text-center text-lg md:text-xl">Stick figures fight and the model picks every move. Watch a recorded match, or fight one yourself.</p>
+          <p class="hero-sub font-wix font-medium text-left md:text-center text-lg md:text-xl">Stick figures fight and an AI picks every move. Fight one yourself, or watch the models fight.</p>
         </section>
       </div>
 
       <section class="stage fstage-area" id="stage" aria-label="The game">
-        <!-- A recorded match (Watch), a live fight, or the replay of the one you just played. -->
-        <div class="viewer-host" id="viewer"></div>
-        <!-- The picker: over the stage, or the whole screen on a phone. -->
-        <div id="overlay" class="picker-overlay" hidden></div>
-        <div class="arcade-bottom">
-          <button id="play-cta" class="fight-cta" type="button"><span class="tri" aria-hidden="true"></span><span id="play-label">Fight an AI</span></button>
+        <div class="viewer-wrap">
+          <!-- A recorded match (Watch), a live fight, or the replay of the one you just played: the stage, with "Fight an AI"
+               on its floor and Activity folding out under it. -->
+          <div class="viewer-host" id="viewer"></div>
+          <!-- The picker: over the stage, or the whole screen on a phone. -->
+          <div id="overlay" class="picker-overlay" hidden></div>
         </div>
         <p id="notice" class="notice-line" role="status" hidden></p>
         <div class="watch" id="watch">
