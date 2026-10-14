@@ -596,7 +596,9 @@ export class FightRenderer {
     const head = toScreen(j.head);
     const w = Math.min(176, this.W * 0.42);
     const rows = b.thinking ? 1 : Math.min(3, b.top.length);
-    const h = 14 + rows * 17;
+    // A fallback gets its own line under the moves, inside the bubble.
+    const lines = rows + (!b.thinking && b.fallback ? 1 : 0);
+    const h = 14 + lines * 17;
     // Left fighter's bubble stays left of the midpoint, right fighter's right of it.
     let x = i === 0 ? Math.min(head.x - w + 24, mid - w - 6) : Math.max(head.x - 24, mid + 6);
     x = Math.max(6, Math.min(this.W - w - 6, x));
@@ -641,7 +643,7 @@ export class FightRenderer {
       });
       if (b.fallback) {
         ctx.fillStyle = '#C2255C';
-        ctx.fillText(`fallback: ${b.fallback}`, x + 10, y + h - 4);
+        ctx.fillText(`fallback: ${b.fallback}`, x + 10, y + 15 + rows * 17);
       }
     }
     ctx.globalAlpha = 1;

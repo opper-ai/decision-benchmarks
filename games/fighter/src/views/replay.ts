@@ -7,50 +7,91 @@ import { bubblesAt, decisionsBySide } from './bubbles.ts';
 import { decisionCard } from './decisions.ts';
 import { statsView } from './stats.ts';
 import { Timeline } from './timeline.ts';
-import { audioToggles } from './audio-toggles.ts';
+import { soundTool } from './audio-toggles.ts';
 import { audio } from '../audio.ts';
 import { clipName, exportClip, exportSupported } from '../export.ts';
-import { OUTCOME_COLORS, SIDES } from '../theme.ts';
+import { OUTCOME_COLORS } from '../theme.ts';
 import { fullscreenButton } from './fullscreen.ts';
-import { collapsiblePanel } from './panel.ts';
+import { activityDrawer } from './panel.ts';
+import { floorLabel, ICONS, menuTool, stageShell, toolButton } from './shell.ts';
 
-const PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>';
-const PAUSE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>';
+export interface ReplayOptions {
+  /** The recording's address on this page, for a recorded match (Copy link). */
+  link?: string;
+  music?: boolean;
+  /** The page's primary button, shown on the stage's floor. */
+  cta?: HTMLElement;
+  /** What the floor says is on: a recording, or the match the visitor just played. */
+  kind?: 'replay' | 'yours';
+}
 
-/** A match played back: the stage, the decisions, stats and clip export. `link` is its address, for a recorded one. */
-export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; note?: string; music?: boolean } = {}): (() => void) & { pause: () => void } {
+/**
+ * A match played back: the stage with its tools on the floor, and under it Activity (the decisions, the stats, the
+ * timeline, the downloads), folded away until asked for.
+ */
+export function replayView(host: HTMLElement, r: Replay, opts: ReplayOptions = {}): (() => void) & { pause: () => void } {
   const player = new ReplayPlayer(r);
   const bySide = decisionsBySide(r);
   const stageHost = h('div.fstage.pausable', { title: 'Click to play or pause (space)' });
   const stage = new Stage(stageHost, r.fighters);
   // Paused: a large play sign over the stage. A toggle also flashes the new state's sign for a moment.
-  const pausedSign = h('div.stage-paused', { 'aria-hidden': 'true' }, h('span', { html: PLAY_ICON }));
+  const pausedSign = h('div.stage-paused', { 'aria-hidden': 'true' }, h('span', { html: ICONS.play }));
   const flash = h('div.stage-flash', { 'aria-hidden': 'true' });
-  stageHost.append(pausedSign, flash);
+  // The progress line on the stage's bottom edge: drag it to seek. The full timeline is in Activity.
+  const progFill = h('i');
+  const prog = h('div.prog', { title: 'Drag to seek' }, progFill);
+  stageHost.append(pausedSign, flash, prog);
   let state = player.stateAt(0);
   let pos = 0;
   let playing = true;
   let speed = 1;
 
-  const playBtn = h('button.fbtn.icon', { type: 'button', title: 'Play / pause (space)' }, '❚❚');
+  const playTool = toolButton('Pause', ICONS.pause);
+  playTool.classList.add('tool-play');
+  const thoughtsTool = toolButton('Thoughts (T)', ICONS.thoughts);
+  thoughtsTool.setAttribute('aria-pressed', 'true');
+  // Speed: a square tool showing the speed, opening the five to pick from.
+  const speedBtn = toolButton('Speed', '1×');
+  speedBtn.classList.add('txt');
+  const speeds: [number, string][] = [[0.25, '¼×'], [0.5, '½×'], [1, '1×'], [2, '2×'], [4, '4×']];
+  const speedOpts = speeds.map(([x, short]) => {
+    const b = h('button.tmenu-opt', { type: 'button', role: 'menuitemradio', 'aria-checked': String(x === 1) }, h('span', null, `${x}×`), x === 1 ? h('small', null, 'normal') : null);
+    b.addEventListener('click', () => {
+      speed = x;
+      stage.tickMs = TICK_MS / x;
+      speedBtn.textContent = short;
+      speedOpts.forEach((o, k) => o.setAttribute('aria-checked', String(speeds[k]![0] === x)));
+      speedMenu.close();
+    });
+    return b;
+  });
+  const speedMenu = menuTool(speedBtn, h('div', { 'aria-label': 'Speed' }, ...speedOpts));
+  const clipTool = toolButton('Save a clip', ICONS.clip);
   const timeEl = h('span.time');
-  const speedSel = h('select.speed', { title: 'Speed' }, ...[0.25, 0.5, 1, 2, 4].map((x) => h('option', { value: x, selected: x === 1 }, `${x}x`)));
-  const bubblesBox = h('input', { type: 'checkbox', checked: true, id: 'bubbles' }) as HTMLInputElement;
   const timeline = new Timeline(r, player.events, (t) => seek(t));
 
+  const setThoughts = (on: boolean) => {
+    stage.renderer.showBubbles = on;
+    thoughtsTool.setAttribute('aria-pressed', String(on));
+  };
   const setPlaying = (p: boolean) => {
     playing = p && state.round.phase !== 'over';
-    playBtn.textContent = playing ? '❚❚' : '▶';
-    playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    playTool.innerHTML = playing ? ICONS.pause : ICONS.play;
+    playTool.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    playTool.title = playing ? 'Pause (space)' : 'Play (space)';
     stage.paused = !playing;
     stageHost.classList.toggle('paused', !playing);
     // The music and the effects stand still with the fight.
     audio.hold(!playing);
   };
-  /** Play or pause from the stage or the keyboard: as the play button, with a flash of the new state on the stage. */
+  const togglePlay = () => {
+    if (state.round.phase === 'over') seek(0);
+    setPlaying(!playing);
+  };
+  /** Play or pause from the stage or the keyboard, with a flash of the new state on the stage. */
   const toggle = () => {
-    playBtn.click();
-    flash.innerHTML = playing ? PLAY_ICON : PAUSE_ICON;
+    togglePlay();
+    flash.innerHTML = playing ? ICONS.play : ICONS.pause;
     flash.classList.remove('show');
     void flash.offsetWidth; // restart the animation
     flash.classList.add('show');
@@ -70,15 +111,15 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
     setPlaying(false);
   };
 
-  // Decision feed.
-  const hideNeutral = h('input', { type: 'checkbox', checked: true, id: 'hide-neutral' }) as HTMLInputElement;
+  // The decision feed: every move, or only the key moments (where something happened).
+  let keyOnly = true;
   const feed = h('div.feed');
   const cards: { d: Decision; el: HTMLElement }[] = [];
   const buildFeed = () => {
     feed.replaceChildren();
     cards.length = 0;
     for (const d of r.decisions) {
-      if (hideNeutral.checked && (!d.outcome || d.outcome === 'neutral') && !d.fallback) continue;
+      if (keyOnly && (!d.outcome || d.outcome === 'neutral') && !d.fallback) continue;
       const el = decisionCard(d, r.fighters, (t) => {
         seek(t);
         setPlaying(false);
@@ -87,15 +128,19 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
       feed.append(el);
     }
   };
-  hideNeutral.addEventListener('change', buildFeed);
-  buildFeed();
   let userScrolledAt = 0;
   feed.addEventListener('wheel', () => (userScrolledAt = performance.now()), { passive: true });
   feed.addEventListener('touchmove', () => (userScrolledAt = performance.now()), { passive: true });
   let lastCurrent: HTMLElement | null = null;
 
+  // The result only shows once the match has played to its end: the facts must not spoil it.
+  const winner = r.result.winner === null ? 'a draw' : `${r.fighters[r.result.winner].label} wins`;
+  const resultEl = h('span.result', { hidden: true }, ` · ${winner}`);
+
   function sync(force = false): void {
     timeEl.textContent = `${clockTime(state.tick)} / ${clockTime(r.ticks)}`;
+    progFill.style.width = `${(state.tick / Math.max(1, r.ticks)) * 100}%`;
+    resultEl.hidden = state.tick < player.endTick;
     timeline.head = state.tick;
     timeline.draw();
     // Current decision in the feed.
@@ -105,7 +150,7 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
       lastCurrent?.classList.remove('current');
       cur?.classList.add('current');
       lastCurrent = cur;
-      if (cur && (force || performance.now() - userScrolledAt > 4000)) feed.scrollTop = cur.offsetTop - feed.clientHeight / 2;
+      if (cur && feed.clientHeight && (force || performance.now() - userScrolledAt > 4000)) feed.scrollTop = cur.offsetTop - feed.clientHeight / 2;
     }
     updateBubbles();
   }
@@ -135,17 +180,25 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
   };
   stage.tick(state);
 
-  playBtn.addEventListener('click', () => {
-    if (state.round.phase === 'over') seek(0);
-    setPlaying(!playing);
-  });
-  speedSel.addEventListener('change', () => {
-    speed = Number(speedSel.value);
-    stage.tickMs = TICK_MS / speed;
-  });
-  bubblesBox.addEventListener('change', () => (stage.renderer.showBubbles = bubblesBox.checked));
-
+  playTool.addEventListener('click', togglePlay);
+  thoughtsTool.addEventListener('click', () => setThoughts(!stage.renderer.showBubbles));
   stageHost.addEventListener('click', () => toggle());
+
+  let dragging = false;
+  const seekAt = (ev: PointerEvent) => {
+    const rect = prog.getBoundingClientRect();
+    seek(Math.max(0, Math.min(r.ticks, Math.round(((ev.clientX - rect.left) / rect.width) * r.ticks))));
+  };
+  prog.addEventListener('pointerdown', (ev) => {
+    ev.stopPropagation();
+    dragging = true;
+    prog.setPointerCapture(ev.pointerId);
+    seekAt(ev);
+  });
+  prog.addEventListener('pointermove', (ev) => dragging && seekAt(ev));
+  prog.addEventListener('pointerup', () => (dragging = false));
+  // A seek is no play/pause.
+  prog.addEventListener('click', (ev) => ev.stopPropagation());
 
   // Space, [ ] and T work while nothing else has focus (the page itself) or the viewer has it (a click in it gives it
   // focus). A focused button, link or field keeps its own keys, and a dialog over the page (the picker) keeps them all.
@@ -173,25 +226,27 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
       seek(Math.max(0, Math.min(r.ticks, state.tick + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 60 : 1))));
     } else if (e.key === ']') nextDecision(1);
     else if (e.key === '[') nextDecision(-1);
-    else if (e.key === 't' || e.key === 'T') {
-      bubblesBox.checked = !bubblesBox.checked;
-      stage.renderer.showBubbles = bubblesBox.checked;
-    }
+    else if (e.key === 't' || e.key === 'T') setThoughts(!stage.renderer.showBubbles);
   };
   window.addEventListener('keydown', onKey);
 
-  // Export.
-  const stageBox = h('div.stage-box');
-  const fs = fullscreenButton(stageBox);
-  const exportBtn = h('button.fbtn', { type: 'button', title: 'Save a video clip' }, 'Export clip');
+  // The stage, its floor and its tools.
+  const { box, tools } = stageShell(stageHost, floorLabel(opts.kind === 'yours' ? 'Your match' : 'Replay', r.fighters), opts.cta ?? null);
+  const fs = fullscreenButton(box);
+  fs.el.className = 'tbtn';
+  tools.append(playTool, thoughtsTool, speedMenu.el, soundTool(), clipTool, fs.el);
+
+  // Export: the clip settings open under the stage.
   const exportPanel = h('div.export', { hidden: true });
-  exportBtn.addEventListener('click', () => {
+  clipTool.addEventListener('click', () => {
     // The export settings sit under the stage, out of sight in fullscreen.
     fs.exit();
     exportPanel.hidden = !exportPanel.hidden;
+    clipTool.setAttribute('aria-expanded', String(!exportPanel.hidden));
     if (!exportPanel.hidden) {
       setPlaying(false);
       fillExport();
+      exportPanel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
   });
   function fillExport(): void {
@@ -265,6 +320,7 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
       }
     });
     exportPanel.replaceChildren(
+      h('div.export-head', null, h('p.kicker', null, 'Save a clip'), h('button.linkish', { type: 'button', onclick: () => clipTool.click() }, 'Close')),
       h('div.export-row', null, h('label', null, 'Range', range), h('label', null, 'Size', size), h('label', null, 'Frame rate', fps)),
       h('div.export-row', null, h('label.check', null, sfx, ' Sound effects'), h('label.check', null, mus, ' Music'), h('label.check', null, bub, ' Thought bubbles')),
       h('div.export-row', null, go, h('span.fnote', null, 'Rendered frame by frame in your browser, usually faster than real time.')),
@@ -272,74 +328,92 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
     );
   }
 
-  // Tabs.
-  const panelBody = h('div.panel-body');
-  const tabDecisions = h('button.tab.active', { type: 'button' }, 'Decisions');
-  const tabStats = h('button.tab', { type: 'button' }, 'Stats');
-  const showDecisions = () => {
-    tabDecisions.classList.add('active');
-    tabStats.classList.remove('active');
-    panelBody.replaceChildren(h('label.check', null, hideNeutral, ' Only decisions where something happened'), feed);
+  // Activity: tabs and the match's facts, the timeline with step by decision, then the feed (or the stats) beside what
+  // the colors mean and the downloads.
+  const tabEvery = h('button.dtab', { type: 'button', role: 'tab' }, 'Every move');
+  const tabKey = h('button.dtab', { type: 'button', role: 'tab' }, 'Key moments');
+  const tabStats = h('button.dtab', { type: 'button', role: 'tab' }, 'Stats');
+  const mainEl = h('div.drawer-main.panel-body');
+  const selectTab = (t: HTMLElement) => {
+    for (const x of [tabEvery, tabKey, tabStats]) x.setAttribute('aria-selected', String(x === t));
+  };
+  const showFeed = (key: boolean) => {
+    keyOnly = key;
+    buildFeed();
+    selectTab(key ? tabKey : tabEvery);
+    mainEl.replaceChildren(feed);
     lastCurrent = null;
     sync(true);
   };
   let statsEl: HTMLElement | null = null;
   const showStats = () => {
-    tabStats.classList.add('active');
-    tabDecisions.classList.remove('active');
+    selectTab(tabStats);
     statsEl ??= statsView(r, player.events);
-    panelBody.replaceChildren(statsEl);
+    mainEl.replaceChildren(statsEl);
   };
-  tabDecisions.addEventListener('click', showDecisions);
+  tabEvery.addEventListener('click', () => showFeed(false));
+  tabKey.addEventListener('click', () => showFeed(true));
   tabStats.addEventListener('click', showStats);
 
-  const [a, b] = r.fighters;
-  const winner = r.result.winner === null ? 'Draw' : `${r.fighters[r.result.winner].label} wins`;
-  stageBox.append(
-    stageHost,
-    h(
-      'div.controls',
-      null,
-      playBtn,
-      h('button.fbtn.icon', { type: 'button', title: 'Previous decision ([)', 'aria-label': 'Previous decision', onclick: () => nextDecision(-1) }, '⏮'),
-      h('button.fbtn.icon', { type: 'button', title: 'Next decision (])', 'aria-label': 'Next decision', onclick: () => nextDecision(1) }, '⏭'),
-      timeEl,
-      h('span.spacer'),
-      h('label.check', { for: 'bubbles' }, bubblesBox, ' Thoughts'),
-      speedSel,
-      audioToggles(),
-      fs.el,
-      exportBtn,
-    ),
-  );
-  const viewer = h(
-    'div.viewer',
+  const facts = h(
+    'span.facts',
     null,
+    `${r.decisions.length} decisions · ${money(r.costUsd)} · ${r.mode === 'paused' ? 'paused' : 'real time'} · ${r.track ?? 'assisted'} track · ${r.deadlineMs} ms deadline`,
+    resultEl,
+    player.diverged !== null ? h('strong.warn', null, ` · Replay diverged at ${clockTime(player.diverged)}`) : '',
+  );
+  const legend = h(
+    'div.legend',
+    null,
+    ...['hit', 'traded', 'punished', 'blocked', 'whiffed', 'defended'].map((o) => h('span', null, h('span.sq', { style: { background: OUTCOME_COLORS[o] } }), o === 'punished' ? 'got hit' : o)),
+    h('span', null, h('span.sq.ko'), 'KO'),
+  );
+  const saveRecording = h('button.fbtn', { type: 'button', title: 'The whole match as a gzipped JSON recording', onclick: () => void downloadReplay(r) }, h('span.ico', { html: ICONS.download }), 'Recording', h('span.ext', null, '.fight.json.gz'));
+  let copyLink: HTMLElement | null = null;
+  if (opts.link) {
+    const href = new URL(opts.link, location.href).href;
+    const btn = h('button.fbtn', { type: 'button' }, h('span.ico', { html: ICONS.link }), 'Copy link');
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(href);
+        btn.lastChild!.textContent = 'Copied';
+        setTimeout(() => (btn.lastChild!.textContent = 'Copy link'), 1600);
+      } catch {
+        // No clipboard here: show the link itself.
+        btn.replaceWith(h('a.fbtn', { href }, h('span.ico', { html: ICONS.link }), 'Link to this match'));
+      }
+    });
+    copyLink = btn;
+  }
+  const body = h(
+    'div.drawer-body',
+    null,
+    h('div.drawer-head', null, h('div.dtabs', { role: 'tablist', 'aria-label': 'Activity' }, tabEvery, tabKey, tabStats), facts),
     h(
-      'div.viewer-main',
+      'div.drawer-step',
       null,
-      h(
-        'div.caption',
-        null,
-        h('p.caption-vs', null, h('span', { style: { color: SIDES[0].deep } }, a.label), h('span.vs-small', null, ' vs '), h('span', { style: { color: SIDES[1].deep } }, b.label)),
-        opts.note ? h('p.fnote', null, opts.note) : null,
-        h('p.caption-sub', null, `${winner}. ${r.mode === 'paused' ? 'Paused' : 'Real-time'} mode, ${r.track ?? 'assisted'} track, ${r.deadlineMs} ms deadline, ${r.decisions.length} decisions, ${money(r.costUsd)}.`, player.diverged !== null ? h('strong.warn', null, ` Replay diverged at ${clockTime(player.diverged)}.`) : ''),
-      ),
-      stageBox,
-      exportPanel,
+      h('button.fbtn.icon', { type: 'button', title: 'Previous decision ([)', 'aria-label': 'Previous decision', html: ICONS.prev, onclick: () => nextDecision(-1) }),
+      h('button.fbtn.icon', { type: 'button', title: 'Next decision (])', 'aria-label': 'Next decision', html: ICONS.next, onclick: () => nextDecision(1) }),
+      timeEl,
       timeline.el,
-      h(
-        'div.legend.small',
-        null,
-        ...['hit', 'traded', 'punished', 'blocked', 'whiffed', 'defended'].map((o) => h('span', null, h('span.sq', { style: { background: OUTCOME_COLORS[o] } }), o === 'punished' ? 'got hit' : o)),
-        h('span', null, h('span.sq.ko'), 'KO'),
-        h('span.share', null, opts.link ? h('a', { href: opts.link }, 'Link to this match') : null, ' ', h('button.fbtn.small', { type: 'button', onclick: () => void downloadReplay(r) }, 'Download')),
-      ),
+    ),
+    h(
+      'div.drawer-cols',
+      null,
+      mainEl,
+      h('aside.drawer-side', null, h('div.side-block', null, h('p.kicker', null, 'What the colors mean'), legend), h('div.side-block', null, h('p.kicker', null, 'Save and share'), h('div.save-btns', null, saveRecording, copyLink))),
     ),
   );
-  viewer.append(collapsiblePanel(viewer, [tabDecisions, tabStats], panelBody));
+
+  const viewer = h('div.viewer');
+  const act = activityDrawer(viewer, body);
+  viewer.append(box, act.drawer, act.tab, exportPanel);
   host.replaceChildren(viewer);
-  showDecisions();
+  showFeed(true);
+  act.onOpen(() => {
+    lastCurrent = null;
+    sync(true);
+  });
   const at = Number(new URLSearchParams(location.hash.split('?')[1] ?? '').get('t'));
   if (at > 0) {
     seek(Math.min(r.ticks, at));
@@ -352,6 +426,7 @@ export function replayView(host: HTMLElement, r: Replay, opts: { link?: string; 
     audio.scene(false);
     audio.hold(false);
     fs.destroy();
+    speedMenu.destroy();
     window.removeEventListener('keydown', onKey);
     host.removeEventListener('pointerdown', onPointer);
     stage.destroy();

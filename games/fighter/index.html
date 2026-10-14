@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Jev Fighter: a benchmark for AI decision models | Opper AI</title>
+    <title>Jev Fighter: a fighting-game benchmark for AI decision models | Opper AI</title>
     <meta name="description" content="Every AI decision model Opper serves fights 104 matches of Jev Fighter, a stick-figure fighting game, picking every move. See which wins the most rounds, watch recorded matches, or fight one yourself." />
     <link rel="canonical" href="%VITE_APP_URL%" />
     <link rel="icon" href="https://opper.ai/favicon.ico" sizes="48x48 96x96 192x192" />
@@ -13,14 +13,14 @@
     <link rel="preload" href="%BASE_URL%fonts/caveat-latin.woff2" as="font" type="font/woff2" crossorigin />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Opper AI" />
-    <meta property="og:title" content="Jev Fighter: a benchmark for AI decision models | Opper AI" />
+    <meta property="og:title" content="Jev Fighter: a fighting-game benchmark for AI decision models | Opper AI" />
     <meta property="og:description" content="Every AI decision model Opper serves fights 104 matches of Jev Fighter, a stick-figure fighting game, picking every move. See which wins the most rounds, watch recorded matches, or fight one yourself." />
     <meta property="og:url" content="%VITE_APP_URL%" />
     <meta property="og:image" content="%VITE_APP_URL%poster.png" />
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="720" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Jev Fighter: a benchmark for AI decision models | Opper AI" />
+    <meta name="twitter:title" content="Jev Fighter: a fighting-game benchmark for AI decision models | Opper AI" />
     <meta name="twitter:description" content="Every AI decision model Opper serves fights 104 matches of Jev Fighter, a stick-figure fighting game, picking every move. See which wins the most rounds, watch recorded matches, or fight one yourself." />
     <meta name="twitter:image" content="%VITE_APP_URL%poster.png" />
     <!-- The theme before the first paint, as on opper.ai: the visitor's choice there (same origin), else the system's. -->
@@ -77,18 +77,18 @@
         <section class="hero flex flex-col items-center justify-center text-center gap-8 pt-24 pb-10 md:pt-32 md:pb-12">
           <!-- The way back to the hub on opper.ai, which lists every game. -->
           <nav class="crumbs" aria-label="Breadcrumb"><a href="/decision-benchmarks">Decision benchmarks</a><span aria-hidden="true">/</span><span aria-current="page">Jev Fighter</span></nav>
-          <h1 class="hero-h1 font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Jev Fighter: the benchmark for AI decision models</h1>
-          <p class="hero-sub font-wix font-medium text-left md:text-center text-lg md:text-xl">Stick figures fight and the model picks every move. Watch a recorded match, or fight one yourself.</p>
+          <h1 class="hero-h1 font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Jev Fighter: the <span class="nobr">fighting-game</span> benchmark for AI models</h1>
+          <p class="hero-sub font-wix font-medium text-left md:text-center text-lg md:text-xl">Stick figures fight and an AI picks every move. Fight one yourself, or watch the models fight.</p>
         </section>
       </div>
 
       <section class="stage fstage-area" id="stage" aria-label="The game">
-        <!-- A recorded match (Watch), a live fight, or the replay of the one you just played. -->
-        <div class="viewer-host" id="viewer"></div>
-        <!-- The picker: over the stage, or the whole screen on a phone. -->
-        <div id="overlay" class="picker-overlay" hidden></div>
-        <div class="arcade-bottom">
-          <button id="play-cta" class="fight-cta" type="button"><span class="tri" aria-hidden="true"></span><span id="play-label">Fight an AI</span></button>
+        <div class="viewer-wrap">
+          <!-- A recorded match (Watch), a live fight, or the replay of the one you just played: the stage, with "Fight an AI"
+               on its floor and Activity folding out under it. -->
+          <div class="viewer-host" id="viewer"></div>
+          <!-- The picker: over the stage, or the whole screen on a phone. -->
+          <div id="overlay" class="picker-overlay" hidden></div>
         </div>
         <p id="notice" class="notice-line" role="status" hidden></p>
         <div class="watch" id="watch">
@@ -101,7 +101,7 @@
         <div class="oc"><h2 id="leaderboard-title" class="font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Leaderboard</h2></div>
         <p id="leaderboard-sub" class="sub">104 matches per model against four fixed-rule baselines: the share of rounds it wins.</p>
         <div class="tablecard"><div class="table-scroll"><table class="lbt" id="leaderboard-table"></table></div></div>
-        <p class="foot">=1 means tied: those means are within each other's margin of error (two standard errors). The vs columns are the share of rounds won against each baseline. Late moves are the share of the model's moves the fallback made, because its answer took over 2 s (or was unusable), so its fighter blocked. Run by @opper-ai means we played the games through Opper. Self-reported models were benchmarked by whoever submitted them, named under Run by: CI replayed every game they sent in to check its score, and the timing (late moves, latency) and cost are as they reported. Baselines are simple scripts, shown for reference and never ranked.</p>
+        <p class="foot">=1 means tied: those means are within each other's margin of error (two standard errors). Late moves are the share of the model's moves the fallback made, because its answer took over 2 s (or was unusable), so its fighter blocked. Run by @opper-ai means we played the games through Opper. Self-reported models were benchmarked by whoever submitted them, named under Run by: CI replayed every game they sent in to check its score, and the timing (late moves, latency) and cost are as they reported. Baselines are simple scripts, shown for reference and never ranked.</p>
       </section>
 
       <section id="add-model" class="section" aria-labelledby="add-model-title">

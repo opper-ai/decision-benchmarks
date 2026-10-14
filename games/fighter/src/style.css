@@ -5,9 +5,15 @@
 
 /*
  * Jev Fighter on opper.ai: the jevman page, with the fighter's paper stage as the centre (light in both themes, as
- * Snake's arcade cabinet is black in both), its decision log and stats beside it. Caveat is the fighter's hand.
+ * Snake's arcade cabinet is black in both), "Fight an AI" on its floor and Activity folding out under it. Caveat is the
+ * fighter's hand.
  */
 @font-face { font-family: 'Caveat'; src: url('/fonts/caveat-latin.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
+/*
+ * Where the H1 needs two lines (under about 1160px), it breaks between words, never at "fighting-|game". An inline
+ * block rather than a nowrap span, which leaves the balanced wrapping (text-wrap: balance) a short first line.
+ */
+.hero-h1 .nobr { display: inline-block; white-space: nowrap; }
 
 :root {
   --f-hand: 'Caveat', 'Comic Sans MS', cursive;
@@ -25,112 +31,236 @@ html.dark {
   --f-shadow: 0 22px 46px -26px rgba(0, 0, 0, 0.75);
 }
 
-/* ---------- the stage: the viewer (a recording or a fight), Fight an AI, the watch chips ---------- */
+/* ---------- the stage: the viewer (a recording or a fight), Fight an AI on its floor, Activity under it ---------- */
 /*
- * On a phone the viewer spans the page column, as the sections below it do (10 of 12 columns). From a tablet up it
- * breaks out of the column to use most of the window (32px gutters, at most 1320px), so the fight is not tiny on a big
- * screen. From 1100px the decisions panel sits beside the stage (a third, 300 to 420px); below that, under it.
+ * The stage spans the page column (10 of 12 columns, as the sections below it) and no more, and is never taller than the
+ * window leaves under the hero, so its floor, with "Fight an AI" on it, is in view on a laptop. Everything about the
+ * match folds out under it (Activity), so the stage never shrinks for it.
  */
-.stage { display: grid; justify-items: center; gap: 14px; }
-.viewer-host { width: calc(min(100%, 1280px) * 10 / 12); min-width: 0; outline: none; }
-@media (min-width: 768px) { .viewer-host { width: min(calc(100% - 64px), 1320px); } }
+/* One column as wide as the page: the phone's chips, a row that scrolls sideways, must not widen it past the screen. */
+.stage { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 14px; }
+.viewer-wrap { position: relative; width: min(calc(min(100%, 1280px) * 10 / 12), max(600px, calc((100svh - 310px) * var(--f-ar)))); }
+.viewer-host { min-width: 0; outline: none; }
 .notice-line, .watch { width: calc(min(100%, 1280px) * 10 / 12); }
-.viewer-loading { display: grid; place-items: center; aspect-ratio: 16 / 8.2; border: 1px solid var(--j-line); border-radius: 16px; color: var(--j-muted); font-size: 14px; }
-.viewer { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (min-width: 1100px) {
-  .viewer { grid-template-columns: minmax(0, 1fr) clamp(300px, 32%, 420px); }
-  /* The panel folded away: the stage takes the whole width, as tall as the window allows, the panel's header under it. */
-  .viewer.panel-collapsed { grid-template-columns: minmax(0, 1fr); }
-  .viewer.panel-collapsed .viewer-main { width: min(100%, calc((100vh - 250px) * var(--f-ar))); justify-self: center; }
-}
-.viewer-main { min-width: 0; display: grid; gap: 10px; align-content: start; }
-.stage-box { display: grid; gap: 10px; min-width: 0; }
-.caption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 14px; }
-.caption p { margin: 0; }
-.caption-vs { font: 700 28px/1.1 var(--f-hand); }
-.caption-vs .vs-small { margin: 0 6px; font: 500 14px var(--j-body); color: var(--j-muted); }
-.caption-sub { font-size: 13px; color: var(--j-muted); }
-.caption .fnote { flex-basis: 100%; }
+.notice-line { text-wrap: balance; }
+.viewer { display: grid; grid-template-columns: minmax(0, 1fr); }
+.stage-box, .stage-frame { min-width: 0; }
+.stage-frame { position: relative; }
 .fstage { position: relative; border: 1px solid var(--j-line); border-radius: 16px; overflow: hidden; background: var(--f-paper); aspect-ratio: 16 / 8.2; box-shadow: var(--f-shadow); }
+.viewer.act-open .fstage { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.fstage.empty { display: grid; place-items: center; color: #5b6b7a; font-size: 14px; }
+.fstage.empty p { margin: 0 0 17%; }
 canvas.stage { display: block; width: 100%; height: 100%; }
 
 /* A recording pauses and plays with a click on the stage: a large play sign while paused, a short flash on a toggle. */
 .fstage.pausable { cursor: pointer; }
-.stage-paused { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+.stage-paused { position: absolute; inset: 0 0 17% 0; display: grid; place-items: center; pointer-events: none; opacity: 0; transition: opacity 0.15s; }
 .fstage.paused .stage-paused { opacity: 1; transition-delay: 0.3s; }
 .stage-paused span, .stage-flash { display: grid; place-items: center; width: clamp(56px, 11%, 104px); aspect-ratio: 1; border-radius: 50%; background: rgba(27, 46, 64, 0.62); color: #fff; box-shadow: 0 10px 30px -12px rgba(27, 46, 64, 0.6); }
 .stage-paused svg, .stage-flash svg { width: 50%; height: 50%; }
-.stage-flash { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); opacity: 0; pointer-events: none; }
+.stage-flash { position: absolute; left: 50%; top: 41%; transform: translate(-50%, -50%); opacity: 0; pointer-events: none; }
 .stage-flash.show { animation: stage-flash 0.55s ease-out; }
 @keyframes stage-flash {
   from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   to { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
 }
 
-/* Fullscreen: the stage and its controls, as large as the screen allows at the stage's own shape. */
-.stage-box:fullscreen, .stage-box.is-fullscreen { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; padding: 16px; background: var(--j-bg); color: var(--j-text); }
-.stage-box.is-fullscreen > * { width: min(100%, calc((100vh - 96px) * var(--f-ar))); }
-.stage-box.is-fullscreen .fstage { box-shadow: none; }
+/* The progress line on the stage's bottom edge: a thicker line under the pointer, drag to seek. */
+.prog { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; height: 14px; cursor: pointer; touch-action: none; }
+.prog::before, .prog i { content: ''; position: absolute; left: 0; bottom: 0; height: 4px; transition: height 0.15s; }
+.prog::before { right: 0; background: rgba(27, 46, 64, 0.14); }
+.prog i { width: 0; background: #1b2e40; }
+.stage-box:hover .prog::before, .stage-box:hover .prog i { height: 7px; }
+
+/*
+ * The floor: the band under the ground line (17% of the stage, as the renderer draws it). Who is on at the left, the
+ * page's primary button in the middle, the tools at the right. The stage is paper in both themes, so is its floor.
+ */
+.floor-ui { position: absolute; left: 0; right: 0; bottom: 0; height: 17%; padding: 0 2%; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; pointer-events: none; }
+.floor-cta, .tools { pointer-events: auto; }
+.floor-label { min-width: 0; overflow: hidden; }
+.floor-on { display: inline-flex; align-items: center; gap: 12px; min-width: 0; white-space: nowrap; }
+.floor-tag { display: inline-flex; align-items: center; gap: 8px; font: 600 11px/1 var(--j-mono); letter-spacing: 0.1em; text-transform: uppercase; color: #5b6b7a; }
+.floor-tag i { width: 8px; height: 8px; border-radius: 50%; background: #d6402b; }
+.floor-tag.live i { animation: live-dot 1.2s ease-in-out infinite; }
+@keyframes live-dot { 50% { opacity: 0.3; } }
+/* Caveat's letters reach past their box (a final "v", a "y"'s tail): the line height and the padding keep them in. */
+.floor-names { padding-right: 0.25em; font: 700 21px/1.3 var(--f-hand); overflow: hidden; text-overflow: ellipsis; }
+.floor-names .vs { margin: 0 2px; font: 500 13px var(--j-body); color: #5b6b7a; }
+.floor-cta { display: flex; justify-content: center; }
+.stage-box.ended .floor-cta { visibility: hidden; }
+
+/* The tools show while the pointer is over the stage, it is paused, or one of them is open; always on a touch screen. */
+.tools { justify-self: end; display: flex; align-items: center; gap: 6px; opacity: 0; transition: opacity 0.15s; }
+.stage-box:hover .tools, .stage-box:focus-within .tools, .stage-box:has(.fstage.paused) .tools, .tools:has([aria-expanded='true']) { opacity: 1; }
+.tbtn { display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 1px solid #d5dde5; border-radius: 10px; background: #ffffff; color: #1b2e40; box-shadow: 0 4px 10px -7px rgba(27, 46, 64, 0.5); }
+.tbtn:hover { background: #f1f4f7; }
+.tbtn svg { width: 18px; height: 18px; }
+.tbtn[aria-pressed='true'], .tbtn[aria-expanded='true'] { background: #e3e9f0; border-color: #a9b6c3; }
+.tbtn.muted svg { opacity: 0.4; }
+.tool-play { display: none; }
+.tbtn.txt { font: 600 13px/1 var(--j-mono); }
+@media (hover: none) {
+  .tools { opacity: 1; }
+  .tool-play { display: grid; }
+}
+/* A tool's menu (sound, speed), opening above it. */
+.tool-menu { position: relative; display: inline-flex; }
+.tmenu { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 5; display: grid; gap: 2px; min-width: 150px; padding: 5px; border: 1px solid #d5dde5; border-radius: 12px; background: #ffffff; box-shadow: 0 16px 36px -18px rgba(27, 46, 64, 0.55); }
+.tmenu-opt { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border: 0; border-radius: 8px; background: none; color: #1b2e40; font: 500 13px var(--j-body); text-align: left; white-space: nowrap; }
+.tmenu-opt:hover { background: #f1f4f7; }
+.tmenu-opt small { margin-left: auto; font-size: 12px; color: #677584; }
+.tmenu-opt[role='menuitemradio'][aria-checked='true'] { background: #e3e9f0; font-weight: 600; }
+.tmenu-opt[role='menuitemcheckbox'][aria-checked='false'] { color: #7a8794; }
+.tmenu-opt[role='menuitemcheckbox'][aria-checked='false'] .tmenu-icon { opacity: 0.4; }
+.tmenu-icon { display: grid; }
+.tmenu-switch { position: relative; flex: none; width: 26px; height: 16px; margin-left: auto; border-radius: 99px; background: #d5dde5; transition: background 0.15s; }
+.tmenu-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 2px rgba(27, 46, 64, 0.35); transition: transform 0.15s; }
+.tmenu-opt[aria-checked='true'] .tmenu-switch { background: #1b2e40; }
+.tmenu-opt[aria-checked='true'] .tmenu-switch::after { transform: translateX(10px); }
+
+/* Fullscreen: the stage and its floor, as large as the screen allows at the stage's own shape. */
+.stage-box:fullscreen, .stage-box.is-fullscreen { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 16px; background: var(--j-bg); color: var(--j-text); }
+/* The frame sizes itself (it is a size container, so it cannot take its content's width), from the moment it is shown. */
+.stage-box:fullscreen > .stage-frame, .stage-box.is-fullscreen > .stage-frame { width: min(100%, calc((100vh - 32px) * var(--f-ar))); }
+.stage-box.is-fullscreen .fstage { box-shadow: none; border-radius: 16px; }
+
+/* Fight an AI: the page's one primary button, in Opper's solid pill; navy on the paper floor in both themes. */
+.fight-cta, .fight-go { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--j-text); border-radius: 999px; background: var(--j-text); color: var(--j-bg); padding: 12px 24px; font: 600 15px/1 var(--j-display); white-space: nowrap; }
+.fight-cta:hover, .fight-go:not(:disabled):hover { background: var(--j-btn-hover); border-color: var(--j-btn-hover); }
+.fight-go:disabled { opacity: 0.4; cursor: not-allowed; }
+.fight-cta .tri, .fight-go .tri { flex: none; width: 0; height: 0; border-left: 9px solid currentColor; border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.fight-cta.stop .tri { border: 0; width: 10px; height: 10px; background: currentColor; }
+.floor-cta .fight-cta { height: 52px; padding: 0 28px; gap: 12px; border-color: #1b2e40; background: #1b2e40; color: #ffffff; font-size: 17px; box-shadow: 0 14px 30px -14px rgba(27, 46, 64, 0.8); }
+.floor-cta .fight-cta:hover { background: #253e55; border-color: #253e55; }
+.fight-go.big, .fbtn.big { min-height: 48px; padding: 0 24px; font-size: 15px; }
+.fight-go.big { font-size: 16px; min-width: 200px; }
+
+/*
+ * The floor is 17% of the stage's height, so on a smaller stage (a tablet's, or a short window's) the button and the
+ * tools shrink with it and stay in the band under the ground line. A phone's go under the stage instead (below).
+ */
+.stage-frame { container: stage / inline-size; }
+@media (min-width: 561px) {
+  @container stage (max-width: 900px) {
+    .floor-cta .fight-cta { height: 44px; padding: 0 22px; gap: 10px; font-size: 15px; }
+  }
+  @container stage (max-width: 720px) {
+    .floor-ui { gap: 8px; }
+    .floor-cta .fight-cta { height: 38px; padding: 0 18px; gap: 9px; font-size: 14px; }
+    .tools { gap: 4px; }
+    .tbtn { width: 32px; height: 32px; border-radius: 9px; }
+    .tbtn svg { width: 16px; height: 16px; }
+    .tbtn.txt { font-size: 12px; }
+    .floor-names { font-size: 18px; }
+    /* The result's card, its buttons in one row, within a stage about 240-330px tall. */
+    .end-card { gap: 8px; padding: 16px 18px 14px; }
+    .end-title { font-size: 34px; }
+    .end-btns .fight-go.big, .end-btns .fbtn.big { min-width: 0; min-height: 40px; padding: 0 16px; font-size: 14px; }
+  }
+  /* A window just wider than a phone's (561-670px): the floor is about 40px tall. */
+  @container stage (max-width: 560px) {
+    .floor-cta .fight-cta { height: 32px; padding: 0 14px; gap: 8px; font-size: 13px; }
+    .tools { gap: 2px; }
+    .tbtn { width: 28px; height: 28px; border-radius: 8px; }
+    .tbtn svg { width: 15px; height: 15px; }
+  }
+}
+
+/* Activity: a tab hanging under the stage; the drawer folds out downward between them. */
+.act-tab { position: relative; z-index: 1; justify-self: center; display: inline-flex; align-items: center; gap: 8px; height: 32px; margin-top: -1px; padding: 0 18px; border: 1px solid var(--j-line); border-top: 0; border-radius: 0 0 12px 12px; background: #edf1f5; color: #1b2e40; font: 600 11px/1 var(--j-mono); letter-spacing: 0.12em; text-transform: uppercase; box-shadow: 0 10px 20px -16px rgba(27, 46, 64, 0.6); }
+.act-tab:hover { background: #e3e9ef; }
+.act-tab .chev { display: grid; }
+.act-tab .chev svg { transition: transform 0.15s; }
+.act-tab[aria-expanded='true'] .chev svg { transform: rotate(180deg); }
+.viewer.act-open .act-tab { background: var(--j-soft); color: var(--j-text); }
+.drawer { display: grid; padding: 14px 16px 16px; border: 1px solid var(--j-line); border-top: 0; border-radius: 0 0 16px 16px; background: var(--j-soft); }
+.drawer-body { display: grid; gap: 12px; min-width: 0; }
+.drawer-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.dtabs { display: flex; flex-wrap: wrap; gap: 2px; }
+.dtab { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: none; color: var(--j-muted); font: 500 13px var(--j-body); }
+button.dtab:not([aria-selected='true']):hover { color: var(--j-text); background: var(--j-hl); }
+.dtab[aria-selected='true'] { background: var(--j-text); color: var(--j-bg); }
+.facts { margin-left: auto; font: 500 12px var(--j-mono); font-variant-numeric: tabular-nums; color: var(--j-muted); }
+.drawer-step { display: flex; align-items: center; gap: 8px; }
+.drawer-step .fbtn.icon svg { width: 16px; height: 16px; }
+.drawer-step .time { font: 500 12px var(--j-mono); font-variant-numeric: tabular-nums; color: var(--j-muted); white-space: nowrap; }
+.drawer-step canvas.timeline { flex: 1; min-width: 0; height: 40px; }
+.drawer-cols { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.drawer-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.drawer-main.panel-body { padding: 0; overflow: visible; }
+.feed { display: flex; flex-direction: column; gap: 4px; overflow: auto; min-height: 0; position: relative; }
+.drawer-main .feed { max-height: 340px; }
+.drawer-side { display: grid; gap: 16px; }
+.side-block { display: grid; gap: 8px; }
+.kicker { margin: 0; font: 600 10px/1.2 var(--j-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--j-muted); }
+/* In a row when Activity is one column, one under the other in its side column. */
+.save-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fbtn .ico { display: grid; }
+.fbtn .ico svg { width: 15px; height: 15px; }
+.fbtn .ext { font: 500 11px var(--j-mono); color: var(--j-muted); }
 
 /* Buttons and fields in the page's own look: pills like the Watch chips. */
 .fbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; border: 1px solid var(--j-line); border-radius: 999px; background: var(--j-card); color: var(--j-text); padding: 5px 14px; font: 500 13px var(--j-body); white-space: nowrap; text-decoration: none; }
 .fbtn:hover { background: var(--j-soft); }
 .fbtn:disabled { opacity: 0.45; cursor: not-allowed; }
 .fbtn.icon { min-width: 34px; padding: 5px 9px; }
-.fbtn.small { min-height: 26px; padding: 2px 10px; font-size: 12px; }
 .fbtn.primary { background: var(--j-text); border-color: var(--j-text); color: var(--j-bg); font-weight: 600; }
 .fbtn.primary:hover { background: var(--j-btn-hover); }
-.toggle[aria-pressed='false'] { color: var(--j-muted); }
-.toggle[aria-pressed='false'] svg { opacity: 0.45; }
-.audio-toggles { display: inline-flex; gap: 6px; }
-select, input[type='number'] { font: 500 14px var(--j-body); border: 1px solid var(--j-strong-line); border-radius: 10px; padding: 7px 10px; background: var(--j-card); color: var(--j-text); max-width: 100%; min-width: 0; }
-label.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--j-text); }
+/* A select (the clip's settings) in the page's look rather than the browser's: the deadline field's box, our chevron. */
+select { appearance: none; height: 36px; max-width: 100%; min-width: 0; padding: 0 32px 0 12px; border: 1px solid var(--j-line); border-radius: 10px; background: var(--j-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%23677584' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 14px; color: var(--j-text); font: 500 13px var(--j-body); cursor: pointer; }
+html.dark select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%23a1a1a1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+select:hover { border-color: var(--j-strong-line); }
+label.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--j-text); cursor: pointer; }
+label.check input { width: 15px; height: 15px; margin: 0; accent-color: var(--j-text); cursor: pointer; }
 .fnote { margin: 0; font-size: 13px; color: var(--j-muted); }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--j-text); margin-right: 6px; vertical-align: -1px; flex: none; }
-.spacer { flex: 1; }
 strong.warn { color: var(--f-danger); }
-
-.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.controls label.check { white-space: nowrap; }
-.controls .time, .status { font: 500 13px var(--j-mono); font-variant-numeric: tabular-nums; color: var(--j-muted); }
-canvas.timeline { display: block; width: 100%; height: 46px; border: 1px solid var(--j-line); border-radius: 10px; cursor: pointer; touch-action: none; }
+.linkish { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--j-text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); cursor: pointer; }
+/* The timeline draws its ink in `color` on its `background` (timeline.ts reads them), so it follows the theme. */
+canvas.timeline { display: block; width: 100%; height: 46px; border: 1px solid var(--j-line); border-radius: 10px; background: var(--j-card); color: var(--j-text); cursor: pointer; touch-action: none; }
 .legend { display: flex; gap: 6px 12px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--j-muted); }
 .legend .sq { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 .legend .sq.ko { background: #e5484d; transform: rotate(45deg) scale(0.8); }
-.legend .share { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
-.legend .share a { color: var(--j-text); font-weight: 500; text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); }
+
+/* Your keys, in one line, under the stage while you fight. */
+.keys-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-size: 12.5px; color: var(--j-muted); }
+.viewer > .keys-strip { margin-top: 14px; }
+.keys-strip > span { display: inline-flex; align-items: center; gap: 4px; }
+kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border: 1px solid var(--j-strong-line); border-bottom-width: 2px; border-radius: 6px; background: var(--j-card); color: var(--j-text); font: 600 11px/1 var(--j-mono); }
+
+/* The Watch chips: the playing one shows a dot and carries the recording's download. */
+.chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--j-text); }
+.chip-split { flex: none; display: inline-flex; align-items: stretch; border: 1px solid var(--j-strong-line); border-radius: 999px; background: var(--j-soft); overflow: hidden; }
+.chip-split .chip { border: 0; border-radius: 0; background: none; }
+.chip-save { display: grid; place-items: center; padding: 0 11px 0 10px; border-left: 1px solid var(--j-line); color: var(--j-text); }
+.chip-save:hover { background: var(--j-hl); }
+.chip-save svg { width: 15px; height: 15px; }
+/* The pill clips what reaches outside it, so the two halves draw their focus ring inside. */
+.chip-split .chip { border-radius: 999px 0 0 999px; }
+.chip-save { border-radius: 0 999px 999px 0; }
+.chip-split .chip:focus-visible, .chip-save:focus-visible { outline-offset: -3px; }
 
 /* Clip export. */
-.export { border: 1px solid var(--j-line); border-radius: 16px; background: var(--j-card); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.export { margin-top: 14px; border: 1px solid var(--j-line); border-radius: 16px; background: var(--j-card); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 .export label:not(.check) { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--j-muted); }
 .export-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
 .export-status { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .progress { flex: 1; min-width: 200px; height: 8px; border-radius: 99px; background: var(--j-track); overflow: hidden; }
 .progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #8cecf2, #f9b58c); transition: width 0.15s; }
 video.preview { width: 100%; border-radius: 12px; border: 1px solid var(--j-line); margin-top: 4px; }
-
-/* The decision log and the stats, beside the stage: as tall as the stage's column, never taller. */
-.panel { background: var(--j-card); border: 1px solid var(--j-line); border-radius: 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-@media (min-width: 1100px) { .viewer:not(.panel-collapsed) .panel { align-self: stretch; height: 0; min-height: 100%; } }
-.tabs { display: flex; gap: 4px; padding: 6px 8px 0; border-bottom: 1px solid var(--j-line); background: var(--j-soft); }
-.panel-collapsed .tabs { border-bottom: 0; }
-/* Folds the panel away (to its header) and back. */
-.panel-toggle { flex: none; align-self: center; display: grid; place-items: center; width: 30px; height: 30px; margin: -4px 0 0; border: 0; border-radius: 8px; background: none; color: var(--j-muted); }
-.panel-toggle:hover { background: var(--j-hl); color: var(--j-text); }
-.panel-toggle svg { transition: transform 0.15s; }
-.panel-toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
-@media (min-width: 1100px) { .panel-toggle[aria-expanded='true'] svg { transform: rotate(-90deg); } }
-.tab { border: 0; background: none; padding: 8px 10px; font: 500 13px var(--j-body); color: var(--j-muted); border-bottom: 2px solid transparent; }
-.tab.active { color: var(--j-text); border-bottom-color: var(--j-text); }
-.panel-body { padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
-.feed { display: flex; flex-direction: column; gap: 4px; overflow: auto; min-height: 0; flex: 1; position: relative; }
+.export-head { display: flex; justify-content: space-between; align-items: center; }
 
 .dc { border: 1px solid var(--j-line); border-radius: 10px; background: var(--j-card); }
 .dc.current { border-color: var(--j-strong-line); background: var(--j-soft); }
 .dc.is-fallback { border-color: color-mix(in srgb, var(--f-danger) 45%, transparent); }
-.dc-head { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; border: 0; background: none; padding: 6px 8px; font: 500 13px var(--j-body); color: var(--j-text); text-align: left; }
+.dc-head { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; border: 0; border-radius: 9px; background: none; padding: 6px 8px; font: 500 13px var(--j-body); color: var(--j-text); text-align: left; }
+/* Inside the card: the feed scrolls, and clips a ring drawn outside it. */
+.dc-head:focus-visible { outline-offset: -2px; }
 .dc-head > * { flex: none; white-space: nowrap; }
 .dc-head .dc-move { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A long fallback note gives way before the move does (its title has the whole of it). */
+.dc-head .o-fallback { flex: 0 10 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .dc-time { color: var(--j-muted); font: 500 12px var(--j-mono); }
 .dc-move { font-weight: 700; }
 .dc-conf { color: var(--j-muted); font-variant-numeric: tabular-nums; }
@@ -159,15 +289,15 @@ html.dark .o-defended { background: rgba(110, 160, 230, 0.18) !important; color:
 .opt-facts { position: relative; color: var(--j-muted); font-size: 11px; }
 .dc-meta { color: var(--j-muted); margin-top: 6px; }
 
-/* Stats. */
-.panel-body h3 { margin: 12px 0 4px; font: 600 12px/1.2 var(--j-display); text-transform: uppercase; letter-spacing: 0.06em; color: var(--j-muted); }
+/* Stats: the headings as Activity's other headings (the kicker), the charts at their drawn size or a little more. */
+.panel-body h3 { margin: 14px 0 6px; font: 600 10px/1.2 var(--j-mono); text-transform: uppercase; letter-spacing: 0.12em; color: var(--j-muted); }
 .panel-body h3:first-child { margin-top: 2px; }
 .panel-body table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
 .panel-body th, .panel-body td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--j-line); vertical-align: top; }
 .panel-body thead th { font-size: 12px; color: var(--j-muted); white-space: nowrap; }
 .stat-table tbody th { color: var(--j-muted); font-weight: 500; }
 .chart-wrap { position: relative; }
-svg.chart { width: 100%; height: auto; display: block; font: 11px var(--j-body); }
+svg.chart { width: 100%; max-width: 440px; height: auto; display: block; font: 11px var(--j-body); }
 svg.chart .grid { stroke: var(--j-line); stroke-width: 1; }
 svg.chart .dashed { stroke-dasharray: 3 4; stroke: var(--j-strong-line); }
 svg.chart .axis { fill: var(--j-muted); }
@@ -175,65 +305,83 @@ svg.chart .label { fill: var(--j-text); font-weight: 600; }
 svg.chart .cross { stroke: var(--j-text); stroke-width: 1; }
 svg.chart .diag { stroke: var(--j-strong-line); stroke-dasharray: 4 4; }
 svg.calib { max-width: 320px; }
+.calib-wrap { display: grid; gap: 6px; margin-top: 10px; }
 .tip { position: absolute; background: var(--j-card); border: 1px solid var(--j-line); border-radius: 8px; padding: 6px 8px; font-size: 12px; pointer-events: none; min-width: 140px; box-shadow: 0 8px 24px -12px rgba(27, 46, 64, 0.35); }
 .tip-t { font-weight: 700; }
-.mix-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+/* The two fighters' move mixes side by side where the drawer is wide enough, one under the other on a phone. */
+.mix-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 28px; }
 .mix-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
-.mix-row { display: grid; grid-template-columns: 92px 1fr 30px; gap: 6px; align-items: center; font-size: 12px; padding: 1px 0; }
+.mix-row { display: grid; grid-template-columns: 108px 1fr 26px; gap: 6px; align-items: center; font-size: 12px; padding: 1px 0; }
 .mix-name { color: var(--j-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mix-bar { height: 10px; background: var(--j-track); border-radius: 2px; }
 .mix-bar span { display: block; height: 100%; border-radius: 0 4px 4px 0; }
 .mix-n { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* Your keys, while you fight. */
-.controls-card { border: 1px solid var(--j-line); border-radius: 16px; background: var(--j-card); padding: 10px 14px; font-size: 13px; }
-.controls-card summary { cursor: pointer; font-weight: 600; }
-.controls-card dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 10px 0 4px; }
-.controls-card dt { font-family: var(--j-mono); white-space: nowrap; }
-.controls-card dd { margin: 0; color: var(--j-muted); }
-
 /* Over the stage: waking the models, then the result. */
-.stage-cover { position: absolute; inset: 0; display: grid; place-items: center; padding: 12px; background: rgba(247, 249, 251, 0.6); }
-.stage-cover.end { background: rgba(247, 249, 251, 0.4); }
+.stage-cover { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; padding: 12px; background: rgba(247, 249, 251, 0.6); }
+.stage-cover.end { background: rgba(247, 249, 251, 0.55); }
+/* The result covers the stage and its floor (it sits in the frame, outside the stage's rounded clip). */
+.stage-frame > .stage-cover { border-radius: 16px; }
+.viewer.act-open .stage-frame > .stage-cover { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .cover-card { background: var(--j-card); color: var(--j-text); border: 1px solid var(--j-line); border-radius: 16px; padding: 18px 22px; display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; max-width: 100%; box-shadow: var(--f-shadow); }
 .cover-card p { margin: 0; }
-.end-title { font: 700 40px/1 var(--f-hand); }
+.end-card { gap: 12px; padding: 24px 26px 20px; }
+.end-title { font: 700 48px/1 var(--f-hand); }
 .end-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .spinner { width: 26px; height: 26px; border: 3px solid var(--j-line); border-top-color: var(--j-text); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Fight an AI: the page's one primary button, in Opper's solid pill. */
-.arcade-bottom { display: flex; justify-content: center; min-height: 44px; }
-.fight-cta, .fight-go { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--j-text); border-radius: 999px; background: var(--j-text); color: var(--j-bg); padding: 12px 24px; font: 600 15px/1 var(--j-display); white-space: nowrap; }
-.fight-cta:hover, .fight-go:hover { background: var(--j-btn-hover); border-color: var(--j-btn-hover); }
-.fight-go:disabled { opacity: 0.4; cursor: not-allowed; }
-.fight-cta .tri { flex: none; width: 0; height: 0; border-left: 8px solid currentColor; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
-.fight-cta.stop .tri { border: 0; width: 9px; height: 9px; background: currentColor; }
-
-/* The picker: a card over the page. */
+/* The picker: over the stage, as jevman's "Who plays the ghosts?" is in its cabinet; the whole screen on a small one. */
 .picker-overlay { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; padding: 16px; overflow: auto; background: rgba(0, 0, 0, 0.55); overscroll-behavior: contain; }
-.fcard { position: relative; margin: auto; width: min(600px, 100%); flex: none; display: grid; gap: 14px; background: var(--j-card); color: var(--j-text); border: 1px solid var(--j-line); border-radius: 16px; padding: 22px 22px 20px; box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.6); }
+@media (min-width: 900px) {
+  /* As tall as the stage, or taller when the card needs it (Advanced open on a short stage). */
+  .picker-overlay { position: absolute; inset: 0 0 auto 0; z-index: 20; aspect-ratio: var(--f-ar); overflow: visible; padding: 14px; border-radius: 16px; background: rgba(237, 241, 245, 0.78); backdrop-filter: blur(3px); }
+}
+.fcard { position: relative; margin: auto; width: min(660px, 100%); flex: none; display: grid; gap: 14px; background: var(--j-card); color: var(--j-text); border: 1px solid var(--j-line); border-radius: 18px; padding: 20px 22px; box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.6); }
 .fcard p { margin: 0; }
 .fcard .x { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--j-muted); }
 .fcard .x:hover { background: var(--j-soft); color: var(--j-text); }
-.fcard-title { padding-right: 36px; font: 600 24px/1.2 var(--j-display); }
-.presets { justify-content: flex-start; }
-.vs { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: start; }
-.side { display: grid; gap: 8px; min-width: 0; padding: 12px; border: 1px solid var(--j-line); border-radius: 12px; background: var(--j-soft); }
-.side-pick { display: grid; gap: 6px; min-width: 0; }
-.side-name { display: inline-flex; align-items: center; font: 700 24px/1 var(--f-hand); }
-.vs-word { font: 700 34px/1 var(--f-hand); padding-top: 22px; }
-.keynote { font-size: 12.5px; color: var(--j-muted); overflow-wrap: anywhere; }
-.keynote.warn { color: var(--f-danger); }
-label.field { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--j-muted); }
-.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 8px; }
-details.advanced summary { cursor: pointer; color: var(--j-muted); font-weight: 600; font-size: 13px; }
-details.advanced[open] summary { margin-bottom: 10px; }
-.fwarn { font-size: 13.5px; color: var(--j-text); padding: 10px 12px; border-radius: 10px; background: var(--j-backup); }
-.fwarn .linkish { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.pick-head { display: grid; gap: 4px; padding-right: 36px; }
+.fcard-title { font: 600 22px/1.2 var(--j-display); }
+.opp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tile { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 52px; padding: 6px 12px; border: 1px solid var(--j-line); border-radius: 12px; background: var(--j-card); color: var(--j-text); text-align: left; }
+.tile:hover { background: var(--j-soft); }
+.tile[aria-checked='true'] { border-color: var(--j-text); box-shadow: inset 0 0 0 1px var(--j-text); background: var(--j-soft); }
+.tile .mark { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 8px; overflow: hidden; color: #1b2e40; font: 700 13px/1 var(--j-display); }
+/* A maker's logo (jevman's): a mark on a quiet square, or an avatar or app icon that fills it. */
+.tile .mark.boxed { background: var(--j-soft); box-shadow: inset 0 0 0 1px var(--j-line); }
+.tile .mark.boxed .logo { width: 18px; height: 18px; object-fit: contain; }
+.tile .mark.fill .logo { width: 28px; height: 28px; object-fit: cover; }
+.tile .mark.fill .logo.round { border-radius: 50%; }
+html.dark .mono-mark { filter: invert(1); }
+.tile-text { display: grid; gap: 1px; min-width: 0; }
+.tile-text b, .tile-text small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-text b { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.tile-text small { font-size: 11.5px; color: var(--j-muted); }
 .go-row { display: flex; justify-content: center; }
-.billing:empty { display: none; }
-.billing { text-align: center; }
+.pick-foot { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.pick-pay { font-size: 12.5px; color: var(--j-muted); }
+.adv-toggle { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 0; color: var(--j-muted); font: 600 12.5px var(--j-body); cursor: pointer; }
+.adv-toggle:hover { color: var(--j-text); }
+.adv-toggle .chev { display: grid; transition: transform 0.15s; }
+.adv-toggle[aria-expanded='true'] .chev { transform: rotate(90deg); }
+.adv { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 10px 18px; padding: 14px 16px; border: 1px solid var(--j-line); border-radius: 12px; background: var(--j-soft); }
+.adv-label { font-size: 13px; font-weight: 600; color: var(--j-muted); }
+/* Over the stage, two settings to a row (mode and side, then track and deadline), so the card stays about its height. */
+@media (min-width: 900px) {
+  .adv { grid-template-columns: max-content max-content max-content minmax(0, 1fr); column-gap: 14px; }
+  .adv > .seg { margin-right: 14px; }
+}
+/* A switch between two or three choices (Advanced's mode, side and track). */
+.seg { justify-self: start; display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--j-track); }
+.seg-opt { height: 30px; padding: 0 14px; border: 0; border-radius: 8px; background: none; color: var(--j-muted); font: 500 13px var(--j-body); white-space: nowrap; }
+.seg-opt:hover { color: var(--j-text); }
+.seg-opt[aria-checked='true'] { background: var(--j-seg-on); color: var(--j-text); font-weight: 600; box-shadow: 0 1px 3px rgba(27, 46, 64, 0.18); }
+.deadline { justify-self: start; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--j-muted); }
+/* A plain field: the browser's stepper arrows would be the one native-looking control in the card. */
+.deadline input { width: 88px; height: 36px; padding: 0 10px; border: 1px solid var(--j-line); border-radius: 10px; background: var(--j-card); color: var(--j-text); font: 500 13px var(--j-mono); appearance: textfield; -moz-appearance: textfield; }
+.deadline input::-webkit-inner-spin-button, .deadline input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.deadline input:hover { border-color: var(--j-strong-line); }
 
 /* The tools (#/still, #/poses): the stage or the pose sheet alone. */
 body.tool-page { background: var(--f-paper); }
@@ -245,17 +393,60 @@ body.tool-page { background: var(--f-paper); }
 .pose figcaption { font-size: 12px; color: var(--j-muted); }
 
 /* ---------- small screens ---------- */
-@media (max-width: 1099px) {
-  .panel { max-height: 440px; }
+/* A tablet: the feed takes the drawer's width, what the colors mean and the downloads go under it. */
+@media (max-width: 900px) {
+  .drawer-cols { grid-template-columns: minmax(0, 1fr); }
 }
+@media (max-width: 760px) {
+  .facts { margin-left: 0; flex-basis: 100%; }
+}
+/* A phone: the stage is 4:3, and its floor too short for the tools and the button, so they go under it. */
 @media (max-width: 560px) {
   :root { --f-ar: 1.3333; }
-  .fstage, .viewer-loading { aspect-ratio: 4 / 3; }
-  .caption-vs { font-size: 24px; }
-  .vs { grid-template-columns: minmax(0, 1fr); }
-  .vs-word { padding: 0; text-align: center; font-size: 26px; }
-  .fields { grid-template-columns: minmax(0, 1fr); }
+  .fstage { aspect-ratio: 4 / 3; }
+  .floor-ui { position: static; height: auto; padding: 12px 0 0; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .floor-label { display: none; }
+  /* A recording's six tools spread across the row; a live fight's two (sound, fullscreen) sit together at its end. */
+  .tools { order: 1; justify-self: stretch; justify-content: flex-end; gap: 8px; opacity: 1; }
+  .tools:has(> :nth-child(5)) { justify-content: space-between; gap: 0; }
+  /* Off the paper, on the page: the tools, the button and Activity take the page's theme, as its other controls do. */
+  .tbtn { width: 44px; height: 44px; border-color: var(--j-line); background: var(--j-card); color: var(--j-text); }
+  .tbtn:hover { background: var(--j-soft); }
+  .tbtn[aria-pressed='true'], .tbtn[aria-expanded='true'] { background: var(--j-hl); border-color: var(--j-strong-line); }
+  .tool-play { display: grid; }
+  .floor-cta { order: 2; }
+  .floor-cta .fight-cta { width: 100%; border-color: var(--j-text); background: var(--j-text); color: var(--j-bg); }
+  .floor-cta .fight-cta:hover { border-color: var(--j-btn-hover); background: var(--j-btn-hover); }
+  .stage-box.ended .floor-cta { display: none; }
+  .act-tab { order: 3; justify-self: stretch; justify-content: center; height: 44px; margin-top: 14px; border-top: 1px solid var(--j-line); border-radius: 12px; background: var(--j-soft); color: var(--j-text); }
+  .act-tab:hover { background: var(--j-hl); }
+  .viewer.act-open .act-tab { border-radius: 12px 12px 0 0; }
+  .drawer { order: 4; }
+  .viewer.act-open .fstage { border-radius: 16px; }
+  .viewer > .export, .viewer > .keys-strip { order: 5; }
+  /* Activity on a phone: the timeline gets a row of its own, a decision's line wraps rather than cutting its move. */
+  .drawer-step { flex-wrap: wrap; }
+  .drawer-step canvas.timeline { flex-basis: 100%; }
+  .dc-head { flex-wrap: wrap; gap: 4px 6px; }
+  /* What a thumb presses is about 40px tall at least. */
+  .tmenu-opt { height: 44px; }
+  .dtab { height: 36px; }
+  .drawer-step .fbtn.icon { min-width: 40px; min-height: 40px; }
+  .watch .chip { min-height: 38px; }
+  .watch { justify-content: flex-start; }
+  .watch .chips { width: 100%; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; padding-bottom: 2px; }
+  .watch .chips > * { flex: none; }
+  .opp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Two to a row, a long model name takes two lines rather than losing its end. */
+  .tile-text b { display: -webkit-box; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+  .adv { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .adv-label:not(:first-child) { margin-top: 6px; }
   .fcard { padding: 18px 16px 16px; }
-  .legend .share { margin-left: 0; }
-  .panel { max-height: 320px; }
+  /* The result under the stage, before its tools: over a 4:3 stage it would not fit. */
+  .stage-frame { display: flex; flex-direction: column; }
+  .stage-frame > .stage-cover.end { position: static; order: 1; padding: 14px 0 0; border-radius: 0; background: none; }
+  .floor-ui { order: 2; }
+  .end-card { width: 100%; }
+  .end-title { font-size: 38px; }
+  .end-btns > * { flex: 1 1 100%; min-width: 0; }
 }

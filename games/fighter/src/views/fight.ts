@@ -1,4 +1,5 @@
 import type { TransportHooks } from '../../../../packages/kit/client/transport.ts';
+import { modelMaker } from '../../../../packages/kit/shared/models.ts';
 import type { Adapter } from '../../shared/adapter.ts';
 import { BASELINE_THINK_MS } from '../../shared/baselines.ts';
 import { Match } from '../../shared/match.ts';
@@ -8,21 +9,21 @@ import type { FighterMeta, Replay } from '../../shared/replay.ts';
 import { downloadReplay, type Me } from '../api.ts';
 import { audio } from '../audio.ts';
 import { h, money } from '../dom.ts';
-import { CONTROLS, getKeyboard } from '../input.ts';
-import { HUMAN, planFighter, type Plan } from '../players.ts';
+import { getKeyboard } from '../input.ts';
+import { logoFor } from '../logos.ts';
+import { HUMAN, modelProblem, planFighter, type Plan } from '../players.ts';
 import { Stage } from '../stage.ts';
 import { SIDES } from '../theme.ts';
-import { audioToggles } from './audio-toggles.ts';
+import { soundTool } from './audio-toggles.ts';
 import { decisionCard, topMoves } from './decisions.ts';
 import { fullscreenButton } from './fullscreen.ts';
-import { collapsiblePanel } from './panel.ts';
+import { activityDrawer } from './panel.ts';
+import { floorLabel, ICONS, stageShell } from './shell.ts';
 
 export const COLORS = [SIDES[0].deep, SIDES[1].deep] as const;
 const STORE = 'fighter.setup';
 /** A model's answer comes through the game's server, which gives it 2 s; the page waits a little longer. */
 const MAX_DEADLINE_MS = 2500;
-/** The pair "Two baselines" picks: the two strongest. */
-const BASELINE_PAIR = ['baseline/maximin', 'baseline/greedy'] as const;
 
 export interface Setup {
   left: string;
@@ -46,6 +47,30 @@ function loadSetup(): Setup {
   return fallback;
 }
 
+/** The mark of a model without a maker's logo (logos.ts) in the picker: its initial on a tint per maker. */
+const TINTS = ['#f5d6ea', '#fde3c8', '#dbe9f7', '#dcefef', '#e8e3f3', '#d9eee2', '#e2f0d6', '#f8e3d6', '#e3e8ee'];
+function tint(key: string): string {
+  let n = 0;
+  for (const c of key) n = (n * 31 + c.charCodeAt(0)) >>> 0;
+  return TINTS[n % TINTS.length]!;
+}
+
+const KEYS: [string[], string][] = [
+  [['A', 'D'], 'move, hold back to block'],
+  [['W'], 'jump'],
+  [['S'], 'block low'],
+  [['U', 'I', 'O'], 'punches'],
+  [['J', 'K', 'L'], 'kicks'],
+  [['H'], 'throw'],
+  [['Y'], 'jump kick'],
+  [['Space'], 'special'],
+];
+
+/** Your keys, in one line, under the stage while you fight. */
+export function keysStrip(): HTMLElement {
+  return h('div.keys-strip', { 'aria-label': 'Your keys' }, ...KEYS.map(([keys, what]) => h('span', null, ...keys.map((k) => h('kbd', null, k)), ` ${what}`)));
+}
+
 export interface PickerOptions {
   me: Me;
   hooks: TransportHooks;
@@ -56,106 +81,94 @@ export interface PickerOptions {
   start: (setup: Setup, plans: [Plan, Plan]) => void;
 }
 
-/** "Fight an AI": who fights whom, the mode, and an honest line when no model can play for this visitor. */
+/**
+ * "Fight an AI", over the stage as jevman's "Who plays the ghosts?" is in its cabinet: pick a decision model, then fight
+ * it in real time on the keyboard. Only models: the baselines are for the leaderboard and Watch. Paused mode, your side,
+ * the track and the deadline wait, closed, under Advanced. When no model can play for this visitor the models still
+ * show, and the button asks them to sign in, or a line says why not.
+ */
 export function pickerCard(o: PickerOptions): HTMLElement {
-  const setup = loadSetup();
-  const group = (label: string, items: [string, string][], sel: string) => h('optgroup', { label }, ...items.map(([value, text]) => h('option', { value, selected: value === sel }, text)));
-  const of = (kind: string): [string, string][] => MODELS.filter((m) => m.kind === kind).map((m) => [m.id, m.label]);
-  const fill = (select: HTMLSelectElement, sel: string) =>
-    select.replaceChildren(group('Play it yourself', [[HUMAN, 'You (keyboard)']], sel), group('Decision models', of('systemone'), sel), group('Baselines (no model, free)', of('baseline'), sel));
-  const left = h('select', { id: 'left' }) as HTMLSelectElement;
-  const right = h('select', { id: 'right' }) as HTMLSelectElement;
-  const pickers = [left, right] as const;
-  fill(left, setup.left);
-  fill(right, setup.right);
-  const mode = h('select', { id: 'mode' }, h('option', { value: 'realtime', selected: setup.mode === 'realtime' }, 'Real time: thinking costs time'), h('option', { value: 'paused', selected: setup.mode === 'paused' }, 'Paused: the fight waits for answers')) as HTMLSelectElement;
-  // Empty = automatic: 2 s in real time, 2.5 s paused.
-  const deadline = h('input', { id: 'deadline', type: 'number', min: 300, max: MAX_DEADLINE_MS, step: 100, placeholder: 'auto', value: setup.deadline || '' }) as HTMLInputElement;
-  const track = h(
-    'select',
-    { id: 'track' },
-    h('option', { value: 'raw', selected: setup.track !== 'assisted' }, 'Raw: situation and rules only'),
-    h('option', { value: 'assisted', selected: setup.track === 'assisted' }, 'Assisted: options show payoffs'),
-  ) as HTMLSelectElement;
-  const start = h('button.fight-go', { type: 'button' }, 'Fight');
-  const billing = h('p.fnote.billing');
-  const warn = h('p.fwarn', { role: 'status' });
-  const notes = ([0, 1] as const).map(() => h('span.keynote'));
+  const saved = loadSetup();
+  const problem = modelProblem(o.me);
+  const models = MODELS.filter((m) => m.kind === 'systemone');
+  const savedSide: 0 | 1 = saved.left !== HUMAN && saved.right === HUMAN ? 1 : 0;
+  const savedOpponent = savedSide === 0 ? saved.right : saved.left;
+  let opponent = models.some((m) => m.id === savedOpponent) ? savedOpponent : DEFAULT_OPPONENT;
 
-  const vsModel = h('button.chip', { type: 'button', role: 'radio' }, 'You vs a decision model');
-  const twoBaselines = h('button.chip', { type: 'button', role: 'radio' }, 'Two baselines');
-  const plans = () => pickers.map((p) => planFighter(p.value, o.me, o.hooks)) as [Plan, Plan];
-  function refresh() {
-    const ps = plans();
-    ps.forEach((p, k) => {
-      notes[k]!.textContent = p.note;
-      notes[k]!.classList.toggle('warn', Boolean(p.problem));
+  /** The maker's logo (jevman's), or the model's initial on a tint for a model without one. */
+  const markFor = (id: string, label: string, maker: string) => {
+    const logo = logoFor(id);
+    if (!logo) return h('span.mark', { style: { background: tint(maker || label) }, 'aria-hidden': 'true' }, label.slice(0, 1));
+    return h(logo.classList.contains('round') || logo.classList.contains('square') ? 'span.mark.fill' : 'span.mark.boxed', { 'aria-hidden': 'true' }, logo);
+  };
+  const tiles = models.map((m) => {
+    const maker = modelMaker(m.id) ?? '';
+    const b = h(
+      'button.tile',
+      { type: 'button', role: 'radio', 'aria-checked': String(m.id === opponent), title: maker ? `${m.label}, by ${maker}` : m.label },
+      markFor(m.id, m.label, maker),
+      h('span.tile-text', null, h('b', null, m.label), h('small', null, maker)),
+    );
+    b.addEventListener('click', () => {
+      opponent = m.id;
+      tiles.forEach((t, k) => t.setAttribute('aria-checked', String(models[k]!.id === opponent)));
     });
-    const modelProblem = ps.find((p) => p.problem)?.problem ?? null;
-    const problem = left.value === HUMAN && right.value === HUMAN ? 'One keyboard, one player: pick a model or a baseline for the other side.' : modelProblem;
-    start.toggleAttribute('disabled', Boolean(problem));
-    billing.textContent = problem ? '' : ps.every((p) => p.source !== 'model') ? 'Runs in your browser: no model calls.' : '';
-    // The honest line: why no model can play here, and what can.
-    warn.replaceChildren();
-    warn.hidden = !problem;
-    if (problem) {
-      if (modelProblem && o.me.loginAvailable && o.me.mode !== 'player') {
-        // As Snake says it: why, then the way in, then what is free.
-        warn.append(o.poolEmpty ? 'The free credits are used up. ' : 'No decision model can play here without an Opper account. ');
-        warn.append(h('button.linkish', { type: 'button', onclick: o.signIn }, 'Sign in with Opper'), ' to play one on your own account, or pick two baselines: they are free.');
-      } else warn.append(problem);
-    }
-    vsModel.setAttribute('aria-checked', String(left.value === HUMAN && ps[1]!.source === 'model'));
-    twoBaselines.setAttribute('aria-checked', String(ps.every((p) => p.source === 'baseline')));
-  }
-  vsModel.addEventListener('click', () => {
-    left.value = HUMAN;
-    if (planFighter(right.value, o.me, o.hooks).source !== 'model') right.value = DEFAULT_OPPONENT;
-    refresh();
-  });
-  twoBaselines.addEventListener('click', () => {
-    left.value = BASELINE_PAIR[0];
-    right.value = BASELINE_PAIR[1];
-    refresh();
+    return b;
   });
 
-  const sideBox = (k: 0 | 1, picker: HTMLSelectElement) =>
-    h('div.side', null, h('label.side-pick', { for: picker.id }, h('span.side-name', null, h('span.dot', { style: { background: COLORS[k] } }), k === 0 ? 'Left' : 'Right'), picker), notes[k]);
-  const x = h('button.x', { type: 'button', 'aria-label': 'Close', html: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' });
+  const x = h('button.x', { type: 'button', 'aria-label': 'Back to watching', title: 'Back to watching (Esc)', html: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' });
   x.addEventListener('click', o.close);
-  const card = h(
-    'div.fcard',
-    { role: 'dialog', 'aria-label': 'Fight an AI' },
-    x,
-    h('p.fcard-title', null, 'Fight an AI'),
-    h('p.fnote', null, 'Every time a fighter is free to act, it gets the situation and its legal moves and picks one. Fight a decision model yourself, or watch two baselines: they follow one fixed rule and run free in your browser.'),
-    h('div.chips.presets', { role: 'radiogroup', 'aria-label': 'Who fights' }, vsModel, twoBaselines),
-    h('div.vs', null, sideBox(0, left), h('div.vs-word', null, 'vs'), sideBox(1, right)),
-    h('label.field', { for: 'mode' }, 'Mode', mode),
-    h(
-      'details.advanced',
-      null,
-      h('summary', null, 'Advanced'),
-      h('div.fields', null, h('label.field', { for: 'track' }, 'Track', track), h('label.field', { for: 'deadline' }, 'Answer deadline (ms)', deadline)),
-      h('p.fnote', null, "Raw gives only the situation and the rules (the benchmark's track, with real time and the 2 s deadline). Assisted adds each move's payoff against the opponent's likely answers, an easier test."),
-    ),
-    warn,
-    h('div.go-row', null, start),
-    billing,
-  );
-  for (const p of pickers) p.addEventListener('change', refresh);
-  refresh();
 
-  start.addEventListener('click', () => {
-    const ps = plans();
+  // Advanced, closed: the mode, your side, the track (a switch each) and the deadline (empty = automatic: 2 s, 2.5 s
+  // paused).
+  const choice = <T extends string>(label: string, options: [T, string, string?][], value: T) => {
+    let current = value;
+    const buttons = options.map(([v, text, title]) => {
+      const b = h('button.seg-opt', { type: 'button', role: 'radio', 'aria-checked': String(v === current), title });
+      b.textContent = text;
+      b.addEventListener('click', () => {
+        current = v;
+        buttons.forEach((x, k) => x.setAttribute('aria-checked', String(options[k]![0] === v)));
+      });
+      return b;
+    });
+    return { el: h('div.seg', { role: 'radiogroup', 'aria-label': label }, ...buttons), get: () => current };
+  };
+  const mode = choice('Mode', [['realtime', 'Real time'], ['paused', 'Paused', 'The fight waits for each answer']], saved.mode);
+  const side = choice('Your side', [['left', 'Left'], ['right', 'Right']], savedSide === 1 ? 'right' : 'left');
+  const track = choice('Track', [['raw', 'Raw', 'The situation and the rules only: the benchmark\'s track'], ['assisted', 'Assisted', "Each option shows its payoff against the opponent's likely answers"]], saved.track === 'assisted' ? 'assisted' : 'raw');
+  const deadline = h('input', { id: 'deadline', type: 'number', min: 300, max: MAX_DEADLINE_MS, step: 100, placeholder: 'auto', value: saved.deadline || '' }) as HTMLInputElement;
+  const row = (label: string, control: HTMLElement, forId?: string) => [h('label.adv-label', forId ? { for: forId } : null, label), control];
+  const advPanel = h(
+    'div.adv',
+    { id: 'pick-advanced', hidden: true },
+    ...row('Mode', mode.el),
+    ...row('Your side', side.el),
+    ...row('Track', track.el),
+    ...row('Answer deadline', h('span.deadline', null, deadline, 'ms'), 'deadline'),
+  );
+  const advToggle = h(
+    'button.adv-toggle',
+    { type: 'button', 'aria-controls': 'pick-advanced', 'aria-expanded': 'false' },
+    'Advanced',
+    h('span.chev', { html: '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>' }),
+  );
+  advToggle.addEventListener('click', () => {
+    advPanel.hidden = !advPanel.hidden;
+    advToggle.setAttribute('aria-expanded', String(!advPanel.hidden));
+  });
+
+  const begin = () => {
+    const [left, right] = side.get() === 'right' ? [opponent, HUMAN] : [HUMAN, opponent];
+    const ps = [planFighter(left, o.me, o.hooks), planFighter(right, o.me, o.hooks)] as [Plan, Plan];
     if (ps.some((p) => p.problem)) return;
-    const paused = mode.value === 'paused';
+    const paused = mode.get() === 'paused';
     const s: Setup = {
-      left: left.value,
-      right: right.value,
+      left,
+      right,
       mode: paused ? 'paused' : 'realtime',
       deadline: Number(deadline.value) > 0 ? Math.min(MAX_DEADLINE_MS, Math.max(300, Number(deadline.value))) : paused ? MAX_DEADLINE_MS : 2000,
-      track: track.value === 'assisted' ? 'assisted' : 'raw',
+      track: track.get(),
     };
     try {
       localStorage.setItem(STORE, JSON.stringify({ ...s, deadline: Number(deadline.value) > 0 ? s.deadline : 0 }));
@@ -163,30 +176,58 @@ export function pickerCard(o: PickerOptions): HTMLElement {
       // storage blocked
     }
     o.start(s, ps);
-  });
-  return card;
-}
+  };
 
-/** The keys, shown under the stage while you play. */
-function controlsCard(side: 0 | 1): HTMLElement {
+  // The button and one line under it: who pays, or how to get in, or why no model can play.
+  const go = h('button.fight-go.big', { type: 'button' });
+  const pay = h('p.pick-pay');
+  const signIn = (text: string) => h('button.linkish', { type: 'button', onclick: o.signIn }, text);
+  if (problem && o.me.loginAvailable && o.me.mode !== 'player') {
+    go.append('Sign in to fight');
+    go.addEventListener('click', o.signIn);
+    pay.append(o.poolEmpty || o.me.pool?.open === false ? 'The free credits are used up: fight on your own Opper account.' : 'Fights run on your own Opper account.');
+  } else if (problem) {
+    go.append(h('span.tri', { 'aria-hidden': 'true' }), 'Fight');
+    go.disabled = true;
+    pay.append(o.me.unavailable ? "Couldn't reach the server. Try again in a moment." : 'No model can play on this server right now.');
+  } else {
+    go.append(h('span.tri', { 'aria-hidden': 'true' }), 'Fight');
+    go.addEventListener('click', begin);
+    if (o.me.mode === 'player') pay.append(`On your Opper account${o.me.user?.email ? ` (${o.me.user.email})` : ''}.`);
+    else if (o.me.mode === 'dev') pay.append('On the local key from .env.');
+    else {
+      const left = o.me.pool?.remainingUsd;
+      pay.append(`Free while Opper's credits last${left !== null && left !== undefined ? ` ($${left.toFixed(2)} left)` : ''}.`);
+      if (o.me.loginAvailable) pay.append(' ', signIn('Sign in'), ' to use your own.');
+    }
+  }
+
   return h(
-    'details.controls-card',
-    { open: true },
-    h('summary', null, `Your controls (you are ${side === 0 ? 'left, facing right' : 'right, facing left'})`),
-    h('dl', null, ...CONTROLS.flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
-    h('p.fnote', null, 'A key pressed a moment before your fighter is free still counts. Every move commits: a whiffed high kick leaves you open.'),
+    'div.fcard',
+    { role: 'dialog', 'aria-label': 'Fight an AI' },
+    x,
+    h('div.pick-head', null, h('p.fcard-title', null, 'Who do you fight?'), h('p.fnote', null, 'Pick an AI model. It picks every move; you fight it on the keyboard.')),
+    h('div.opp-grid', { role: 'radiogroup', 'aria-label': 'AI models' }, ...tiles),
+    h('div.go-row', null, go),
+    h('div.pick-foot', null, pay, advToggle),
+    advPanel,
   );
 }
 
 export interface LiveOptions {
+  /** The page's primary button ("Stop the fight" while it lasts), shown on the stage's floor. */
+  cta: HTMLElement;
   /** Opens the replay of the match just played (kept in this page only). */
   watch: (r: Replay) => void;
+  /** The same fight again, at once. */
   again: () => void;
+  /** Back to the picker, for another opponent. */
+  change: () => void;
   /** The match is over (or stopped). */
   ended: () => void;
 }
 
-/** A match played live in `host`: the stage, the decisions as they come, and at the end its result. */
+/** A match played live in `host`: the stage, the decisions as they come (in Activity), and at the end its result. */
 export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOptions): () => void {
   const meta = plans.map((p, k) => p.meta(COLORS[k])) as [FighterMeta, FighterMeta];
   const match = new Match({
@@ -204,33 +245,29 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
   const models = meta.filter((_, k) => plans[k]!.source === 'model').map((m) => m.label);
   const stageHost = h('div.fstage');
   const stage = new Stage(stageHost, meta);
-  const overlay = h('div.stage-cover', null, h('div.cover-card', null, h('div.spinner'), h('div', null, models.length ? `Waking up ${models.join(' and ')}` : 'Getting ready')));
-  stageHost.append(overlay);
+  const cover = h('div.stage-cover', null, h('div.cover-card', null, h('div.spinner'), h('div', null, models.length ? `Waking up ${models.join(' and ')}` : 'Getting ready')));
+  stageHost.append(cover);
   const feed = h('div.feed');
-  const status = h('span.status');
+  const status = h('span.facts');
   const lat: [number[], number[]] = [[], []];
 
   // A live match cannot pause (the models answer in real time), so its stage takes no clicks; it can go fullscreen.
-  const stageBox = h('div.stage-box');
-  const fs = fullscreenButton(stageBox);
-  stageBox.append(stageHost, h('div.controls', null, status, h('span.spacer'), audioToggles(), fs.el));
-  const viewer = h(
-    'div.viewer',
+  const { box, frame, tools } = stageShell(stageHost, floorLabel('Live', meta, true), o.cta);
+  const fs = fullscreenButton(box);
+  fs.el.className = 'tbtn';
+  tools.append(soundTool(), fs.el);
+  const modeLine = `${s.mode === 'paused' ? 'paused' : 'real time'} · ${s.track} track · ${s.deadline} ms deadline`;
+  const body = h(
+    'div.drawer-body',
     null,
-    h(
-      'div.viewer-main',
-      null,
-      h(
-        'div.caption',
-        null,
-        h('p.caption-vs', null, h('span', { style: { color: COLORS[0] } }, meta[0].label), h('span.vs-small', null, ' vs '), h('span', { style: { color: COLORS[1] } }, meta[1].label)),
-        h('p.caption-sub', null, `Live, ${s.mode === 'paused' ? 'paused' : 'real-time'} mode, ${s.track} track, ${s.deadline} ms deadline.`),
-      ),
-      stageBox,
-      human !== null ? controlsCard(human) : null,
-    ),
+    // One list while the match lasts: a heading, not a tab that looks pressable.
+    h('div.drawer-head', null, h('p.kicker', null, 'Decisions, newest first'), status),
+    h('div.drawer-main.panel-body', null, feed),
   );
-  viewer.append(collapsiblePanel(viewer, [h('span.tab.active', null, 'Decisions, newest first')], h('div.panel-body', null, feed)));
+  const viewer = h('div.viewer');
+  const act = activityDrawer(viewer, body);
+  viewer.append(box, act.drawer, act.tab);
+  if (human !== null) viewer.append(keysStrip());
   host.replaceChildren(viewer);
 
   match.onTick((st, events) => stage.tick(st, events));
@@ -256,35 +293,50 @@ export function live(host: HTMLElement, s: Setup, plans: [Plan, Plan], o: LiveOp
     }
     const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
     const cost = match.decisions.reduce((sum, d) => sum + (d.answer?.costUsd ?? 0), 0);
-    status.textContent = `${match.decisions.length} decisions, avg latency ${avg(lat[0])} / ${avg(lat[1])} ms, ${money(cost)}`;
+    status.textContent = `${match.decisions.length} decisions · avg ${avg(lat[0])} / ${avg(lat[1])} ms · ${money(cost)} · ${modeLine}`;
   };
   stage.tick(match.state);
 
   let stopped = false;
   (async () => {
     const errs = await match.warmUp();
-    overlay.remove();
-    if (errs.length) status.textContent = `Warm-up problem: ${errs.join('; ')}`;
+    cover.remove();
+    if (errs.length) {
+      status.textContent = `Warm-up problem: ${errs.join('; ')}`;
+      if (!act.drawer.hidden) act.drawer.scrollIntoView({ block: 'nearest' });
+    }
     const replay = await match.run();
     if (stopped) return;
     o.ended();
-    const download = h('button.fbtn', { type: 'button' }, 'Download the replay');
-    download.addEventListener('click', () => void downloadReplay(replay));
-    const watch = h('button.fight-go', { type: 'button', onclick: () => o.watch(replay) }, 'Watch the replay and stats');
-    stageHost.append(
+    // The end card has its own buttons: the floor's would be a second "Fight".
+    box.classList.add('ended');
+    const floorTag = box.querySelector('.floor-tag');
+    floorTag?.classList.remove('live');
+    if (floorTag?.lastChild) floorTag.lastChild.textContent = 'Final';
+    const again = h('button.fight-go.big', { type: 'button', onclick: o.again }, h('span.tri', { 'aria-hidden': 'true' }), 'Fight again');
+    const winner = replay.result.winner;
+    // Over the stage and its floor; on a phone, whose 4:3 stage is too short for it, under the stage (style.css).
+    frame.append(
       h(
         'div.stage-cover.end',
         null,
         h(
-          'div.cover-card',
+          'div.cover-card.end-card',
           null,
-          h('p.end-title', null, replay.result.winner === null ? 'Draw' : `${meta[replay.result.winner].label} ${meta[replay.result.winner].kind === 'human' ? 'win' : 'wins'}`),
-          h('p.fnote', null, 'This match stays in your browser: watch it with its stats, or save it.'),
-          h('div.end-btns', null, watch, download, h('button.fbtn', { type: 'button', onclick: o.again }, 'Fight again')),
+          h('p.end-title', null, winner === null ? 'Draw' : `${meta[winner].label} ${meta[winner].kind === 'human' ? 'win' : 'wins'}`),
+          h('p.fnote', null, `${replay.decisions.length} decisions · ${money(replay.costUsd)}`),
+          h(
+            'div.end-btns',
+            null,
+            again,
+            h('button.fbtn.big', { type: 'button', onclick: () => o.watch(replay) }, 'Watch the replay'),
+            h('button.fbtn.big', { type: 'button', title: 'The whole match as a gzipped JSON recording (.fight.json.gz)', onclick: () => void downloadReplay(replay) }, h('span.ico', { html: ICONS.download }), 'Download'),
+          ),
+          h('p.fnote', null, 'This match stays in your browser: download it to keep it. ', h('button.linkish', { type: 'button', onclick: o.change }, 'Change opponent')),
         ),
       ),
     );
-    watch.focus({ preventScroll: true });
+    again.focus({ preventScroll: true });
   })();
 
   audio.scene(true);

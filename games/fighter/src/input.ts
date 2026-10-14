@@ -35,18 +35,6 @@ const DIR_KEYS: Record<string, Dir> = {
   KeyS: 'down',
 };
 
-/** The controls as shown to the player. */
-export const CONTROLS: [string, string][] = [
-  ['A D  (or ← →)', 'walk; hold back to block high; double-tap: dash / backdash'],
-  ['W  (or ↑)', 'jump'],
-  ['S  (or ↓)', 'block low (hold)'],
-  ['U I O', 'punches: jab, straight, uppercut (Shift+U: jab, straight)'],
-  ['J K L', 'kicks: low kick, high kick, sweep (Shift+J: low kick, sweep)'],
-  ['H', 'throw'],
-  ['Y', 'jump kick'],
-  ['Space', 'special (when the meter is full)'],
-];
-
 /**
  * What the keyboard asks for, independent of the DOM so it can be tested. Directions are screen
  * directions; the left fighter's forward is right, the right fighter's is left (they never cross).
