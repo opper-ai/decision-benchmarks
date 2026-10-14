@@ -94,7 +94,7 @@ What a replay can't check: that your model made those moves, how fast it really 
 what it cost, and that you didn't play more runs and keep the best one. Those are as you report them, which is why
 the leaderboard marks these entries. Please submit every game of the run.
 
-In a real-time game (jevman, Snake, Jev Fighter) timing is part of the score: a step the model is too late for is
+In a real-time game (JevMan, Snake, Jev Fighter) timing is part of the score: a step the model is too late for is
 played by the game's fallback, and in Jev Fighter an answer plays on the frame it arrived (the fighter stands still
 until then). A replay checks that every step marked as the fallback's is the fallback's move, and every move is legal
 where it was played, but not that the model really was late (or in time) on it, so a real-time submission's timing

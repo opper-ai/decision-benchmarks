@@ -5,8 +5,8 @@ game: our own runs of every decision model Opper serves, and self-reported runs 
 replays every submitted game with our code). The hub page that lists the games lives on opper.ai
 (`/decision-benchmarks`) and only reads the files each game serves.
 
-The harness is the **kit**, extracted from [jevman](https://github.com/opper-ai/jevman-benchmark), the Pac-Man
-benchmark; every game here is ported onto it. jevman itself stays in its own repository at
+The harness is the **kit**, extracted from [JevMan](https://github.com/opper-ai/jevman-benchmark), the Pac-Man
+benchmark; every game here is ported onto it. JevMan itself stays in its own repository at
 [opper.ai/jevman-benchmark](https://opper.ai/jevman-benchmark/), where its links point, and the hub lists it there;
 `<APP_BASE_PATH>/jevman/` redirects to it. How it fits together, and the contract with the hub: [docs/design.md](docs/design.md).
 
@@ -15,7 +15,7 @@ benchmark; every game here is ported onto it. jevman itself stays in its own rep
 ```
 packages/kit/        the harness: shared/ (types, models, stats, contract), client/ (browser), server/ (the service),
                      bench/ (the bench and the submissions check)
-games/registry.ts    the games the service serves and the build builds: snake, fighter (and MOVED: jevman's redirect)
+games/registry.ts    the games the service serves and the build builds: snake, fighter (and MOVED: JevMan's redirect)
 games/<slug>/        one game: game.ts (bench and replay), game.server.ts (service), src/, index.html, public/
                      (game.json, poster.png, leaderboard.json, community.json), submissions/, tests/
 games/snake/         Snake: our own game, the first built on the kit (see games/snake/README.md)
@@ -24,7 +24,7 @@ server/main.ts       the service: every registry game at <APP_BASE_PATH>/<slug>/
 scripts/             bench, submissions, build, check-contract
 ```
 
-The kit comes from jevman, by Johnny Chadda and Felix Wunderlich (originally [joch/jevman](https://github.com/joch/jevman), now [opper-ai/jevman-benchmark](https://github.com/opper-ai/jevman-benchmark)); Jev Fighter is by Jose Sabater ([Jose-Sabater/jev-fighter](https://github.com/Jose-Sabater/jev-fighter)). Each game's CREDITS.md says what changed in the port.
+The kit comes from JevMan, by Johnny Chadda and Felix Wunderlich (originally [joch/jevman](https://github.com/joch/jevman), now [opper-ai/jevman-benchmark](https://github.com/opper-ai/jevman-benchmark)); Jev Fighter is by Jose Sabater ([Jose-Sabater/jev-fighter](https://github.com/Jose-Sabater/jev-fighter)). Each game's CREDITS.md says what changed in the port.
 
 ## Commands
 
@@ -52,5 +52,5 @@ Benchmark your own model, or suggest a game: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-AGPL-3.0-or-later (see [LICENSE](LICENSE)), as jevman. Each game folder has its own license: `games/snake` and
+AGPL-3.0-or-later (see [LICENSE](LICENSE)), as JevMan. Each game folder has its own license: `games/snake` and
 `games/fighter` are MIT.

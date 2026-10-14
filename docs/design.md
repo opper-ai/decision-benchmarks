@@ -19,7 +19,7 @@ packages/kit/
                official runs -> leaderboard.json, submissions -> community.json
 games/
   registry.ts           the games the service, the bench and the build serve: snake, fighter; MOVED: games that live
-                        elsewhere on opper.ai (jevman), whose old paths here redirect there
+                        elsewhere on opper.ai (JevMan), whose old paths here redirect there
   <slug>/
     game.ts             GameDefinition: the bench and the submissions check
     game.server.ts      GameServer: what the service needs (Node-safe imports only)
@@ -163,7 +163,7 @@ to main runs the same CI and then deploys (`deploy.yml`), when deploys are enabl
 
 ## The games
 
-jevman, the Pac-Man benchmark the kit was extracted from, is not here: it stays in its own repository
+JevMan, the Pac-Man benchmark the kit was extracted from, is not here: it stays in its own repository
 ([opper-ai/jevman-benchmark](https://github.com/opper-ai/jevman-benchmark)) at `opper.ai/jevman-benchmark/`, the URL
 its links point to, and the hub lists it there. `MOVED` in `games/registry.ts` sends `<APP_BASE_PATH>/jevman/...` there
 with a permanent redirect.

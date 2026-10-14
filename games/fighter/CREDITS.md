@@ -25,7 +25,7 @@ keyboard controls, and the fight, replay, stats, timeline and pose views, with c
   downloaded.
 - **The model list** comes from the kit (Opper's decision models, one route each); chat LLMs are no longer in the picker.
   The default opponent is Clef.
-- **The page** follows every game page's layout (Snake's, after jevman's): the recording on the stage, Fight an AI, then
+- **The page** follows every game page's layout (Snake's, after JevMan's): the recording on the stage, Fight an AI, then
   the kit's shared leaderboard table over `leaderboard.json`, `community.json` and `baselines.json`, and the method.
 - **Dropped**: the fighter's own server, session and OAuth code, its bench, smoke, replays and gen-audio scripts, the
   direct System One, chat and OpenAI Decisions adapters, the Dockerfile, Railway and CI configuration, the raw audio
@@ -44,6 +44,6 @@ keyboard controls, and the fight, replay, stats, timeline and pose views, with c
   Caveat (Impallari Type, SIL Open Font License 1.1), Wix Madefor Display and Wix Madefor Text (Wix.com, SIL Open
   Font License 1.1) and JetBrains Mono (JetBrains, SIL Open Font License 1.1), the latin subsets. The license texts are in
   `public/fonts/OFL.txt`.
-- The model logos in `public/logos/` are copied from jevman (opper-ai/jevman-benchmark, its `public/logos/`): each is its
+- The model logos in `public/logos/` are copied from JevMan (opper-ai/jevman-benchmark, its `public/logos/`): each is its
   maker's own mark (TypeSafe, Cloudflare, OpenAI, Microsoft, EmpirioLabs, Convai Innovations, and Jared Palmer's avatar
-  for Kev), used to name the model, as on jevman.
+  for Kev), used to name the model, as on JevMan.
