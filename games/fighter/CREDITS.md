@@ -42,7 +42,8 @@ keyboard controls, and the fight, replay, stats, timeline and pose views, with c
   provider's terms for generated audio apply.
 - Fonts, self-hosted in `public/fonts/` (the page shares opper.ai's origin, so it loads nothing from Google Fonts):
   Caveat (Impallari Type, SIL Open Font License 1.1), Wix Madefor Display and Wix Madefor Text (Wix.com, SIL Open
-  Font License 1.1) and JetBrains Mono (JetBrains, SIL Open Font License 1.1), the latin subsets.
+  Font License 1.1) and JetBrains Mono (JetBrains, SIL Open Font License 1.1), the latin subsets. The license texts are in
+  `public/fonts/OFL.txt`.
 - The model logos in `public/logos/` are copied from jevman (opper-ai/jevman-benchmark, its `public/logos/`): each is its
   maker's own mark (TypeSafe, Cloudflare, OpenAI, Microsoft, EmpirioLabs, Convai Innovations, and Jared Palmer's avatar
   for Kev), used to name the model, as on jevman.

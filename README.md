@@ -24,7 +24,7 @@ server/main.ts       the service: every registry game at <APP_BASE_PATH>/<slug>/
 scripts/             bench, submissions, build, check-contract
 ```
 
-The kit comes from jevman, by Johnny Chadda and Felix Wunderlich ([opper-ai/jevman-benchmark](https://github.com/opper-ai/jevman-benchmark)); Jev Fighter is by Jose Sabater ([Jose-Sabater/jev-fighter](https://github.com/Jose-Sabater/jev-fighter)). Each game's CREDITS.md says what changed in the port.
+The kit comes from jevman, by Johnny Chadda and Felix Wunderlich (originally [joch/jevman](https://github.com/joch/jevman), now [opper-ai/jevman-benchmark](https://github.com/opper-ai/jevman-benchmark)); Jev Fighter is by Jose Sabater ([Jose-Sabater/jev-fighter](https://github.com/Jose-Sabater/jev-fighter)). Each game's CREDITS.md says what changed in the port.
 
 ## Commands
 
