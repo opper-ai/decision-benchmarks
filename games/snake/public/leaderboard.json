@@ -1,12 +1,186 @@
 {
-  "generatedAt": "2026-10-12T00:00:00.000Z",
+  "generatedAt": "2026-10-14T09:48:18.962Z",
   "game": "snake",
-  "benchVersion": 1,
+  "benchVersion": 3,
   "metric": {
     "name": "Apples",
     "unit": "apples",
     "higherIsBetter": true
   },
-  "entries": [],
-  "skipped": []
+  "entries": [
+    {
+      "model": "openai/gpt-6-luna-decisions",
+      "name": "GPT-6 Luna Decisions",
+      "games": 100,
+      "metric": {
+        "mean": 48.8,
+        "stdError": 1.152,
+        "best": 68
+      },
+      "meanLatencyMs": 242,
+      "fallbackRate": 0.017,
+      "costPerGame": 0.03493,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 767.3,
+        "wallShare": 0.01,
+        "bodyShare": 0.57,
+        "starvedShare": 0.01,
+        "capShare": 0.41
+      }
+    },
+    {
+      "model": "typesafe/jev-1.13.0",
+      "name": "Jev 1.13",
+      "games": 100,
+      "metric": {
+        "mean": 37.94,
+        "stdError": 1.234,
+        "best": 68
+      },
+      "meanLatencyMs": 234,
+      "fallbackRate": 0.001,
+      "costPerGame": 0.0163,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 525.4,
+        "wallShare": 0,
+        "bodyShare": 0.95,
+        "starvedShare": 0,
+        "capShare": 0.05
+      }
+    },
+    {
+      "model": "empiriolabs/aplomb-1",
+      "name": "Aplomb 1",
+      "games": 100,
+      "metric": {
+        "mean": 25.05,
+        "stdError": 0.864,
+        "best": 50
+      },
+      "meanLatencyMs": 226,
+      "fallbackRate": 0.011,
+      "costPerGame": 0.00289,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 330.6,
+        "wallShare": 0.01,
+        "bodyShare": 0.99,
+        "starvedShare": 0,
+        "capShare": 0
+      }
+    },
+    {
+      "model": "azure:global/microsoft-decision-1",
+      "name": "Microsoft Decision 1",
+      "games": 100,
+      "metric": {
+        "mean": 20.06,
+        "stdError": 0.786,
+        "best": 40
+      },
+      "meanLatencyMs": 274,
+      "fallbackRate": 0.414,
+      "costPerGame": 0.00542,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 340.7,
+        "wallShare": 0.01,
+        "bodyShare": 0.99,
+        "starvedShare": 0,
+        "capShare": 0
+      }
+    },
+    {
+      "model": "cloudflare:global/clef-flash",
+      "name": "Clef Flash",
+      "games": 100,
+      "metric": {
+        "mean": 9.87,
+        "stdError": 0.502,
+        "best": 22
+      },
+      "meanLatencyMs": 266,
+      "fallbackRate": 0.16,
+      "costPerGame": 0.00579,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 133,
+        "wallShare": 0.08,
+        "bodyShare": 0.91,
+        "starvedShare": 0.01,
+        "capShare": 0
+      }
+    },
+    {
+      "model": "sference/clef",
+      "name": "Clef",
+      "games": 100,
+      "metric": {
+        "mean": 6.97,
+        "stdError": 0.48,
+        "best": 19
+      },
+      "meanLatencyMs": 187,
+      "fallbackRate": 0.014,
+      "costPerGame": 0.00895,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 77.1,
+        "wallShare": 0.63,
+        "bodyShare": 0.37,
+        "starvedShare": 0,
+        "capShare": 0
+      }
+    },
+    {
+      "model": "opper/kev-4b",
+      "name": "Kev 4B",
+      "games": 100,
+      "metric": {
+        "mean": 6.71,
+        "stdError": 0.616,
+        "best": 27
+      },
+      "meanLatencyMs": 200,
+      "fallbackRate": 0.002,
+      "costPerGame": 0.002,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 112.5,
+        "wallShare": 0.94,
+        "bodyShare": 0.06,
+        "starvedShare": 0,
+        "capShare": 0
+      }
+    },
+    {
+      "model": "berget/convaiinnovations/laya",
+      "name": "Laya",
+      "games": 100,
+      "metric": {
+        "mean": 0.34,
+        "stdError": 0.057,
+        "best": 2
+      },
+      "meanLatencyMs": 94,
+      "fallbackRate": 0.034,
+      "costPerGame": 0.0007,
+      "via": "systemone",
+      "extra": {
+        "meanSteps": 39.8,
+        "wallShare": 0.97,
+        "bodyShare": 0.01,
+        "starvedShare": 0.02,
+        "capShare": 0
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "model": "greenpt/metis",
+      "reason": "provider errors: 52 of 100 games had more than 5% of their calls fail (GreenPT rate limiting), and 30 still did after one rerun on the same seed"
+    }
+  ]
 }

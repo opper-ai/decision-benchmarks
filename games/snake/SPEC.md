@@ -122,7 +122,10 @@ a baseline as a model.
 - **Request check.** The service reads the board back from the request's state, rebuilds the request with our own
   wording, and refuses any body that differs from it in any way (fields, questions, text, key).
 - **Page.** The page follows opper.ai's theme (light or dark, as jevman does); the arcade cabinets are black in both.
-  Until the official run, Watch plays the baselines' recordings (the top one first), and the leaderboard shows the
-  baselines in a group of their own below an empty ranking. `community.json` is built from `submissions/` at build
+  Watch has a chip for every ranked model, in leaderboard order, the top one playing first; each plays that
+  model's official game whose apples are closest to its mean (on a tie, the lowest seed), gzipped as the bench wrote
+  it (public/demo/<model>.json.gz, listed in src/recordings.ts). A model the leaderboard skips gets no chip. Before
+  the official run Watch played the baselines' recordings; the baselines now show only in the leaderboard, in a group
+  of their own below the ranking. `community.json` is built from `submissions/` at build
   time, so the page copes with it missing. Play shows every decision model; signed out with no free credits, they are
   greyed out with a note to sign in, and the baselines (run in the browser, free) can still be raced.

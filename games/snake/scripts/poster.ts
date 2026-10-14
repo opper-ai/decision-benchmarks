@@ -1,6 +1,7 @@
-// Renders public/poster.png (16:9, for the hub's game card) from a real recorded game: the flood-fill baseline's demo,
-// at the step it has the most apples before it ends. Node only, no dependencies: the board is drawn with the page's
-// own renderer into a pixel buffer, the lettering with a small 5 x 7 pixel font, and the PNG encoded with zlib.
+// Renders public/poster.png (16:9, for the hub's game card) from a real recorded game: the flood-fill baseline's
+// (scripts/flood.json, Watch's demo before the official run), at the step it has the most apples before it ends.
+// Node only, no dependencies: the board is drawn with the page's own renderer into a pixel buffer, the lettering with
+// a small 5 x 7 pixel font, and the PNG encoded with zlib.
 // Run: node games/snake/scripts/poster.ts
 import { readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
@@ -74,7 +75,7 @@ function text(s: string, x: number, y: number, size: number, color: string): voi
 }
 
 // The flood-fill baseline's recorded game, at its last step before the end.
-const rec = JSON.parse(readFileSync(new URL('../public/demo/flood.json', import.meta.url), 'utf8')) as { seed: number; steps: { choice: Move }[] };
+const rec = JSON.parse(readFileSync(new URL('./flood.json', import.meta.url), 'utf8')) as { seed: number; steps: { choice: Move }[] };
 let s: GameState = createGame(rec.seed);
 let shown = s;
 for (const st of rec.steps) {

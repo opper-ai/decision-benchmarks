@@ -76,7 +76,7 @@ reference and never on the leaderboard.
 - `bench/verify.ts`: the replay the submissions check runs
 - `src/`, `index.html`: the page
 - `public/`: `game.json`, `poster.png` (rendered by `node games/snake/scripts/poster.ts`), `leaderboard.json` (official
-  runs), `baselines.json`, `demo/` (the recordings Watch plays)
+  runs), `baselines.json`, `demo/` (the recordings Watch plays: each ranked model's official game closest to its mean)
 
 ## License
 
