@@ -20,6 +20,12 @@ export interface Adapter {
   decide(q: Question, signal: AbortSignal, view?: GameState): Promise<Answer>;
   /** A human player: no questions, the match reads this whenever the fighter is free to act. */
   human?: HumanInput;
+  /**
+   * A scripted player on a fixed thinking time (the benchmark's baselines): asked as a model is (ahead, by its
+   * latency, one question at a time), but its answer comes exactly `delayTicks` frames after it was asked, computed by
+   * `decide`, with no clock. Deterministic, so a recording's moves for it can be recomputed (ScriptedPlayer).
+   */
+  scripted?: { decide: (q: Question, view: GameState) => Answer; delayTicks: number };
 }
 
 export interface HumanInput {

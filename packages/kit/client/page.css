@@ -119,6 +119,12 @@ main { display: block; padding-bottom: 96px; }
 .col h1 { text-wrap: balance; }
 /* The H1 and its line sit together, as each section's heading and its line do. */
 .oc .hero { gap: 10px; }
+/* The way back to the hub (opper.ai/decision-benchmarks), above the H1: a quiet line, left on phones as the H1 is. */
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--j-muted); }
+@media (min-width: 768px) { .crumbs { justify-content: center; } }
+.crumbs a { color: inherit; text-decoration: none; }
+.crumbs a:hover, .crumbs a:focus-visible { color: var(--j-text); text-decoration: underline; text-underline-offset: 3px; }
+.crumbs [aria-current] { color: var(--j-text); }
 /* The H1 at the size of the page's section headings (the Leaderboard's), and a quieter line under it. */
 .oc .hero-sub { font-size: 17px; }
 

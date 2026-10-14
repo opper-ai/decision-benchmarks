@@ -1,18 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import server from '../game.server.ts';
-import { DEFAULT_RULES } from '../shared/engine/engine.ts';
-import { baselineSettled, engineSeedFor, fightersFor, PausedRun } from '../shared/gauntlet.ts';
+import { isActionable } from '../shared/engine/engine.ts';
+import { benchBaseline, benchMatch, engineSeedFor, fightersFor } from '../shared/gauntlet.ts';
+import { instantClock } from '../shared/match.ts';
 import { buildQuestion, type Question } from '../shared/question.ts';
 import { checkRequest, toSystemOne } from '../shared/request.ts';
 
 /** Questions from a real fight: both fighters' views over its first few hundred ticks, on both tracks, full and compact. */
 function questions(): Question[] {
   const spec = { opponent: 'baseline/maximin' as const, side: 0 as const, engineSeed: engineSeedFor(5) };
-  const run = new PausedRun({ seed: spec.engineSeed, track: 'assisted', deadlineMs: 5000, fighters: fightersFor(spec, 'baseline/greedy'), rules: DEFAULT_RULES });
+  const match = benchMatch({ seed: spec.engineSeed, adapters: [benchBaseline('baseline/greedy'), benchBaseline('baseline/maximin')], fighters: fightersFor(spec, 'baseline/greedy'), clock: instantClock, paced: false });
   const out: Question[] = [];
-  for (let asks = run.asks(); asks.length && out.length < 60; asks = run.asks()) {
-    for (const a of asks) out.push(a.question(), buildQuestion(a.view, a.side, { track: 'raw' }), buildQuestion(a.view, a.side, { track: 'assisted', maxTokens: 440 }));
-    run.apply(asks.map((a) => baselineSettled(a.side === 0 ? 'baseline/greedy' : 'baseline/maximin', a)));
+  while (!match.over && out.length < 60) {
+    for (const i of [0, 1] as const) {
+      if (!isActionable(match.state, i)) continue;
+      const view = match.view(i);
+      out.push(buildQuestion(view, i, { track: 'assisted' }), buildQuestion(view, i, { track: 'raw' }), buildQuestion(view, i, { track: 'assisted', maxTokens: 440 }), buildQuestion(view, i, { track: 'raw', maxTokens: 440 }));
+    }
+    match.tickOnce();
   }
   return out;
 }

@@ -33,7 +33,7 @@ html.dark {
  * match folds out under it (Activity), so the stage never shrinks for it.
  */
 .stage { display: grid; justify-items: center; gap: 14px; }
-.viewer-wrap { position: relative; width: min(calc(min(100%, 1280px) * 10 / 12), max(600px, calc((100svh - 290px) * var(--f-ar)))); }
+.viewer-wrap { position: relative; width: min(calc(min(100%, 1280px) * 10 / 12), max(600px, calc((100svh - 310px) * var(--f-ar)))); }
 .viewer-host { min-width: 0; outline: none; }
 .notice-line, .watch { width: calc(min(100%, 1280px) * 10 / 12); }
 .viewer { display: grid; grid-template-columns: minmax(0, 1fr); }

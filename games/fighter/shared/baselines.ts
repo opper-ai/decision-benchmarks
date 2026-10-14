@@ -1,12 +1,12 @@
 import type { Adapter, Answer } from './adapter.ts';
 import { gap, rand, type GameState } from './engine/engine.ts';
 import { MOVE_IDS, MOVES, type MoveId } from './engine/moves.ts';
-import { habit, simulateExchange, type Column, type Question } from './question.ts';
+import { buildQuestion, habit, simulateExchange, type Column, type Question } from './question.ts';
 
 /**
  * Reference players that need no model. They appear on the leaderboard so a model's result can be
  * read against them: a model that cannot beat `random` is not deciding anything. The reading
- * baselines use only what the assisted question shows (or, on the raw track, the same simulation).
+ * baselines use only what the assisted question shows (on the raw track they work it out from the state).
  */
 export const BASELINES = ['baseline/random', 'baseline/guard', 'baseline/greedy', 'baseline/payoff', 'baseline/maximin'] as const;
 export type BaselineId = (typeof BASELINES)[number];
@@ -22,6 +22,12 @@ export const BASELINE_INFO: Record<BaselineId, string> = {
   'baseline/payoff': "Best typical outcome: the payoff row's avg column.",
   'baseline/maximin': 'Best worst case: the move whose worst outcome is least bad.',
 };
+
+/**
+ * How long a baseline thinks in a real-time match: about a fast classifier's answer. The page's baselines wait this
+ * long; the benchmark's answer this many milliseconds' worth of frames after they are asked (shared/gauntlet.ts).
+ */
+export const BASELINE_THINK_MS = 250;
 
 const sleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -73,7 +79,11 @@ function nearness(q: Question, view: GameState | undefined, id: MoveId): number 
  * plays the gauntlet with it and the verifier recomputes every baseline move with it. `view` is the state the
  * question describes.
  */
-export function baselineAnswer(id: BaselineId, q: Question, view?: GameState): { move: MoveId; probabilities: Partial<Record<MoveId, number>> } {
+export function baselineAnswer(id: BaselineId, asked: Question, view?: GameState): { move: MoveId; probabilities: Partial<Record<MoveId, number>> } {
+  // A baseline reads the payoff rows whatever the track: on the raw track it works out the assisted question (the same
+  // options, with their payoffs) from the state, so it plays the same on both. It is an opponent, not the test.
+  const reads = id !== 'baseline/random' && id !== 'baseline/guard';
+  const q = reads && asked.track === 'raw' && view ? buildQuestion(view, asked.fighter, { track: 'assisted' }) : asked;
   const ids = q.options.map((o) => o.id);
   if (id === 'baseline/random') {
     const [r] = rand(((view?.seed ?? 1) ^ Math.imul(q.tick + 7, 2246822519) ^ (q.fighter ? 0x51ed : 0)) >>> 0);

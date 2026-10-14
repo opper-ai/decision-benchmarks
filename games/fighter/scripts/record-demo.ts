@@ -4,8 +4,10 @@
 //       one benchmark game, exactly as `npm run bench -- --game fighter --seed <n>` plays it (the model against the
 //       baseline that seed picks, from the side it picks), so it passes the submissions check
 //   node games/fighter/scripts/record-demo.ts --left <id> --right <id> --fight <k> --out <file>
-//       two decision models against each other, on the benchmark's settings (paused, assisted track, 5 s deadline,
+//       two decision models against each other, on the benchmark's settings (real time, raw track, 2 s deadline,
 //       fight k's start), which the bench does not play
+//
+// Both play live, on the wall clock: a match takes as long as it lasts (a minute or several).
 //
 // --label <id>=<name> (repeatable) names a fighter on the stage and the Watch chip. Models go through Opper with
 // OPPER_API_KEY (or TYPESAFE_API_KEY for Jev). Costs what the calls cost; the total is printed.
@@ -17,8 +19,9 @@ import { systemOneTransport } from '../../../packages/kit/bench/transports.ts';
 import { warmUp } from '../../../packages/kit/bench/warm.ts';
 import { devTargetFromEnv } from '../../../packages/kit/server/systemone.ts';
 import { isModelId } from '../../../packages/kit/shared/models.ts';
+import type { Adapter } from '../shared/adapter.ts';
 import type { Side } from '../shared/engine/engine.ts';
-import { askWithin, BENCH_RULES, BENCH_TRACK, DEADLINE_MS, engineSeedFor, matchSpec, PausedRun, playGauntlet, SIDE_COLORS } from '../shared/gauntlet.ts';
+import { benchMatch, DEADLINE_MS, engineSeedFor, matchSpec, playGauntlet, SIDE_COLORS } from '../shared/gauntlet.ts';
 import { modelInfo } from '../shared/models.ts';
 import type { FighterMeta, Replay } from '../shared/replay.ts';
 import { transportAdapter } from '../shared/transport-adapter.ts';
@@ -63,10 +66,7 @@ if (values.model !== undefined) {
   if (!Number.isSafeInteger(fight) || fight < 0) die('--fight must be a whole number of at least 0');
   const adapters = await Promise.all(ids.map(adapterFor));
   const fighters = ids.map((model, i): FighterMeta => ({ model, label: modelInfo(model).label, kind: 'systemone', color: SIDE_COLORS[i]! })) as [FighterMeta, FighterMeta];
-  const run = new PausedRun({ seed: engineSeedFor(fight), track: BENCH_TRACK, deadlineMs: DEADLINE_MS, fighters, maxTokens: [modelInfo(ids[0]).contextTokens, modelInfo(ids[1]).contextTokens], rules: BENCH_RULES });
-  const now = () => performance.now();
-  for (let asks = run.asks(); asks.length; asks = run.asks()) run.apply(await Promise.all(asks.map((a) => askWithin(adapters[a.side]!, a, DEADLINE_MS, now))));
-  rec = run.replay();
+  rec = await benchMatch({ seed: engineSeedFor(fight), adapters: adapters as [Adapter, Adapter], fighters }).run();
 }
 
 for (const f of rec.fighters) f.label = labels.get(f.model) ?? f.label;
@@ -79,6 +79,8 @@ console.log(`${rec.fighters[0].label} vs ${rec.fighters[1].label}: ${rec.result.
 for (const r of rec.result.rounds) console.log(`  round: ${JSON.stringify(r)}`);
 for (const s of [0, 1] as const) {
   const mine = rec.decisions.filter((d) => d.fighter === s);
-  console.log(`  ${rec.fighters[s].label}: ${mine.length} decisions, ${mine.filter((d) => d.fallback).length} fallbacks`);
+  const lat = mine.filter((d) => d.answer).map((d) => d.latencyMs).sort((a, b) => a - b);
+  const p = (q: number) => lat[Math.min(lat.length - 1, Math.floor(q * lat.length))] ?? 0;
+  console.log(`  ${rec.fighters[s].label}: ${mine.length} decisions, ${mine.filter((d) => d.fallback).length} fallbacks, latency p50 ${p(0.5)} ms, p90 ${p(0.9)} ms`);
 }
 console.log(`cost $${rec.costUsd.toFixed(4)}; wrote ${values.out} (${bytes.length} bytes)`);

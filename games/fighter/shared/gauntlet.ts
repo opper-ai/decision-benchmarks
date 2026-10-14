@@ -1,34 +1,41 @@
-// The benchmark: one game is one paused match, assisted track, of the model
-// under test against one baseline of the gauntlet (greedy, payoff, maximin), from one side. The score is the model's
-// share of the rounds (a drawn round counts half), in percent. The bench plays it (game.ts) and the submissions check
-// replays it with `verifyGauntlet`, on the same stepper, so a match replays exactly as it was played.
+// The benchmark: one game is one live match (real time, raw track) of the model under test against one baseline of the
+// gauntlet (greedy, payoff, maximin, random), from one side. The fight runs on the wall clock at its normal speed, as
+// on the page: the model is asked ahead, its answer plays when it arrives, and the fallback (block) plays for an answer
+// that misses the deadline. The baselines think as on the page (250 ms), counted in frames so they replay exactly. The score is the model's share
+// of the rounds (a drawn round counts half), in percent. The bench plays it (game.ts) with shared/match.ts, the live
+// match driver; the submissions check replays it with `verifyGauntlet`, which recomputes every baseline move.
 import type { GameResult, Verdict } from '../../../packages/kit/shared/game.ts';
 import { mean } from '../../../packages/kit/shared/stats.ts';
-import type { Adapter, Answer } from './adapter.ts';
-import { baselineAnswer, baselineName, type BaselineId } from './baselines.ts';
-import { clone, DEFAULT_RULES, ENGINE_VERSION, hashState, isActionable, legalMoves, newGame, step, type GameEvent, type GameState, type Inputs, type RoundResult, type Rules, type Side } from './engine/engine.ts';
+import type { Adapter } from './adapter.ts';
+import { BASELINE_THINK_MS, baselineAnswer, baselineName, isBaseline, type BaselineId } from './baselines.ts';
+import { DEFAULT_RULES, ENGINE_VERSION, hashState, isActionable, legalMoves, newGame, step, type GameState, type Inputs, type RoundResult, type Rules, type Side } from './engine/engine.ts';
 import { isMoveId, type MoveId } from './engine/moves.ts';
 import { fallbackMove } from './fallback.ts';
-import { CHECKPOINT_EVERY } from './match.ts';
+import { CHECKPOINT_EVERY, instantClock, Match, realClock, ScriptedPlayer, TICK_MS, type Clock } from './match.ts';
 import { modelInfo } from './models.ts';
-import { buildQuestion, offeredMoves, type Question, type Track } from './question.ts';
-import { annotateOutcomes, type BenchInfo, type Decision, type FallbackReason, type FighterMeta, type Replay } from './replay.ts';
+import type { Track } from './question.ts';
+import type { BenchInfo, Decision, FallbackReason, FighterMeta, Replay } from './replay.ts';
 import { Perception } from './view.ts';
 
 /**
  * Bump when anything a score depends on changes: the engine (ENGINE_VERSION), the track, the mode, the deadline, the
  * gauntlet, the seeds or the question format. tests/bench-version.test.ts pins them.
  */
-export const BENCH_VERSION = 1;
-export const GAUNTLET = ['baseline/greedy', 'baseline/payoff', 'baseline/maximin'] as const;
+export const BENCH_VERSION = 4;
+export const GAUNTLET = ['baseline/greedy', 'baseline/payoff', 'baseline/maximin', 'baseline/random'] as const;
 export type GauntletId = (typeof GAUNTLET)[number];
-export const BENCH_MODE = 'paused';
-export const BENCH_TRACK: Track = 'assisted';
-/** How long the match waits for an answer before the fallback (block) plays. Paused: decisions, not speed. */
-export const DEADLINE_MS = 5000;
+export const BENCH_MODE = 'realtime';
+export const BENCH_TRACK: Track = 'raw';
+/**
+ * How long an answer may take before the fallback (block) plays: the page's live default, and what the game's server
+ * gives one model call. The fight does not wait meanwhile: a fighter that can act stands still until its answer comes.
+ */
+export const DEADLINE_MS = 2000;
 /** The engine version and rules the benchmark plays. */
 export const BENCH_ENGINE = ENGINE_VERSION;
 export const BENCH_RULES: Rules = DEFAULT_RULES;
+/** A baseline's thinking time in frames: the page's BASELINE_THINK_MS (15 frames at 60 per second). */
+export const BOT_DELAY_TICKS = Math.round(BASELINE_THINK_MS / TICK_MS);
 export const SIDE_COLORS = ['#E07B45', '#1FA3B3'] as const;
 
 export interface MatchSpec {
@@ -42,172 +49,35 @@ export interface MatchSpec {
 /** Fight k's engine seed, spread out so neighbouring fights start differently. */
 export const engineSeedFor = (k: number): number => (Math.imul(k + 1, 0x9e3779b1) ^ 0x5bd1e995) >>> 0;
 
+const N = GAUNTLET.length;
+
 /**
- * What bench seed `seed` plays: seed % 3 picks the baseline, floor(seed / 3) % 2 the side, floor(seed / 6) the fight.
- * Game i plays seed i, so 102 games are 17 fights x 3 baselines x 2 sides.
+ * What bench seed `seed` plays: seed % 4 picks the baseline, floor(seed / 4) % 2 the side, floor(seed / 8) the fight.
+ * Game i plays seed i, so 104 games are 13 fights x 4 baselines x 2 sides.
  */
 export function matchSpec(seed: number): MatchSpec {
   if (!Number.isSafeInteger(seed) || seed < 0) throw new Error('a bench seed is a whole number of at least 0');
-  return { opponent: GAUNTLET[seed % 3]!, side: (Math.floor(seed / 3) % 2) as Side, engineSeed: engineSeedFor(Math.floor(seed / 6)) };
+  return { opponent: GAUNTLET[seed % N]!, side: (Math.floor(seed / N) % 2) as Side, engineSeed: engineSeedFor(Math.floor(seed / (2 * N))) };
 }
 
 /** A benchmark recording: the replay, with what match it was. */
 export type GauntletRecording = Replay & { bench: BenchInfo };
 
-/** A question for a fighter that can act now. The question is built on first use (the verifier never builds the model's). */
-export interface Ask {
-  side: Side;
-  tick: number;
-  /** What the fighter sees (the opponent with a reaction delay). */
-  view: GameState;
-  question(): Question;
-}
-
-/** How a question was settled: an answer, or why there was none (the fallback then plays). */
-export type Settled = { answer: Answer } | { reason: FallbackReason; error?: string; latencyMs: number };
-
-export interface PausedRunOptions {
-  seed: number;
-  track: Track;
-  deadlineMs: number;
-  fighters: [FighterMeta, FighterMeta];
-  maxTokens?: [number | undefined, number | undefined];
-  rules?: Rules;
-  /** Sides whose questions are recorded in the decisions; the others get an empty one. Default: both. */
-  questionsFor?: readonly Side[];
-}
-
 /**
- * A paused match, one decision at a time, with no clock: as shared/match.ts plays paused mode (a fighter is asked when
- * it can act, about what it sees, and the fight waits for the answer), but synchronous, so the same code plays a match
- * (with answers from models) and replays one (with answers from a recording).
+ * A baseline as the benchmark plays it: asked like a model (ahead, about what it will see), it answers BOT_DELAY_TICKS
+ * frames later, as the page's baselines do after BASELINE_THINK_MS. Counted in frames, so a replay recomputes it.
  */
-export class PausedRun {
-  readonly state: GameState;
-  readonly decisions: Decision[] = [];
-  readonly events: GameEvent[] = [];
-  readonly checkpoints: Replay['checkpoints'] = [];
-  private readonly opts: PausedRunOptions;
-  private readonly perception = new Perception();
-  /** Each side's last decision, until the fighter is free again (closes its outcome window). */
-  private readonly open: [Decision | null, Decision | null] = [null, null];
-  private current: Ask[] | null = null;
-
-  constructor(opts: PausedRunOptions) {
-    this.opts = opts;
-    this.state = newGame(opts.seed, opts.rules ?? DEFAULT_RULES);
-  }
-
-  get over(): boolean {
-    return this.state.round.phase === 'over';
-  }
-
-  /** The questions to answer now: runs the fight on until a fighter can act. Empty once the match is over. */
-  asks(): Ask[] {
-    while (!this.current) {
-      if (this.over) return [];
-      const asks = this.asksNow();
-      if (asks.length) this.current = asks;
-      else this.tick([null, null]);
-    }
-    return this.current;
-  }
-
-  private asksNow(): Ask[] {
-    const s = this.state;
-    const out: Ask[] = [];
-    for (const i of [0, 1] as const) {
-      if (!isActionable(s, i) || s.fighters[i].phase === 'ko') continue;
-      const view = this.perception.view(s, i);
-      if (!offeredMoves(view, i).length) continue;
-      let q: Question | null = null;
-      out.push({ side: i, tick: s.tick, view, question: () => (q ??= buildQuestion(view, i, { track: this.opts.track, maxTokens: this.opts.maxTokens?.[i] })) });
-    }
-    return out;
-  }
-
-  /** Applies the answers to `asks()` (in its order): each fighter's move, or the fallback's, then one tick. */
-  apply(settled: readonly Settled[]): void {
-    const asks = this.current;
-    if (!asks) throw new Error('nothing was asked');
-    if (settled.length !== asks.length) throw new Error(`${asks.length} questions, ${settled.length} answers`);
-    this.current = null;
-    const s = this.state;
-    const inputs: Inputs = [null, null];
-    asks.forEach((a, k) => {
-      const r = settled[k]!;
-      const i = a.side;
-      let move: MoveId | null;
-      let fallback: FallbackReason | null = null;
-      let answer: Answer | null = null;
-      let error: string | undefined;
-      let latencyMs: number;
-      if ('answer' in r) {
-        answer = r.answer;
-        latencyMs = answer.latencyMs;
-        move = answer.move;
-        if (!legalMoves(s, i).includes(move)) {
-          fallback = 'illegal';
-          move = fallbackMove(s, i);
-        }
-      } else {
-        fallback = r.reason;
-        error = r.error;
-        latencyMs = r.latencyMs;
-        move = fallbackMove(s, i);
-      }
-      if (!move) return;
-      inputs[i] = move;
-      const question = (this.opts.questionsFor ?? [0, 1]).includes(i) ? a.question() : { fighter: i, track: this.opts.track, tick: a.tick, instructions: '', context: {}, options: [] };
-      const d: Decision = { fighter: i, askedTick: a.tick, questionTick: a.view.tick, appliedTick: s.tick, move, question, answer, fallback, latencyMs, arrivedTick: s.tick, ...(error ? { error } : {}) };
-      this.decisions.push(d);
-      this.open[i] = d;
-    });
-    this.tick(inputs);
-  }
-
-  private tick(inputs: Inputs): void {
-    this.perception.record(this.state, inputs);
-    const events = step(this.state, inputs);
-    for (const e of events) this.events.push(e);
-    for (const i of [0, 1] as const) {
-      const d = this.open[i];
-      if (d && this.state.tick > d.appliedTick + 1 && (isActionable(this.state, i) || this.state.round.phase !== 'fight')) {
-        d.doneTick = this.state.tick;
-        this.open[i] = null;
-      }
-    }
-    if (this.state.tick % CHECKPOINT_EVERY === 0) this.checkpoints.push({ tick: this.state.tick, hash: hashState(this.state) });
-  }
-
-  replay(): Replay {
-    const s = this.state;
-    const checkpoints = [...this.checkpoints];
-    if (!checkpoints.length || checkpoints[checkpoints.length - 1]!.tick !== s.tick) checkpoints.push({ tick: s.tick, hash: hashState(s) });
-    const decisions = annotateOutcomes(this.decisions, this.events, s.tick);
-    return {
-      format: 1,
-      engineVersion: ENGINE_VERSION,
-      seed: this.opts.seed,
-      mode: 'paused',
-      track: this.opts.track,
-      rules: s.rules,
-      deadlineMs: this.opts.deadlineMs,
-      fighters: this.opts.fighters,
-      createdAt: new Date().toISOString(),
-      ticks: s.tick,
-      costUsd: decisions.reduce((sum, d) => sum + (d.answer?.costUsd ?? 0), 0),
-      decisions,
-      cancellations: [],
-      checkpoints,
-      result: { winner: s.winner, rounds: clone(s).results },
-    };
-  }
-}
-
-/** A gauntlet baseline's answer to its question, as its adapter gives it in a paused match. */
-export function baselineSettled(id: BaselineId, a: Ask): Settled {
-  return { answer: { ...baselineAnswer(id, a.question(), a.view), latencyMs: 0, costUsd: 0 } };
+export function benchBaseline(id: BaselineId): Adapter {
+  const decide = (q: Parameters<typeof baselineAnswer>[1], view: GameState) => ({ ...baselineAnswer(id, q, view), latencyMs: BASELINE_THINK_MS, costUsd: 0 });
+  return {
+    id,
+    kind: 'baseline',
+    async warmUp() {},
+    async decide(q, _signal, view) {
+      return decide(q, view!);
+    },
+    scripted: { decide, delayTicks: BOT_DELAY_TICKS },
+  };
 }
 
 /** The fighters of a benchmark match: the model on its side, the baseline on the other. */
@@ -219,41 +89,47 @@ export function fightersFor(spec: MatchSpec, model: string): [FighterMeta, Fight
   return metas as [FighterMeta, FighterMeta];
 }
 
-/** Asks `adapter` within the deadline; a late, failed or unusable answer is settled as the reason the fallback plays. */
-export async function askWithin(adapter: Adapter, a: Ask, deadlineMs: number, now: () => number): Promise<Settled> {
-  const started = now();
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<Settled>((resolve) => {
-    timer = setTimeout(() => {
-      controller.abort();
-      resolve({ reason: 'timeout', error: `no answer within ${deadlineMs} ms`, latencyMs: deadlineMs });
-    }, deadlineMs);
+/** A live match on the benchmark's settings (mode, track, deadline, rules) between two players. */
+export function benchMatch(o: { seed: number; adapters: [Adapter, Adapter]; fighters: [FighterMeta, FighterMeta]; clock?: Clock; paced?: boolean }): Match {
+  return new Match({
+    seed: o.seed,
+    mode: BENCH_MODE,
+    track: BENCH_TRACK,
+    deadlineMs: DEADLINE_MS,
+    rules: BENCH_RULES,
+    adapters: o.adapters,
+    fighters: o.fighters,
+    maxTokens: [modelInfo(o.fighters[0].model).contextTokens, modelInfo(o.fighters[1].model).contextTokens],
+    clock: o.clock ?? realClock,
+    paced: o.paced ?? true,
   });
-  const answered = adapter.decide(a.question(), controller.signal, a.view).then(
-    (answer): Settled => ({ answer: { ...answer, latencyMs: Math.min(deadlineMs, Math.max(0, Math.round(answer.latencyMs))) } }),
-    (err: Error): Settled => ({ reason: err?.name === 'InvalidAnswer' ? 'invalid' : 'error', error: String(err?.message ?? err).slice(0, 200), latencyMs: Math.min(deadlineMs, Math.round(now() - started)) }),
-  );
+}
+
+/**
+ * Plays bench seed `seed`: `adapter` is the model under test (`model` is the id the recording names), on the wall
+ * clock (`clock`, for tests). A baseline under test is scripted like the opponent, so its match needs no clock.
+ */
+export async function playGauntlet(o: { seed: number; model: string; adapter: Adapter; signal?: AbortSignal; clock?: Clock }): Promise<GauntletRecording> {
+  const spec = matchSpec(o.seed);
+  const adapters: Adapter[] = [];
+  adapters[spec.side] = o.adapter;
+  adapters[1 - spec.side] = benchBaseline(spec.opponent);
+  const instant = Boolean(o.adapter.scripted);
+  const match = benchMatch({ seed: spec.engineSeed, adapters: adapters as [Adapter, Adapter], fighters: fightersFor(spec, o.model), clock: instant ? instantClock : o.clock, paced: !instant });
+  const stop = () => match.stop();
+  if (o.signal?.aborted) throw new Error('the match was stopped');
+  o.signal?.addEventListener('abort', stop, { once: true });
   try {
-    return await Promise.race([answered, timeout]);
+    const replay = await match.run();
+    if (o.signal?.aborted) throw new Error('the match was stopped');
+    return { ...replay, bench: { version: BENCH_VERSION, seed: o.seed, side: spec.side, opponent: spec.opponent, model: o.model } };
   } finally {
-    clearTimeout(timer);
+    o.signal?.removeEventListener('abort', stop);
   }
 }
 
-/** Plays bench seed `seed`: `adapter` is the model under test (`model` is the id the recording names). */
-export async function playGauntlet(o: { seed: number; model: string; adapter: Adapter; signal?: AbortSignal; now?: () => number }): Promise<GauntletRecording> {
-  const spec = matchSpec(o.seed);
-  const now = o.now ?? (() => performance.now());
-  const maxTokens: [number | undefined, number | undefined] = [undefined, undefined];
-  maxTokens[spec.side] = modelInfo(o.model).contextTokens;
-  const run = new PausedRun({ seed: spec.engineSeed, track: BENCH_TRACK, deadlineMs: DEADLINE_MS, fighters: fightersFor(spec, o.model), maxTokens, rules: BENCH_RULES });
-  for (let asks = run.asks(); asks.length; asks = run.asks()) {
-    if (o.signal?.aborted) throw new Error('the match was stopped');
-    run.apply(await Promise.all(asks.map((a) => (a.side === spec.side ? askWithin(o.adapter, a, DEADLINE_MS, now) : baselineSettled(spec.opponent, a)))));
-  }
-  return { ...run.replay(), bench: { version: BENCH_VERSION, seed: o.seed, side: spec.side, opponent: spec.opponent, model: o.model } };
-}
+/** The adapter a baseline under test plays with. */
+export const baselineUnderTest = (model: string): Adapter | null => (isBaseline(model) ? benchBaseline(model) : null);
 
 export interface FighterResult extends GameResult {
   opponent: GauntletId;
@@ -319,9 +195,11 @@ const fail = (error: string): { ok: false; error: string } => ({ ok: false, erro
 
 /**
  * Replays a benchmark recording with our code and recomputes its score. The match is rebuilt from its seed (which fixes
- * the baseline and the side), every baseline move is recomputed (never read from the recording), every model move must
- * be legal, offered and made when its fighter could act, every fallback must be the fallback rule's move, answers must
- * have come within the deadline, and the checkpoint hashes, the length and the rounds must match the recording's.
+ * the baseline and the side) and played tick by tick: every baseline move is recomputed (never read from the
+ * recording), every model move must be applied on a tick its fighter could act and be legal there (else it is the
+ * fallback rule's move, which is recomputed), answers must have come within the deadline and been played on the first
+ * tick the fighter could act after they arrived, and the checkpoint hashes, the length and the rounds must match the
+ * recording's. When an answer arrived (its latency) is the one thing a replay cannot check: that is self-reported.
  */
 export function verifyGauntlet(rec: unknown, seed: number): Verdict<FighterResult> {
   try {
@@ -330,6 +208,9 @@ export function verifyGauntlet(rec: unknown, seed: number): Verdict<FighterResul
     return fail(`could not be replayed: ${(err as Error)?.message ?? String(err)}`);
   }
 }
+
+const isTick = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
+const isCost = (v: unknown) => v === null || v === undefined || (typeof v === 'number' && Number.isFinite(v) && v >= 0);
 
 function verify(rec: unknown, seed: number): Verdict<FighterResult> {
   if (!isObj(rec)) return fail('not a recording');
@@ -353,54 +234,80 @@ function verify(rec: unknown, seed: number): Verdict<FighterResult> {
   const mine = (r.decisions as Decision[]).filter((d) => d.fighter === side);
   const theirs = (r.decisions as Decision[]).filter((d) => d.fighter === opp);
 
-  const run = new PausedRun({ seed: spec.engineSeed, track: BENCH_TRACK, deadlineMs: DEADLINE_MS, fighters: r.fighters as [FighterMeta, FighterMeta], rules: BENCH_RULES, questionsFor: [opp] });
-  let k = 0;
-  for (let asks = run.asks(); asks.length; asks = run.asks()) {
-    const settled: Settled[] = [];
-    let checkMove: MoveId | null = null;
-    for (const a of asks) {
-      if (a.side === opp) {
-        settled.push(baselineSettled(spec.opponent, a));
-        continue;
-      }
-      const d = mine[k++];
-      const at = `decision ${k} (tick ${a.tick})`;
-      if (!d) return fail(`the recording stops at tick ${a.tick}, where the model had to decide`);
-      if (d.appliedTick !== a.tick || d.askedTick !== a.tick || d.questionTick !== a.tick) return fail(`${at}: made at tick ${String(d.appliedTick)}, but the fighter could act at tick ${a.tick}`);
-      if (!isMoveId(d.move)) return fail(`${at}: ${String(d.move).slice(0, 40)} is not a move`);
-      if (!FALLBACKS.includes(d.fallback)) return fail(`${at}: unknown fallback ${String(d.fallback).slice(0, 40)}`);
-      if (!(typeof d.latencyMs === 'number' && Number.isFinite(d.latencyMs) && d.latencyMs >= 0 && d.latencyMs <= DEADLINE_MS)) return fail(`${at}: latency must be between 0 and the ${DEADLINE_MS} ms deadline`);
-      if (d.fallback === null || d.fallback === 'illegal') {
-        const ans = d.answer as Answer | null;
-        if (!isObj(ans) || !isMoveId(ans.move)) return fail(`${at}: an answered decision needs its answer`);
-        if (!(ans.costUsd === null || ans.costUsd === undefined || (typeof ans.costUsd === 'number' && Number.isFinite(ans.costUsd) && ans.costUsd >= 0))) return fail(`${at}: cost must be a number of at least 0`);
-        if (ans.latencyMs !== d.latencyMs) return fail(`${at}: two latencies`);
-        const legal = legalMoves(run.state, side).includes(ans.move);
-        if (d.fallback === null) {
-          if (ans.move !== d.move) return fail(`${at}: the answer was ${ans.move}, the move ${d.move}`);
-          if (!offeredMoves(a.view, side).includes(d.move)) return fail(`${at}: ${d.move} was not offered (not legal or out of reach)`);
-        } else if (legal) return fail(`${at}: ${ans.move} was legal, so it is no fallback`);
-        settled.push({ answer: { move: ans.move, probabilities: null, latencyMs: d.latencyMs, costUsd: ans.costUsd ?? null } });
-      } else {
-        if (d.answer !== null) return fail(`${at}: a ${d.fallback} fallback has no answer`);
-        settled.push({ reason: d.fallback!, latencyMs: d.latencyMs });
-      }
-      checkMove = d.move;
-    }
-    run.apply(settled);
-    // The fallback rule's move, recomputed: a recorded fallback must be exactly it.
-    if (checkMove !== null) {
-      const ours = run.decisions.filter((d) => d.fighter === side).at(-1);
-      if (!ours || ours.move !== checkMove) return fail(`decision ${k}: the fallback rule plays ${ours?.move ?? 'nothing'} there, not ${checkMove}`);
+  // The model's decisions, each checked on its own before the replay applies them in order.
+  let prevApplied = -1;
+  for (const [n, d] of mine.entries()) {
+    const at = `decision ${n + 1}`;
+    if (!isTick(d.askedTick) || !isTick(d.appliedTick) || !isTick(d.arrivedTick)) return fail(`${at}: needs the ticks it was asked, its answer arrived and it was applied`);
+    if (!(d.askedTick > prevApplied && d.askedTick <= d.arrivedTick && d.arrivedTick <= d.appliedTick)) return fail(`${at}: asked at tick ${d.askedTick}, arrived at ${d.arrivedTick}, applied at ${d.appliedTick}: out of order`);
+    prevApplied = d.appliedTick;
+    if (!isMoveId(d.move)) return fail(`${at}: ${String(d.move).slice(0, 40)} is not a move`);
+    if (!FALLBACKS.includes(d.fallback)) return fail(`${at}: unknown fallback ${String(d.fallback).slice(0, 40)}`);
+    if (!(typeof d.latencyMs === 'number' && Number.isFinite(d.latencyMs) && d.latencyMs >= 0)) return fail(`${at}: latency must be a number of at least 0`);
+    if (d.fallback === null || d.fallback === 'illegal') {
+      const ans = d.answer;
+      if (!isObj(ans) || !isMoveId(ans.move)) return fail(`${at}: an answered decision needs its answer`);
+      if (!isCost(ans.costUsd)) return fail(`${at}: cost must be a number of at least 0`);
+      if (ans.latencyMs !== d.latencyMs) return fail(`${at}: two latencies`);
+      if (d.latencyMs > DEADLINE_MS) return fail(`${at}: answered after the ${DEADLINE_MS} ms deadline`);
+      if (!isObj(d.question) || !Array.isArray(d.question.options) || !d.question.options.some((o) => isObj(o) && o.id === ans.move)) return fail(`${at}: ${ans.move} was not one of the options it was asked about`);
+      if (d.fallback === null && ans.move !== d.move) return fail(`${at}: the answer was ${ans.move}, the move ${d.move}`);
+    } else {
+      if (d.answer !== null) return fail(`${at}: a ${d.fallback} fallback has no answer`);
+      if (d.fallback === 'timeout' && d.latencyMs < DEADLINE_MS) return fail(`${at}: a timeout before the ${DEADLINE_MS} ms deadline`);
+      if (d.fallback !== 'timeout' && d.latencyMs > DEADLINE_MS) return fail(`${at}: settled after the ${DEADLINE_MS} ms deadline, so it was a timeout`);
     }
   }
-  if (k !== mine.length) return fail(`the recording has ${mine.length - k} model decisions after the match ended`);
-  const ourTheirs = run.decisions.filter((d) => d.fighter === opp);
+
+  // The match, tick by tick: the model's moves from the recording, the baseline's recomputed.
+  const s = newGame(spec.engineSeed, BENCH_RULES);
+  const perception = new Perception();
+  const bot = new ScriptedPlayer(opp, benchBaseline(spec.opponent).scripted!, { track: BENCH_TRACK });
+  bot.manage(s, [], () => perception.view(s, opp));
+  const ourTheirs: Decision[] = [];
+  const checkpoints: Replay['checkpoints'] = [];
+  // Ticks right after a round ended: the only moments a question in flight may be dropped.
+  const roundEnds = new Set<number>();
+  let k = 0;
+  while (s.round.phase !== 'over') {
+    if (s.tick > r.ticks! + 1) return fail(`the match lasts longer than the recording's ${r.ticks} ticks`);
+    const inputs: Inputs = [null, null];
+    const d = mine[k];
+    if (d && d.appliedTick === s.tick) {
+      const at = `decision ${k + 1} (tick ${s.tick})`;
+      k++;
+      if (!isActionable(s, side)) return fail(`${at}: applied when the fighter could not act`);
+      const legal = legalMoves(s, side);
+      if (d.fallback === null) {
+        if (!legal.includes(d.move)) return fail(`${at}: ${d.move} is not legal there`);
+      } else {
+        if (d.fallback === 'illegal' && legal.includes(d.answer!.move)) return fail(`${at}: ${d.answer!.move} was legal, so it is no fallback`);
+        if (d.move !== fallbackMove(s, side)) return fail(`${at}: the fallback rule plays ${fallbackMove(s, side) ?? 'nothing'} there, not ${d.move}`);
+      }
+      inputs[side] = d.move;
+    } else if (d && d.arrivedTick! <= s.tick && d.appliedTick > s.tick && isActionable(s, side)) {
+      return fail(`decision ${k + 1}: its answer was in at tick ${d.arrivedTick} and the fighter could act at tick ${s.tick}, but it was applied at tick ${d.appliedTick}`);
+    }
+    const ours = bot.take(s);
+    if (ours) {
+      inputs[opp] = ours.move;
+      ourTheirs.push(ours);
+    }
+    perception.record(s, inputs);
+    const events = step(s, inputs);
+    if (events.some((e) => e.kind === 'round_end')) roundEnds.add(s.tick);
+    if (s.tick % CHECKPOINT_EVERY === 0) checkpoints.push({ tick: s.tick, hash: hashState(s) });
+    bot.manage(s, events, () => perception.view(s, opp));
+  }
+  if (!Array.isArray(r.cancellations)) return fail('a recording lists its cancelled questions (cancellations)');
+  const dropped = (r.cancellations as unknown[]).find((c) => !isObj(c) || (c.fighter === side && !roundEnds.has(c.cancelledTick as number)));
+  if (dropped) return fail(`a question of the model's was dropped at tick ${String(isObj(dropped) ? dropped.cancelledTick : '?')}: only a new round drops one`);
+  if (k !== mine.length) return fail(`the recording has ${mine.length - k} model decisions the match never applied (after it ended, or not in tick order)`);
   if (ourTheirs.length !== theirs.length || ourTheirs.some((d, n) => d.move !== theirs[n]!.move || d.appliedTick !== theirs[n]!.appliedTick)) return fail(`${spec.opponent} does not play what the recording says`);
-  const ours = run.replay();
-  if (ours.ticks !== r.ticks) return fail(`the match lasts ${ours.ticks} ticks, the recording says ${r.ticks}`);
-  if (JSON.stringify(ours.checkpoints) !== JSON.stringify((r.checkpoints as unknown[]).map((c) => (isObj(c) ? { tick: c.tick, hash: c.hash } : c)))) return fail('a checkpoint hash does not match');
-  if (JSON.stringify(ours.result) !== JSON.stringify(r.result)) return fail('the result does not match');
-  const result = resultOf(spec, mine, ours.result);
-  return { ok: true, result, fingerprint: fnv(`${seed}|${mine.map((d) => `${d.appliedTick}:${d.move}`).join(',')}`) };
+  if (!checkpoints.length || checkpoints[checkpoints.length - 1]!.tick !== s.tick) checkpoints.push({ tick: s.tick, hash: hashState(s) });
+  if (s.tick !== r.ticks) return fail(`the match lasts ${s.tick} ticks, the recording says ${r.ticks}`);
+  if (JSON.stringify(checkpoints) !== JSON.stringify((r.checkpoints as unknown[]).map((c) => (isObj(c) ? { tick: c.tick, hash: c.hash } : c)))) return fail('a checkpoint hash does not match');
+  const result = { winner: s.winner, rounds: structuredClone(s.results) };
+  if (JSON.stringify(result) !== JSON.stringify(r.result)) return fail('the result does not match');
+  return { ok: true, result: resultOf(spec, mine, result), fingerprint: fnv(`${seed}|${mine.map((d) => `${d.appliedTick}:${d.move}`).join(',')}`) };
 }
