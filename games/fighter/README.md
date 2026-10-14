@@ -1,9 +1,14 @@
 # Jev Fighter
 
-Stick figures fight; decision models pick every move. A 2D fighting game built as a benchmark: a deterministic engine,
-exact replays, and one question per decision whose options are the fighter's legal moves. Served at
-[opper.ai/decision-benchmarks/fighter](https://opper.ai/decision-benchmarks/fighter/): fight the models yourself, watch
-recorded matches, and see how every decision model Opper serves ranks.
+Stick figures fight; decision models pick every move. A 2D fighting game with a deterministic engine, exact replays,
+and one question per decision whose options are the fighter's legal moves. Served at
+[opper.ai/decision-benchmarks/fighter](https://opper.ai/decision-benchmarks/fighter/): fight a decision model yourself
+(are you better than it?), or watch two models fight.
+
+**Not a benchmark on the page.** The score below (rounds won against four fixed-rule bots) didn't generalize: a
+model's rank here said little about how it decides elsewhere. So the page shows no leaderboard, its `game.json` says
+`"benchmark": false` (the hub on opper.ai lists the game but never ranks it), and Watch plays only decision models
+against each other. The bench and the submissions check below still run, for whoever wants the numbers.
 
 Ported from [Jose-Sabater/jev-fighter](https://github.com/Jose-Sabater/jev-fighter) (MIT) onto this repository's kit:
 see [CREDITS.md](CREDITS.md).
@@ -123,8 +128,8 @@ sign in), or any two fighters, baselines included, in real time or paused. Keys:
 double-tap to dash), W jump, S block low, U I O punches, J K L kicks, H throw, Y jump kick, Space special. A match you
 play stays in your browser: watch it with its stats, or save its best 18 seconds as a video, made in your browser.
 
-**Watch**: recorded matches (public/demo/: GPT-6 Luna against Jev, and Jev against each baseline, all played live on
-the benchmark's settings, recorded with scripts/record-demo.ts), with every
+**Watch**: recorded matches between decision models only (public/demo/: GPT-6 Luna against Jev, played live on the
+benchmark's settings, recorded with scripts/record-demo.ts --left/--right), with every
 decision, the question it answered, a timeline and per-fighter stats. Click the stage, then Space plays and pauses,
 arrows step, `[` `]` jump between decisions. Each recording's highlight, its 18 seconds with the most damage dealt,
 saves as a video (MP4) or its best 10 seconds as a GIF (public/clips/, made with scripts/clips.ts), to share; any
@@ -138,7 +143,7 @@ game.server.ts     the request check the service runs before a model sees a ques
 shared/engine/     the deterministic simulation (integer math, 60 ticks per second); ENGINE_VERSION
 shared/            questions, perception, baselines, fallback, the live match driver, the benchmark (gauntlet.ts),
                    replays, stats
-src/               the page: renderer, sound, keyboard, the fight, replay, stats and leaderboard views, clip export
+src/               the page: renderer, sound, keyboard, the fight, replay and stats views, clip export
 public/            game.json, poster.png, leaderboard.json, baselines.json, demo/, clips/, logos/, audio/
 tests/             engine, questions, matches, the benchmark and its verifier, the request check, submissions
 scripts/           record-demo.ts: records a match for Watch (a benchmark game, or two decision models)

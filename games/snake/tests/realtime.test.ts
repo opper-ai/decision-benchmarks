@@ -4,7 +4,7 @@ import { seedFor } from '../game';
 import { baselineTransport } from '../shared/baselines';
 import { createGame, step, turn, type Move } from '../shared/engine';
 import { fallbackMove, allFacts, parseState, viewOf } from '../shared/questions';
-import { RealtimeSnake, SPEED_STEP_MS, startClock } from '../shared/race';
+import { RealtimeSnake, startClock, STEP_MS } from '../shared/play';
 
 const answer = (choice: unknown, extra: Partial<DecideResponse> = {}): DecideResponse => ({ answers: { snake: { type: 'choice', choice } }, usage: { input_tokens: 400, output_tokens: 2 }, latencyMs: 30, costUsd: 0.0001, traceId: null, ...extra });
 
@@ -37,7 +37,7 @@ function slowModel(delay: (n: number) => number, choice: (n: number) => Move = (
   return { t, transport };
 }
 
-const STEP = SPEED_STEP_MS.normal;
+const STEP = STEP_MS;
 
 describe('RealtimeSnake', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -142,10 +142,10 @@ describe('RealtimeSnake', () => {
     expect(ai.tick()?.source).toBe('fallback');
   });
 
-  it('a baseline answers at once, so it never falls back, even at the fast speed', async () => {
+  it('a baseline answers at once, so it never falls back, even at twice the speed', async () => {
     const ai = new RealtimeSnake({ transport: baselineTransport('flood'), seed: seedFor(5), timeoutMs: 2000 });
     while (!ai.over) {
-      await vi.advanceTimersByTimeAsync(SPEED_STEP_MS.fast);
+      await vi.advanceTimersByTimeAsync(STEP / 2);
       ai.tick();
     }
     expect(ai.fallbacks).toBe(0);
@@ -181,23 +181,5 @@ describe('startClock', () => {
     stop();
     vi.advanceTimersByTime(1000);
     expect(m).toBe(2);
-  });
-
-  it('both boards step together: after ~5 s at each speed, the same number of steps on each', async () => {
-    for (const ms of Object.values(SPEED_STEP_MS)) {
-      const ai = new RealtimeSnake({ transport: baselineTransport('greedy'), seed: seedFor(6), timeoutMs: 2000 });
-      let you = createGame(seedFor(6));
-      const stop = startClock(ms, () => {
-        you = step(you, 'straight');
-        ai.tick();
-        return true;
-      });
-      await vi.advanceTimersByTimeAsync(5000);
-      stop();
-      expect(you.steps).toBe(Math.min(Math.floor(5000 / ms), you.steps));
-      // The player's board goes into a wall quickly going straight; the AI keeps step for as long as both are alive.
-      expect(ai.steps.length).toBeGreaterThanOrEqual(you.steps);
-      expect(ai.steps.length).toBeLessThanOrEqual(Math.floor(5000 / ms));
-    }
   });
 });

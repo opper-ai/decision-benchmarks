@@ -35,5 +35,6 @@ describe('a submission', () => {
     renameSync(join(swapped, 'tmp.json.gz'), join(swapped, 'game-02.json.gz'));
     const again = checkSubmissions(quick, root, quiet);
     expect(again.refused).toMatchObject([{ id: 'swapped-bot', error: expect.stringMatching(/game-01.json.gz: played bench seed 1, not 0/) }]);
-  });
+    // Two matches played, then replayed twice: 16 s on a quiet CI runner, past 30 s on a busy one.
+  }, 90_000);
 });

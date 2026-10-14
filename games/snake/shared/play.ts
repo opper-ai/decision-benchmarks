@@ -3,7 +3,7 @@
 // a time, and early: once its answer for the coming step is in, the question for the step after goes out at once, so
 // every step gives it 275 ms plus any time left from the previous step. An answer that is in by the tick moves the
 // snake; if the tick comes first, the request is cancelled and the game's fallback moves the snake instead. The score is decision quality and speed together. The bench plays it
-// headless with real timers (playSnake); the page's race steps a RealtimeSnake on its own clock next to your board.
+// headless with real timers (playSnake). The page plays your own game on the same clock (startClock, STEP_MS).
 // Isomorphic.
 import { askPaused, type BaseDecision, type SchedulerGame } from '../../../packages/kit/client/scheduler.ts';
 import { parseChoice, type Transport } from '../../../packages/kit/shared/systemone.ts';
@@ -46,7 +46,7 @@ export const SNAKE_SCHEDULER: Pick<SchedulerGame<GameState, SnakePoint, SnakeQue
 /** The question key of a step: what the server signs an answer for. */
 export const stepKey = (s: GameState): string => `s${s.steps}`;
 
-/** The benchmark's clock: a step every 275 ms, for every model (the race's Normal speed). */
+/** The benchmark's clock: a step every 275 ms, for every model, and for you when you play on the page. */
 export const STEP_MS = 275;
 
 export interface RealtimeSnakeOptions {
@@ -221,8 +221,8 @@ export class RealtimeSnake {
 }
 
 /**
- * A clock: calls onTick every stepMs until it returns false or the returned stop is called. The race steps both
- * boards inside the same onTick, so neither can run ahead of the other.
+ * A clock: calls onTick every stepMs until it returns false or the returned stop is called. The page steps your game
+ * with it.
  */
 export function startClock(stepMs: number, onTick: () => boolean): () => void {
   const timer = setInterval(() => {

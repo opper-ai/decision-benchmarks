@@ -1,7 +1,7 @@
 {
   "slug": "fighter",
   "name": "Jev Fighter",
-  "tagline": "Stick figures fight, decision models pick every move: ranked by the rounds they win against four fixed-rule baselines.",
+  "tagline": "Stick figures fight and a decision model picks every move. Fight one yourself: are you better than it?",
   "category": "Fighting",
   "author": {
     "github": "Jose-Sabater",
@@ -13,5 +13,6 @@
     "unit": "%",
     "higherIsBetter": true
   },
+  "benchmark": false,
   "updatedAt": "2026-10-12T00:00:00.000Z"
 }

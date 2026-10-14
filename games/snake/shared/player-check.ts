@@ -7,8 +7,8 @@ import { createGame, MAX_STEPS, step, type Move } from './engine.ts';
 /** The only board: your apples. */
 export const BOARD = 'classic';
 /**
- * The fastest the player's board steps (the race's Fast speed, 8 steps a second). The check uses it as the floor for
- * every speed: one board for all speeds, and a slower game only ever takes longer than this.
+ * The floor the check holds a game to: 8 steps a second. The page plays at the models' 275 ms a step (and a pause only
+ * adds time), so a game played there always passes; one sent faster than this was computed, not played.
  */
 export const PLAYER_STEP_MS = 125;
 /** A game can't come in faster than this share of its steps' time (timers drift, so not all of it). */

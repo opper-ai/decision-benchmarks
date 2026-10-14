@@ -79,6 +79,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid #3bb6c9; outline-offset: 2px; }
 .mono { font-family: var(--j-mono); font-variant-numeric: tabular-nums; }
+/* A maker's mark (jevman's): in the leaderboard and on the Watch chips. A black mark turns white in dark mode. */
+.logo { width: 18px; height: 18px; object-fit: contain; flex: none; }
+.logo.round { border-radius: 50%; object-fit: cover; }
+.logo.square { border-radius: 4px; object-fit: cover; }
+html.dark .mono-mark { filter: invert(1); }
 
 /* Account: the free credits (amount only, explained on hover) and Login/Sign up, or a signed-in player's menu. */
 .account { display: flex; align-items: center; gap: 12px; font-size: 14px; }
@@ -135,6 +140,7 @@ main { display: block; padding-bottom: 96px; }
 .watch-label { font-size: 13px; color: var(--j-muted); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .chip { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 500; white-space: nowrap; border: 1px solid var(--j-line); background: var(--j-card); }
+.chip:has(> .logo) { padding-left: 7px; }
 .chip:hover { background: var(--j-soft); }
 .chip[aria-checked='true'] { background: var(--j-soft); border-color: var(--j-strong-line); }
 .chip .sub { font: 500 11px var(--j-mono); color: var(--j-muted); }
@@ -144,7 +150,35 @@ main { display: block; padding-bottom: 96px; }
 .section .sub { max-width: 680px; margin: -4px 0 6px; color: var(--j-text); font: 500 17px/1.5 var(--j-display); text-align: left; }
 @media (min-width: 768px) { .section .sub { margin-inline: auto; text-align: center; } }
 .section .foot { margin: 0; font-size: 12.5px; color: var(--j-muted); }
+.section .sub a { text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); }
+/* The leaderboard, as jevman's: a table from laptops up, a list on phones (see the 900px rules). */
 .tablecard { border: 1px solid var(--j-line); border-radius: 16px; overflow: hidden; }
+/* A model's mark links where its name does. */
+.logo-link { display: inline-flex; flex: none; line-height: 0; }
+.logo.initial { display: grid; place-items: center; border-radius: 50%; background: var(--j-soft); border: 1px solid var(--j-line); color: var(--j-muted); font: 600 10px/1 var(--j-mono); }
+.lbl { display: none; }
+.lbl-cols { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--j-soft); font-size: 12px; color: var(--j-muted); }
+.lbl-cols .rk { width: 40px; }
+.lbl-cols .grow { flex: 1; }
+.lbl-cols span:last-child { padding-right: 46px; }
+.lbl-empty { margin: 0; padding: 12px 14px; border-top: 1px solid var(--j-line); font-size: 13px; color: var(--j-muted); }
+.lbl-row { border-top: 1px solid var(--j-line); }
+.lbl-row.open { background: var(--j-keyrow); }
+.lbl-head { min-height: 56px; display: flex; align-items: center; gap: 10px; padding: 8px 6px 8px 14px; cursor: pointer; }
+.lbl-head .rk { width: 40px; flex: none; font: 600 13px var(--j-mono); color: var(--j-muted); }
+.lbl-row.tie .rk { color: var(--j-text); }
+.lbl-head .logo { width: 22px; height: 22px; }
+.lbl-head .who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lbl-head .mname { font-size: 15px; font-weight: 600; line-height: 1.3; color: inherit; text-decoration: none; }
+.lbl-head .who small { font-size: 12.5px; color: var(--j-muted); }
+.lbl-head .n { font: 600 15px var(--j-mono); font-variant-numeric: tabular-nums; }
+.lbl-toggle { flex: none; width: 36px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--j-muted); }
+.lbl-head .chev { transition: transform 160ms; }
+.lbl-row.open .chev { transform: rotate(180deg); }
+.lbl-d { margin: 0; padding: 2px 14px 14px 86px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; font-size: 13px; }
+.lbl-d dt { color: var(--j-muted); }
+.lbl-d dd { margin: 0; text-align: right; font-family: var(--j-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.lbl-d a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); }
 /* The table scrolls inside its card on narrow screens, never the page. */
 .table-scroll { overflow-x: auto; }
 .lbt { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -153,7 +187,11 @@ main { display: block; padding-bottom: 96px; }
 .lbt .r { text-align: right; }
 .lbt .rk { font: 600 13px var(--j-mono); width: 3.2em; color: var(--j-muted); }
 .lbt tr.tie .rk { color: var(--j-text); }
+.lbt .mdl { display: flex; align-items: center; gap: 10px; }
+.lbt .mdl .logo { width: 20px; height: 20px; }
 .lbt .mdl b { display: block; font-weight: 600; }
+.lbt .mname { display: block; color: inherit; text-decoration: none; }
+.lbt a.mname:hover b { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); }
 .lbt .mdl small { font-size: 12px; color: var(--j-muted); }
 .lbt .scw { display: grid; grid-template-columns: minmax(80px, 1fr) auto; gap: 10px; align-items: center; min-width: 170px; }
 .lbt .bar { height: 6px; border-radius: 99px; background: var(--j-track); overflow: hidden; }
@@ -161,10 +199,30 @@ main { display: block; padding-bottom: 96px; }
 .lbt tr.tie .bar i { background: var(--j-text); }
 .lbt .n { font-family: var(--j-mono); font-variant-numeric: tabular-nums; }
 .lbt .pm { font-size: 11px; color: var(--j-muted); }
-.lbt .run a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); }
-.lbt tr.group td { background: var(--j-soft); color: var(--j-muted); font-size: 12px; padding: 8px 12px; }
-.lbt tr.baseline { color: var(--j-muted); }
+/* Run by: a GitHub handle, ours (@opper-ai) or the community submitter's. */
+.lbt .run { font-size: 13px; }
+.lbt .run a, .lbt .mdl small a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--j-strong-line); }
 .lbt tr.empty td { white-space: normal; color: var(--j-muted); }
+/* A baseline's row: in the table at its score, not ranked, marked Base where the rank would be. */
+.kind-tag { display: inline-block; padding: 1px 5px; border: 1px solid var(--j-strong-line); border-radius: 999px; background: var(--j-card); color: var(--j-text); font: 600 10px/1.3 var(--j-mono); cursor: help; }
+.kind-tag:hover, .kind-tag:focus-visible, .kind-tag[aria-describedby] { border-color: var(--j-text); }
+.lbt tr.ref td { background: var(--j-keyrow); border-top: 1px dashed var(--j-strong-line); }
+.lbt tr.ref + tr td { border-top: 1px dashed var(--j-strong-line); }
+.lbl-row.ref { background: var(--j-keyrow); border-top: 1px dashed var(--j-strong-line); }
+.lbl-row.ref + .lbl-row { border-top: 1px dashed var(--j-strong-line); }
+.lbl-row.ref .kind-tag { padding: 1px 5px; font-size: 9.5px; }
+/* The tag's explanation, styled as the credits' tooltip in the header; fixed to the window, as the table scrolls in its card. */
+.kind-tip { position: fixed; z-index: 80; width: max-content; max-width: 320px; background: var(--j-card); color: var(--j-text); border: 1px solid var(--j-line); border-radius: 8px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; line-height: 1.45; box-shadow: 0 8px 24px -12px rgba(27, 46, 64, 0.35); pointer-events: none; }
+.kind-tip[hidden] { display: none; }
+/* Just above phone width a tag in the rank column would push the table wider than its card: its gap gives way. */
+@media (max-width: 960px) { .lbt td.rk, .lbt th:first-child { padding-right: 4px; } }
+.lbt .show-m { display: none; }
+/* Narrower than a laptop the full table doesn't fit: Games and Run by go, and long model names wrap. */
+@media (max-width: 1279px) {
+  .lbt .hide-m { display: none; }
+  .lbt .show-m { display: inline; }
+  .lbt td:nth-child(2) { white-space: normal; }
+}
 .spec { margin: 0; border: 1px solid var(--j-line); border-radius: 16px; background: var(--j-card); overflow: hidden; }
 .spec > div { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; padding: 16px 20px; }
 .spec > div + div { border-top: 1px solid var(--j-line); }
@@ -184,6 +242,10 @@ main { display: block; padding-bottom: 96px; }
 @media (max-width: 760px) { .steps { grid-template-columns: minmax(0, 1fr); } .repo-line { justify-content: flex-start; text-align: left; } }
 
 /* ---------- small screens ---------- */
-@media (max-width: 900px) { .section { margin-top: 64px; } }
+@media (max-width: 900px) {
+  .section { margin-top: 64px; }
+  .tablecard:has(.lbl) .table-scroll { display: none; }
+  .lbl { display: block; }
+}
 @media (max-width: 520px) { .user-menu .name { display: none; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } html { scroll-behavior: auto; } }

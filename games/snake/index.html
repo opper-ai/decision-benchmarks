@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Snake: a benchmark for AI decision models | Opper AI</title>
-    <meta name="description" content="Every AI decision model Opper serves plays 100 seeded games of Snake in real time, a step every 275 ms. See who eats the most apples, watch them play, or race one on the same board." />
+    <meta name="description" content="Every AI decision model Opper serves plays 100 seeded games of Snake in real time, a step every 275 ms. See who eats the most apples, watch them play, or play yourself and see where you would rank." />
     <link rel="canonical" href="%VITE_APP_URL%" />
     <link rel="icon" href="https://opper.ai/favicon.ico" sizes="48x48 96x96 192x192" />
     <link rel="icon" href="https://opper.ai/images/icon-dark.png" media="(prefers-color-scheme: light)" />
@@ -14,14 +14,14 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Opper AI" />
     <meta property="og:title" content="Snake: a benchmark for AI decision models | Opper AI" />
-    <meta property="og:description" content="Every AI decision model Opper serves plays 100 seeded games of Snake in real time, a step every 275 ms. See who eats the most apples, watch them play, or race one on the same board." />
+    <meta property="og:description" content="Every AI decision model Opper serves plays 100 seeded games of Snake in real time, a step every 275 ms. See who eats the most apples, watch them play, or play yourself and see where you would rank." />
     <meta property="og:url" content="%VITE_APP_URL%" />
     <meta property="og:image" content="%VITE_APP_URL%poster.png" />
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="720" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Snake: a benchmark for AI decision models | Opper AI" />
-    <meta name="twitter:description" content="Every AI decision model Opper serves plays 100 seeded games of Snake in real time, a step every 275 ms. See who eats the most apples, watch them play, or race one on the same board." />
+    <meta name="twitter:description" content="Every AI decision model Opper serves plays 100 seeded games of Snake in real time, a step every 275 ms. See who eats the most apples, watch them play, or play yourself and see where you would rank." />
     <meta name="twitter:image" content="%VITE_APP_URL%poster.png" />
     <!-- The theme before the first paint, as on opper.ai: the visitor's choice there (same origin), else the system's. -->
     <script>
@@ -78,42 +78,41 @@
           <!-- The way back to the hub on opper.ai, which lists every game. -->
           <nav class="crumbs" aria-label="Breadcrumb"><a href="/decision-benchmarks">Decision benchmarks</a><span aria-hidden="true">/</span><span aria-current="page">Snake</span></nav>
           <h1 class="hero-h1 font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Snake: the benchmark for AI decision models</h1>
-          <p class="hero-sub font-wix font-medium text-left md:text-center text-lg md:text-xl">Every model plays 100 seeded games in real time, a step every 275 ms. Watch them, or race one on the same board.</p>
+          <p class="hero-sub font-wix font-medium text-left md:text-center text-lg md:text-xl">Every model plays 100 seeded games in real time, a step every 275 ms. Watch them, or play yourself and see where you would rank.</p>
         </section>
       </div>
 
       <section class="stage" aria-label="The game">
-        <div class="arena" id="arena">
-          <!-- Your board: only while you play. -->
-          <div class="tv you" id="tv-you" hidden>
-            <div class="arcade-top">
-              <span class="cell"><small>You</small><b id="you-score">0</b></span>
-              <span class="cell end"><small>Steps</small><b id="you-steps">0</b></span>
-            </div>
-            <div class="board" id="board-you">
-              <canvas id="canvas-you" width="360" height="360" aria-label="Your Snake board"></canvas>
-              <p class="board-banner" id="banner-you" hidden></p>
-            </div>
+        <!-- The cabinet: a model's recorded game in Watch, yours in Play. -->
+        <div class="tv" id="tv">
+          <div class="arcade-top">
+            <span class="cell"><small id="plate-label">AI</small><b id="score">0</b></span>
+            <!-- Clicked, the players' high scores open over the board, as on jevman. -->
+            <span class="cell mid" role="button" tabindex="0" aria-describedby="hi-tip" aria-label="High scores"><small>High score</small><b id="hi-score">0</b><span id="hi-tip" class="hi-tip" role="tooltip"></span></span>
+            <span class="cell end"><small>Steps</small><b id="steps">0</b></span>
           </div>
-          <!-- The AI's board: a recorded game in Watch, the model you race in Play. -->
-          <div class="tv ai" id="tv-ai">
-            <div class="arcade-top">
-              <span class="cell"><small id="ai-label">AI</small><b id="ai-score">0</b></span>
-              <span class="cell mid" tabindex="0" aria-describedby="hi-tip"><small>High score</small><b id="hi-score">0</b><span id="hi-tip" class="hi-tip" role="tooltip">The players' best</span></span>
-              <span class="cell end"><small>Steps</small><b id="ai-steps">0</b></span>
-            </div>
-            <div class="board" id="board-ai">
-              <canvas id="canvas-ai" width="360" height="360" aria-label="The AI's Snake board"></canvas>
-              <p class="board-banner" id="banner-ai" hidden></p>
-              <div id="overlay" class="overlay" hidden></div>
-            </div>
+          <div class="board" id="board">
+            <canvas id="canvas" width="360" height="360" aria-label="The Snake board"></canvas>
+            <p class="board-banner" id="banner" hidden></p>
+            <div id="overlay" class="overlay" hidden></div>
+            <!-- While watching: the recording's highlight to save (MP4 or GIF), in the board's corner as on jevman. -->
+            <button id="save" class="save-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="save-menu" hidden>
+              <svg viewBox="0 0 16 16" width="18" height="18" fill="none" aria-hidden="true"><path d="M8 2.5V10M5 7.2l3 3 3-3M3 13h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              <span class="save-tip" aria-hidden="true">Save highlight</span>
+            </button>
+            <div id="save-menu" class="save-menu" hidden></div>
+          </div>
+          <!-- The cabinet's bottom strip, as on jevman: Play while watching, New game while your game is paused. -->
+          <div class="arcade-bottom">
+            <button id="play-cta" class="play-cta" type="button"><span class="tri" aria-hidden="true"></span><span id="play-label">Play</span></button>
+          </div>
+          <!-- Phones, while you play: a strip to swipe on, so the thumb needn't cover the board (the whole cabinet takes
+               swipes). The lit arrow faces your last swipe. -->
+          <div class="swipe-pad" id="swipe-pad" hidden>
+            <span class="swipe-compass" aria-hidden="true"><i data-dir="up"></i><i data-dir="left"></i><span class="head"></span><i data-dir="right"></i><i data-dir="down"></i></span>
+            <span class="swipe-label">Swipe here to steer</span>
           </div>
         </div>
-        <div class="arcade-bottom">
-          <button id="play-cta" class="play-cta" type="button"><span class="tri" aria-hidden="true"></span><span id="play-label">Race an AI</span></button>
-        </div>
-        <!-- Phones: a strip to swipe on, so the thumb needn't cover your board. -->
-        <div class="swipe-pad" id="swipe-pad" hidden><span class="swipe-label">Swipe here to steer</span></div>
         <p id="notice" class="notice-line" role="status" hidden></p>
         <div class="watch" id="watch">
           <span class="watch-label">Watch</span>
@@ -124,14 +123,8 @@
       <section id="leaderboard" class="section" aria-labelledby="leaderboard-title">
         <div class="oc"><h2 id="leaderboard-title" class="font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Leaderboard</h2></div>
         <p id="leaderboard-sub" class="sub">100 games per model on the same seeded boards, in real time at a step every 275 ms: the mean number of apples eaten.</p>
-        <div class="tablecard"><div class="table-scroll"><table class="lbt" id="leaderboard-table"></table></div></div>
-        <p class="foot">=1 means tied: those means are within each other's margin of error (two standard errors). Run by @opper-ai means we played the games through Opper. Late steps are the share of steps the model didn't answer in time, so the fallback moved the snake. Self-reported models were benchmarked by whoever submitted them, named under Run by: CI replayed every game they sent in to check its score, and the timing (late steps, latency) and cost are as they reported. Baselines are simple scripts, shown for reference and never ranked.</p>
-      </section>
-
-      <section id="highscores" class="section" aria-labelledby="highscores-title">
-        <div class="oc"><h2 id="highscores-title" class="font-wix font-semibold text-3xl md:text-4xl text-left md:text-center">Players' high scores</h2></div>
-        <p class="sub">Your apples when you race an AI. The server replays every game from the board it dealt before it takes a score.</p>
-        <ol class="hs-list" id="hs-list"></ol>
+        <div class="tablecard"><div class="table-scroll"><table class="lbt" id="leaderboard-table"></table></div><div class="lbl" id="leaderboard-list"></div></div>
+        <p class="foot">=1 means tied: those means are within each other's margin of error (two standard errors). Run by @opper-ai means we played the games through Opper. Late steps are the share of steps the model didn't answer in time, so the fallback moved the snake. Community models were self-reported: benchmarked by whoever submitted them, named under Run by. CI replayed every game they sent in to check its score, and the timing (late steps, latency) and cost are as they reported.</p>
       </section>
 
       <section id="add-model" class="section" aria-labelledby="add-model-title">

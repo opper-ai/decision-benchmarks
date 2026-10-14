@@ -19,7 +19,8 @@ games/registry.ts    the games the service serves and the build builds: snake, f
 games/<slug>/        one game: game.ts (bench and replay), game.server.ts (service), src/, index.html, public/
                      (game.json, poster.png, leaderboard.json, community.json), submissions/, tests/
 games/snake/         Snake: our own game, the first built on the kit (see games/snake/README.md)
-games/fighter/       Jev Fighter (jev-fighter, by Jose Sabater), on the kit: served at <APP_BASE_PATH>/fighter/
+games/fighter/       Jev Fighter (jev-fighter, by Jose Sabater), on the kit: served at <APP_BASE_PATH>/fighter/, a game to
+                     play against the models (game.json: benchmark false, so the hub never ranks it)
 server/main.ts       the service: every registry game at <APP_BASE_PATH>/<slug>/
 scripts/             bench, submissions, build, check-contract
 ```

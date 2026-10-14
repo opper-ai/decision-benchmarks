@@ -69,7 +69,8 @@ describe('the gauntlet', () => {
     expect(compared).toBeGreaterThan(10);
     expect(match.decisions.every((d) => d.question.track === 'raw' && d.question.options.every((o) => o.payoff === undefined))).toBe(true);
     expect(new Set(match.decisions.map((d) => d.move)).size).toBeGreaterThan(2);
-  });
+    // A whole match, every baseline asked twice a step: about 10 s here, past 30 s on a busy CI runner.
+  }, 90_000);
 });
 
 describe('a recorded benchmark match', async () => {

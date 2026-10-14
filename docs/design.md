@@ -99,7 +99,7 @@ The hub at `opper.ai/decision-benchmarks` lists the games and only reads these f
 
 | File | Shape |
 |---|---|
-| `game.json` | `{ slug, name, tagline, category: 'Arcade'\|'Puzzle'\|'Fighting'\|'Strategy', author: { github, originalRepo? }, license, metric: { name, unit, higherIsBetter }, updatedAt }`. Our own games have `author.github: "opper-ai"` and no `originalRepo`. `updatedAt` is set at build time from the newest results: the official run, or a newer accepted submission. |
+| `game.json` | `{ slug, name, tagline, category: 'Arcade'\|'Puzzle'\|'Fighting'\|'Strategy', author: { github, originalRepo? }, license, metric: { name, unit, higherIsBetter }, benchmark?: false, updatedAt }`. Our own games have `author.github: "opper-ai"` and no `originalRepo`. `benchmark: false` marks a game to play against the models rather than a benchmark (Jev Fighter): the hub lists it but never ranks it. `updatedAt` is set at build time from the newest results: the official run, or a newer accepted submission. |
 | `leaderboard.json` | `{ generatedAt, game, benchVersion, metric, entries: Entry[], skipped: { model, reason }[] }`. `Entry = { model, name, games, metric: { mean, stdError, best }, meanLatencyMs: number\|null, fallbackRate, costPerGame: number\|null, via: 'systemone'\|'chat-adapter', extra? }`, best first. |
 | `community.json` | the same, with entries that add `by, url?, selfReported: true`. Not committed: built from `submissions/` at build time. |
 | `api/highscores` | `{ order: string[], boards: { <board>: [{ initials, score, at }] } }`; 404 for a game without high scores. |
@@ -176,7 +176,7 @@ with a permanent redirect.
 - **snake** (Arcade, ours): a model steers a snake on a seeded 16 x 16 board, one `choice` per step (the direction the
   head moves next, every direction but the reverse offered, in a shuffled order), in real time: the snake steps every 275 ms for every model, and a step whose answer is not in by the tick is
   played by a fallback that never steers toward the apple, so the score is decision quality and speed together.
-  Score = apples eaten, until death, 150 steps without an apple or 1000 steps. Players race a model on the same server-issued seed,
+  Score = apples eaten, until death, 150 steps without an apple or 1000 steps. Players play on the models' clock on a server-issued seed,
   and their game is replayed on the server for the high-score board. Rules: `games/snake/SPEC.md`.
 - **fighter** (Jev Fighter, Fighting): a deterministic 2D fighting game. One benchmark game is one live match (real
   time at the game's normal speed, raw track: the situation and the rules, no payoff rows) against one of four
@@ -185,7 +185,8 @@ with a permanent redirect.
   played by a fallback that blocks. The verifier replays the match tick by tick from the recorded ticks each answer
   was applied on, recomputes the baselines' moves and checks every model move's legality where it was applied, the
   fallback rule and the checkpoint hashes; when each answer arrived is as recorded (self-reported in a submission). Its five baselines (`random`, `guard`, `greedy`,
-  `payoff`, `maximin`) are on its page, from `public/baselines.json`. Question design:
+  `payoff`, `maximin`) have their results in `public/baselines.json`. Its page is a game to play, not a benchmark
+  (`game.json`: `benchmark: false`): no leaderboard there or on the hub. Question design:
   `games/fighter/docs/specs/2026-10-06-v2-harness.md`.
 
 ## License

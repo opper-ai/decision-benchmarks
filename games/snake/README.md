@@ -3,7 +3,7 @@
 Which AI decision model plays Snake best? Every model plays 100 seeded games in real time, a step every 275 ms,
 and the leaderboard ranks them by the apples they eat. Live at
 [opper.ai/decision-benchmarks/snake](https://opper.ai/decision-benchmarks/snake/), where you can watch the recorded
-games or race a model on the same board.
+games, or play yourself on the models' clock and see where your apples would rank.
 
 ## What it measures
 
@@ -64,19 +64,23 @@ timing of a game you played yourself (which steps your model answered in time), 
 self-reported.
 
 The free baselines play without a key: `npm run bench -- --game snake --model baseline/greedy` (also
-`baseline/random` and `baseline/flood`). Their 100-game results are in `public/baselines.json`, shown on the page for
-reference and never on the leaderboard.
+`baseline/random` and `baseline/flood`). Their 100-game results are in `public/baselines.json`. They check the bench
+and the pipeline without a key; the page doesn't show them (a script's score says little to someone choosing a
+model), and they are never ranked.
 
 ## Files
 
 - `game.ts`: the bench and replay side (`GameDefinition`); `game.server.ts`: the service side (request check, high
   scores on seeds the server issues)
-- `shared/`: the engine, the question, the real-time play loop (`play.ts`, which the race on the page also uses), the
-  baselines, the recording and the high-score check
+- `shared/`: the engine, the question, the real-time play loop (`play.ts`, whose clock the page's own game uses too),
+  the baselines, the recording and the high-score check
 - `bench/verify.ts`: the replay the submissions check runs
 - `src/`, `index.html`: the page
-- `public/`: `game.json`, `poster.png` (rendered by `node games/snake/scripts/poster.ts`), `leaderboard.json` (official
-  runs), `baselines.json`, `demo/` (the recordings Watch plays: each ranked model's official game closest to its mean)
+- `public/`: `game.json`, `poster.png` (the top model's recorded game, drawn by `node games/snake/scripts/poster.ts`),
+  `leaderboard.json` (official runs), `baselines.json`, `demo/` (the recordings Watch plays: each ranked model's
+  official game closest to its mean), `clips/` (each recording's highlight to save, an 18 s MP4 and a 10 s GIF,
+  rendered by `node games/snake/scripts/clips.ts` after `npm i --no-save @napi-rs/canvas`; needs ffmpeg), `logos/` (the
+  makers' marks)
 
 ## License
 

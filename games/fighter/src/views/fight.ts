@@ -72,6 +72,18 @@ export function keysStrip(): HTMLElement {
   return h('div.keys-strip', { 'aria-label': 'Your keys' }, ...KEYS.map(([keys, what]) => h('span', null, ...keys.map((k) => h('kbd', null, k)), ` ${what}`)));
 }
 
+/**
+ * The same keys on the picker, before the fight starts: moving on one line, attacking on the next. The fight has no
+ * touch controls, so a touch screen is told it needs a keyboard.
+ */
+function keysLegend(): HTMLElement {
+  const group = (title: string, keys: typeof KEYS) =>
+    h('div.keys-group', null, h('span.keys-title', null, title), h('span.keys-row', null, ...keys.map(([ks, what]) => h('span.key', null, ...ks.map((k) => h('kbd', null, k)), what))));
+  const legend = h('div.pick-keys', { role: 'group', 'aria-label': 'Controls' }, group('Move', KEYS.slice(0, 3)), group('Attack', KEYS.slice(3)));
+  if (matchMedia('(pointer: coarse)').matches) legend.append(h('p.keys-note', null, 'You fight on a keyboard: this game has no touch controls.'));
+  return legend;
+}
+
 export interface PickerOptions {
   me: Me;
   hooks: TransportHooks;
@@ -84,7 +96,7 @@ export interface PickerOptions {
 
 /**
  * "Fight an AI", over the stage as jevman's "Who plays the ghosts?" is in its cabinet: pick a decision model, then fight
- * it in real time on the keyboard. Only models: the baselines are for the leaderboard and Watch. Paused mode, your side,
+ * it in real time on the keyboard. Only models: you fight a decision model, never a script. Paused mode, your side,
  * the track and the deadline wait, closed, under Advanced. When no model can play for this visitor the models still
  * show, and the button asks them to sign in, or a line says why not.
  */
@@ -209,6 +221,7 @@ export function pickerCard(o: PickerOptions): HTMLElement {
     x,
     h('div.pick-head', null, h('p.fcard-title', null, 'Who do you fight?'), h('p.fnote', null, 'Pick an AI model. It picks every move; you fight it on the keyboard.')),
     h('div.opp-grid', { role: 'radiogroup', 'aria-label': 'AI models' }, ...tiles),
+    keysLegend(),
     h('div.go-row', null, go),
     h('div.pick-foot', null, pay, advToggle),
     advPanel,

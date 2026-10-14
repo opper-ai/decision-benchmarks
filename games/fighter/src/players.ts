@@ -28,9 +28,9 @@ export interface Plan {
 export function modelProblem(me: Me): string | null {
   if (me.mode === 'player' || me.mode === 'dev') return null;
   if (me.mode === 'pool') return me.pool?.open === false ? 'The free credits are used up. Sign in with Opper to play the models on your own account.' : null;
-  if (me.unavailable) return "Couldn't reach the server, so no model can play right now. Play a baseline, or watch a recorded match.";
-  if (me.loginAvailable) return 'Sign in with Opper to let a model play. Or play a baseline, or watch a recorded match.';
-  return 'No model can play here: this server has no free credits and no Login with Opper. Play a baseline, or watch a recorded match.';
+  if (me.unavailable) return "Couldn't reach the server, so no model can play right now. Watch a recorded match instead.";
+  if (me.loginAvailable) return 'Sign in with Opper to let a model play. Or watch a recorded match.';
+  return 'No model can play here: this server has no free credits and no Login with Opper. Watch a recorded match instead.';
 }
 
 /** Who pays for a model fighter, as its picker says it. */
