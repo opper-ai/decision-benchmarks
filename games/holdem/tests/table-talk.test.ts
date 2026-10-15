@@ -208,7 +208,9 @@ describe('cleanTalk is the same on the client and the server', () => {
       expect(cleanTalk(once), JSON.stringify(text)).toBe(once);
       expect(lone(once), JSON.stringify(text)).toBe(false);
       expect(once.length).toBeLessThanOrEqual(MAX_SAY);
-      expect(once).not.toMatch(/[\p{Cc}‪-‮⁦-⁩​]/u);
+      expect(once).not.toMatch(/[\p{Cc}\u202A-\u202E\u2066-\u2069\u200B]/u);
+      // No tag character outside a flag: nothing hidden for a model to read.
+      expect(once.replace(/\u{1F3F4}[\u{E0061}-\u{E007A}]{1,6}\u{E007F}/gu, ''), JSON.stringify(text)).not.toMatch(/[\u{E0000}-\u{E007F}]/u);
     }
   });
 
