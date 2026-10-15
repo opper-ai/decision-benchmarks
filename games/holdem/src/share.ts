@@ -2,7 +2,7 @@
 // replays the game: who sat where, the Sit & Go's table key, and every move that is not a bot's (the engine recomputes the
 // bots' moves, as verify does). No table talk, reasoning or timings: those stay with the player.
 //
-// The code is base64url of: a version byte; the seat count; a byte per seat (kind in the top two bits, then an index
+// The code is base64url of: a version byte (2 for a table of 2 to 4, 3 for 5 or 6: LINK_VERSIONS); the seat count; a byte per seat (kind in the top two bits, then an index
 // into LINK_MODELS or BOT_NAMES); the table key (32 bytes); then a stream of 4-bit moves:
 //   0-7  a menu option (fold, check, call, small, half, three_quarters, pot, allin), by its index in OPTION_KEYS
 //   8, 9 the fallback's fold and check
@@ -15,10 +15,19 @@ import { BOT_NAMES, botDecide, isBotName, type BotName } from '../shared/bots.ts
 import { observe, OPTION_KEYS, toAct, type Action, type OptionKey } from '../shared/engine.ts';
 import { verifyRecording, type Player, type RecordedAction, type Recording } from '../shared/recording.ts';
 import { keyBytes } from '../shared/rng.ts';
-import { actSitAndGo, newSitAndGo, nextHand, STARTING_STACK, type SitAndGo } from '../shared/sitngo.ts';
+import { actSitAndGo, MAX_SEATS, newSitAndGo, nextHand, STARTING_STACK, type SitAndGo } from '../shared/sitngo.ts';
 
-/** 2: the table key (32 bytes) replaced the 4-byte seed. */
-export const LINK_VERSION = 2;
+/**
+ * The link versions this page reads, and the seat counts each holds. 2: the table key (32 bytes) replaced the 4-byte
+ * seed. 3: tables of 5 and 6, whose blind levels last two orbits (sitngo.ts): the same layout, the seat count past 4. A
+ * game of 2 to 4 is still written as version 2, byte for byte as before, so every link made before opens the same game
+ * and a page from before opens every link of 2 to 4; it says a link of 5 or 6 was made by another version of the game.
+ */
+export const LINK_VERSIONS: Readonly<Record<number, { min: number; max: number }>> = { 2: { min: 2, max: 4 }, 3: { min: 5, max: MAX_SEATS } };
+/** The newest version: what a link of 5 or 6 seats is written as. */
+export const LINK_VERSION = 3;
+/** The version a game of `seats` goes in. */
+const versionFor = (seats: number): number => (seats <= LINK_VERSIONS[2]!.max ? 2 : LINK_VERSION);
 const KEY_BYTES = 32;
 
 /**
@@ -99,6 +108,7 @@ export function fromBase64Url(text: string): Uint8Array | null {
 function unlinkable(rec: Recording): string | null {
   if (rec.mode !== 'sitngo' || !rec.sitngo) return 'only a Sit & Go can be shared';
   if (rec.sitngo.startingStack !== STARTING_STACK) return 'only the standard 1500-chip Sit & Go can be shared';
+  if (rec.players.length < 2 || rec.players.length > MAX_SEATS) return `a link holds 2 to ${MAX_SEATS} players`;
   for (const p of rec.players) {
     if (p.kind === 'model' && !LINK_MODELS.includes(p.id)) return `${p.id} can't be named in a link`;
     if (p.kind === 'bot' && !isBotName(p.id)) return `${p.id} is not a bot`;
@@ -110,7 +120,7 @@ function unlinkable(rec: Recording): string | null {
 export function encodeGame(rec: Recording): string {
   const problem = unlinkable(rec);
   if (problem) throw new Error(problem);
-  const head = [LINK_VERSION, rec.players.length, ...rec.players.map((p) => (KIND[p.kind] << 6) | (p.kind === 'model' ? LINK_MODELS.indexOf(p.id) : p.kind === 'bot' ? BOT_NAMES.indexOf(p.id as BotName) : 0))];
+  const head = [versionFor(rec.players.length), rec.players.length, ...rec.players.map((p) => (KIND[p.kind] << 6) | (p.kind === 'model' ? LINK_MODELS.indexOf(p.id) : p.kind === 'bot' ? BOT_NAMES.indexOf(p.id as BotName) : 0))];
   head.push(...keyBytes(rec.sitngo!.key));
   const nibbles: number[] = [];
   for (const hand of rec.hands) {
@@ -148,9 +158,10 @@ export function decodeGame(code: string): Decoded {
   if (code.length > MAX_CODE_LENGTH) return fail('This link is too long to be a game.');
   const bytes = fromBase64Url(code);
   if (!bytes || bytes.length < 2 + 2 + KEY_BYTES) return fail('This link is not a game.');
-  if (bytes[0] !== LINK_VERSION) return fail('This link was made by another version of the game.');
+  const seats = LINK_VERSIONS[bytes[0]!];
+  if (!seats) return fail('This link was made by another version of the game.');
   const n = bytes[1]!;
-  if (n < 2 || n > 4 || bytes.length < 2 + n + KEY_BYTES) return fail('This link is not a game.');
+  if (n < seats.min || n > seats.max || bytes.length < 2 + n + KEY_BYTES) return fail('This link is not a game.');
   const players: Player[] = [];
   for (let i = 0; i < n; i++) {
     const b = bytes[2 + i]!;
