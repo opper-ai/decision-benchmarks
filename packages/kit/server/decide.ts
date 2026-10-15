@@ -30,6 +30,8 @@ export interface DecideDeps {
   keyMode?: KeyMode;
   /** Which System One API `baseUrl` points at (default Opper). */
   provider?: Provider;
+  /** Opper only: the project an organization key calls for (X-Opper-Project). */
+  project?: string;
   /** Sent to Opper as X-Opper-Name, so traces show which game called. */
   callName?: string;
   /** The caller gave up on the call (a real-time game whose step has passed): it is cancelled. */
@@ -55,6 +57,31 @@ function upstreamMessage(text: string): string {
     // not JSON; use the raw text
   }
   return text.slice(0, 200);
+}
+
+/**
+ * What the page is told when Opper refuses a call for the key rather than the request (null for any other failure):
+ * the player's sign-in expired (401, the session is cleared) or their wallet is empty (402); the free credits are spent
+ * (402 poolEmpty); the local key was rejected or is empty; or the key may not use the model (403). The same for a
+ * System One and a chat call.
+ */
+export function refusedUpstream(status: number, keyMode: KeyMode | undefined, label: string): DecideResult | null {
+  if (keyMode === 'player') {
+    if (status === 401) return { status: 401, body: { error: 'Your Opper sign-in has expired. Sign in again to keep playing.', signedOut: true, clearSession: true } };
+    if (status === 402) return { status: 402, body: { error: 'Your Opper wallet is empty. Top it up to keep playing.', walletUrl: WALLET_URL } };
+  }
+  // The free credits ran out (or their key was revoked): the page asks the visitor to sign in.
+  if (keyMode === 'pool' && (status === 401 || status === 402)) return poolEmpty(402);
+  // The local key: a rejected key or an empty wallet won't fix itself either (no sign-in to redo, though).
+  if (keyMode === 'dev' && (status === 401 || status === 402)) {
+    return { status, body: { error: status === 401 ? 'The API key in .env was rejected' : "The API key's Opper wallet is empty" } };
+  }
+  // Any key can lack access to a listed model; that is not a passing upstream error.
+  if (status === 403) {
+    const whose = keyMode === 'player' ? 'your Opper account' : keyMode === 'pool' ? 'the free credits' : 'this API key';
+    return { status: 403, body: { error: `${label} is not enabled for ${whose}` } };
+  }
+  return null;
 }
 
 /**
@@ -85,7 +112,7 @@ export async function handleDecide(input: unknown, deps: DecideDeps): Promise<De
       headers: {
         Authorization: `Bearer ${deps.apiKey}`,
         'Content-Type': 'application/json',
-        ...(provider === 'opper' ? { 'X-Opper-Name': deps.callName ?? 'decision-benchmarks' } : {}),
+        ...(provider === 'opper' ? { 'X-Opper-Name': deps.callName ?? 'decision-benchmarks', ...(deps.project ? { 'X-Opper-Project': deps.project } : {}) } : {}),
       },
       body: JSON.stringify({ model, state: input.state, questions: input.questions }),
       signal: withSignal(timeoutMs, deps.signal),
@@ -95,22 +122,7 @@ export async function handleDecide(input: unknown, deps: DecideDeps): Promise<De
     if (!res.ok) {
       const error = redact(`${label} returned HTTP ${res.status}: ${upstreamMessage(redact(text))}`);
       log(`${tag} ${actors} failed after ${latencyMs} ms: ${error}`);
-      if (deps.keyMode === 'player') {
-        if (res.status === 401) return { status: 401, body: { error: 'Your Opper sign-in has expired. Sign in again to keep playing.', signedOut: true, clearSession: true } };
-        if (res.status === 402) return { status: 402, body: { error: 'Your Opper wallet is empty. Top it up to keep playing.', walletUrl: WALLET_URL } };
-      }
-      // The free credits ran out (or their key was revoked): the page asks the visitor to sign in.
-      if (deps.keyMode === 'pool' && (res.status === 401 || res.status === 402)) return poolEmpty(402);
-      // The local key: a rejected key or an empty wallet won't fix itself either (no sign-in to redo, though).
-      if (deps.keyMode === 'dev' && (res.status === 401 || res.status === 402)) {
-        return { status: res.status, body: { error: res.status === 401 ? 'The API key in .env was rejected' : "The API key's Opper wallet is empty" } };
-      }
-      // Any key can lack access to a listed model; that is not a passing upstream error.
-      if (res.status === 403) {
-        const whose = deps.keyMode === 'player' ? 'your Opper account' : deps.keyMode === 'pool' ? 'the free credits' : 'this API key';
-        return { status: 403, body: { error: `${label} is not enabled for ${whose}` } };
-      }
-      return { status: 502, body: { error } };
+      return refusedUpstream(res.status, deps.keyMode, label) ?? { status: 502, body: { error } };
     }
     const json = JSON.parse(text) as { answers?: Record<string, unknown>; usage?: { input_tokens: number; output_tokens: number } };
     const usage = json.usage ?? { input_tokens: 0, output_tokens: 0 };
@@ -240,6 +252,7 @@ export async function handleDecideRequest(ctx: DecideContext, req: HttpRequest, 
       keyMode: key.mode,
       provider: key.provider,
       baseUrl: key.baseUrl,
+      ...(key.project ? { project: key.project } : {}),
       fetch: deps.fetch,
       now: deps.now,
       log: deps.log,

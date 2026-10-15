@@ -1,5 +1,6 @@
+import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { openSession, parseCookies, safeEqual, sealSession, serializeCookie, SESSION_MAX_AGE_S, type SessionData } from '../server/session';
+import { openSession, parseCookies, purposeKey, safeEqual, seal, sealSession, serializeCookie, SESSION_MAX_AGE_S, unseal, type SessionData } from '../server/session';
 
 const SECRET = 'a'.repeat(64);
 const data = (over: Partial<SessionData> = {}): SessionData => ({ v: 1, apiKey: 'op-test-key', user: { name: 'Ada', email: 'ada@example.com' }, issuedAt: 1_000, ...over });
@@ -45,5 +46,33 @@ describe('session cookie', () => {
     expect(parseCookies(undefined)).toEqual({});
     expect(serializeCookie('s', 'v=1', { maxAge: 60.7, path: '/', httpOnly: true, secure: true })).toBe('s=v%3D1; Max-Age=60; Path=/; HttpOnly; Secure; SameSite=Lax');
     expect(serializeCookie('s', '', { maxAge: 0, path: '/auth' })).toBe('s=; Max-Age=0; Path=/auth; SameSite=Lax');
+  });
+});
+
+describe('sealed values', () => {
+  const key = purposeKey(SECRET, 'holdem-table');
+  it('round-trips any JSON value under a key per purpose, unreadable and different each time', () => {
+    const value = { seed: 123456789, log: ['c,x', 'f'] };
+    const sealed = seal(value, key);
+    expect(sealed).not.toContain('123456789');
+    expect(seal(value, key)).not.toBe(sealed);
+    expect(unseal(sealed, key)).toEqual(value);
+  });
+  it('derives a different key per purpose and secret, as HMAC(secret, "decision-benchmarks:" + purpose)', () => {
+    expect(purposeKey(SECRET, 'holdem-table')).toEqual(createHmac('sha256', SECRET).update('decision-benchmarks:holdem-table').digest());
+    expect(purposeKey(SECRET, 'other')).not.toEqual(key);
+    expect(unseal(seal({ a: 1 }, purposeKey(SECRET, 'other')), key)).toBeNull();
+    expect(unseal(seal({ a: 1 }, purposeKey('b'.repeat(64), 'holdem-table')), key)).toBeNull();
+  });
+  it('refuses tampering and malformed input', () => {
+    const sealed = seal({ a: 1 }, key);
+    const [iv, ct, tag] = sealed.split('.');
+    const flipped = ct.slice(0, -2) + (ct.at(-2) === 'A' ? 'B' : 'A') + ct.slice(-1);
+    expect(unseal(`${iv}.${flipped}.${tag}`, key)).toBeNull();
+    expect(unseal(`${iv}.${ct}`, key)).toBeNull();
+    for (const bad of ['', 'garbage', 'a.b.c', undefined, null, 42, {}]) expect(unseal(bad, key)).toBeNull();
+  });
+  it('keeps sessions apart from other sealed values', () => {
+    expect(openSession(seal(data(), key), SECRET, 2_000)).toBeNull();
   });
 });

@@ -1,0 +1,56 @@
+{
+  "format": 1,
+  "replays": [
+    {
+      "file": "titans.json.gz",
+      "title": "Titans: Fable, Astra and Argon",
+      "blurb": "GPT-6 Astra wins in 28 hands. In hand 28, GPT-6 Astra won the biggest pot, 3,592 chips, 80% of the chips in play, with two pair.",
+      "players": [
+        "anthropic/claude-fable-5-1",
+        "azure/gpt-6-astra-global",
+        "vertexai/gemini-4-argon-eu"
+      ],
+      "hands": 28,
+      "recordedAt": "2026-10-14"
+    },
+    {
+      "file": "claude-vs-gpt.json.gz",
+      "title": "Claude vs GPT",
+      "blurb": "GPT-5.6 Terra wins in 31 hands. In hand 16, Sonnet 5.5 called Opus 5.5's river bet with a pair, and won 62 big blinds.",
+      "players": [
+        "aws/claude-opus-5-5",
+        "vertexai/claude-sonnet-5-5-eu",
+        "azure:eu/gpt-6.1-sol",
+        "azure/gpt-5.6-terra"
+      ],
+      "hands": 31,
+      "recordedAt": "2026-10-14"
+    },
+    {
+      "file": "open-models.json.gz",
+      "title": "Open models: DeepSeek, Kimi, GLM and Qwen",
+      "blurb": "Kimi K3 wins in 32 hands. In hand 32, Kimi K3 called DeepSeek V4 Pro's all-in with a pair, and won 25 big blinds.",
+      "players": [
+        "nebius/deepseek-ai/DeepSeek-V4-Pro-0813",
+        "sference/kimi-k3",
+        "inceptron/zai-org/GLM-5.3",
+        "alibaba:global/qwen3.8-max"
+      ],
+      "hands": 32,
+      "recordedAt": "2026-10-14"
+    },
+    {
+      "file": "decision-models.json.gz",
+      "title": "Decision models: no words, only tells",
+      "blurb": "Jev 1.13 wins in 43 hands. In hand 1, Clef rivered a flush against Kev 4B's straight (80% to win). Pot: 154 big blinds.",
+      "players": [
+        "typesafe/jev-1.13.0",
+        "sference/clef",
+        "openai/gpt-6-luna-decisions",
+        "opper/kev-4b"
+      ],
+      "hands": 43,
+      "recordedAt": "2026-10-14"
+    }
+  ]
+}

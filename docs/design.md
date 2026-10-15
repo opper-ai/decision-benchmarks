@@ -18,8 +18,8 @@ packages/kit/
   bench/       node: the bench CLI (--game --model(s) --endpoint --format systemone|chat --games --submit --name --by),
                official runs -> leaderboard.json, submissions -> community.json
 games/
-  registry.ts           the games the service, the bench and the build serve: snake, fighter; MOVED: games that live
-                        elsewhere on opper.ai (JevMan), whose old paths here redirect there
+  registry.ts           the games the service, the bench and the build serve: snake, fighter, holdem; MOVED: games
+                        that live elsewhere on opper.ai (JevMan), whose old paths here redirect there
   <slug>/
     game.ts             GameDefinition: the bench and the submissions check
     game.server.ts      GameServer: what the service needs (Node-safe imports only)
@@ -51,13 +51,15 @@ interface GameDefinition<Rec = unknown, R extends GameResult = GameResult> {
   slug: string;
   benchVersion: number;                       // bump when rules or questions change; older submissions are refused
   mode: 'realtime' | 'paused';
-  timing: { decisionTimeoutMs: number; callTimeoutMs: number; maxInFlight: number };
+  timing: { decisionTimeoutMs: number; callTimeoutMs: number; chatTimeoutMs?: number; maxInFlight: number };
   rules: { minGames: number; officialGames: number; seedFor(i: number): number; maxRecordingBytes: number };
   metric: { name: string; unit: string; higherIsBetter: boolean };
-  play(o: { transport: Transport; seed: number; signal: AbortSignal; model: string }): Promise<{ result: R; recording: Rec }>;
+  play(o: { transport: Transport; seed: number; signal: AbortSignal; model: string; via?: 'systemone' | 'chat-adapter' }): Promise<{ result: R; recording: Rec }>;
   verify(rec: unknown, o: { seed: number }): Verdict<R>;      // recomputes the result with our code
   summarize?(results: R[]): Record<string, number | string>;  // -> a leaderboard entry's extra
   baselines?: Record<string, { name: string; transport?(): Transport }>;
+  chatModels?: readonly { id: string; name: string; reasoningEffort?: string; maxTokens?: number }[];  // chat models official runs play
+  chat?: ChatFormat;                          // how the game asks a chat model (shared/chat.ts); else choice + probabilities
 }
 
 // games/<slug>/game.server.ts
@@ -71,6 +73,7 @@ interface GameServer {
     seeded?: boolean;                                    // games start from a seed the server issues
     check(rec: unknown, verify: AnswerVerifier, seeds: SeedVerifier): { ok: true; score: number; board: string } | { ok: false; error: string };
   };
+  api?: { routes: Record<string, (call: GameApiCall) => Promise<GameApiResponse>>; maxBodyBytes?: number };  // the game's own POST routes
 }
 ```
 
@@ -78,6 +81,21 @@ interface GameServer {
   options as `criteria`). `decideRequest` runs for every key (player, pool or dev), and the kit caps a request at five
   questions. A verdict may carry `as`, the game's own name for the model, so a game can keep the ids its recordings
   use while the request carries the Opper id.
+- **Chat models.** A game may also list chat models (`chatModels`), which the bench plays through Opper's
+  OpenAI-compatible `/v3/compat/chat/completions` with a strict JSON schema, and its own `chat` format (messages,
+  schema, parser) so a chat model is asked exactly what the game asks. Their rows say `chat-adapter`. A refused reply
+  (`finish_reason: "refusal"`) comes back as `{ type: 'refusal' }`, which no game takes for a choice.
+  `timing.chatTimeoutMs` gives them longer than decision models; `play` gets `via` to know which applies.
+- **A game's own API.** A game whose server does more than check and forward a question (AI Hold'em deals the cards
+  and asks the models itself, so the browser never sees the deck) lists its own POST routes below `/api/` in `api`. The
+  kit mounts them next to its own, refuses what needs no body (not POST, cross-site, not JSON), caps and parses the
+  body, and lends the route what it needs: who would pay (`payer()`: the signed-in player, else the free credits unless
+  the route says they don't pay, else the local key), the answer when nobody can (`unpaid()`: 401 or 402), the
+  visitor's free-credits allowance (`takePool()`, 429) and accounting (`poolSpent()`), the visitor's address as those
+  limits count it (`visitor`, for the game's own `VisitorLimits`), sealing under a key per game and
+  purpose (`seal`/`open`, AES-256-GCM, `HMAC(SESSION_SECRET, "decision-benchmarks:<slug>-<purpose>")`), and a signal
+  that aborts when the client goes away. `server/chat.ts` asks a chat model from the server in the game's own format,
+  answered and refused as `/api/decide` is.
 - **Answer signatures.** The service signs each answer with a key per game,
   `HMAC(SESSION_SECRET, "decision-benchmarks:answers:" + slug)`, so an answer signed for one game never verifies in
   another. A high-score check uses the signatures to tell real model answers from made-up ones.
@@ -117,8 +135,8 @@ One Node process serves every game in the registry (`GAMES=<slug>,...` serves a 
 answers at the root and below the base path, `/revision` below the base path (the commit and the games served).
 
 Per game, below `<base>/<slug>/`: the static page, `api/decide` (one model call), `api/warm` (a tiny call that wakes
-an idle model), `api/me` (who is signed in, and whether the free credits are open), `api/highscores` and, for seeded
-games, `api/seed`.
+an idle model), `api/me` (who is signed in, and whether the free credits are open), `api/highscores`, for seeded
+games `api/seed`, and the game's own API routes (AI Hold'em's `api/table/*`).
 
 **Sign-in.** Login with Opper is one OAuth app and one sign-in for every game: `<base>/auth/login?return=<page>`,
 `<base>/auth/callback` and `<base>/auth/logout`, so the app has one redirect URI
@@ -172,6 +190,7 @@ with a permanent redirect.
 |---|---|---|---|---|
 | snake | real time (275 ms a step) | Apples | 100 | MIT |
 | fighter | real time (live speed, 2 s deadline) | Rounds won vs bots (%) | 104 | MIT |
+| holdem | paused (2.5 s, chat models 20 s) | bb/100 | 4 | AGPL-3.0-or-later |
 
 - **snake** (Arcade, ours): a model steers a snake on a seeded 16 x 16 board, one `choice` per step (the direction the
   head moves next, every direction but the reverse offered, in a shuffled order), in real time: the snake steps every 275 ms for every model, and a step whose answer is not in by the tick is
@@ -188,9 +207,16 @@ with a permanent redirect.
   `payoff`, `maximin`) have their results in `public/baselines.json`. Its page is a game to play, not a benchmark
   (`game.json`: `benchmark: false`): no leaderboard there or on the hub. Question design:
   `games/fighter/docs/specs/2026-10-06-v2-harness.md`.
+- **holdem** (AI Hold'em, Strategy, ours): No-limit Texas Hold'em against AI models. One benchmark game is 120
+  duplicate cash hands: 30 deals, each played four times with the model rotated through every seat against three
+  scripted bots (rock, station, maniac), stacks reset to 100 big blinds every hand; the score is big blinds won per
+  100 hands. Decision models answer one `choice` question, chat models the same question as JSON with table talk.
+  The verifier replays every hand, recomputes the bots' moves and checks the fallbacks. Live tables are dealt and
+  played by the server (`api/table/*`). Plan: `docs/specs/2026-10-14-ai-holdem.md`.
 
 ## License
 
 The repository root, including the kit and the service, is AGPL-3.0-or-later (see [LICENSE](../LICENSE)). Each game
-folder has its own LICENSE: `games/snake` and `games/fighter` are MIT. Each game's
+folder has its own LICENSE: `games/snake` and `games/fighter` are MIT, `games/holdem` is
+AGPL-3.0-or-later. Each game's
 CREDITS.md names its authors and says what changed in the port.

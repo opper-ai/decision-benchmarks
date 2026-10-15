@@ -1,0 +1,82 @@
+/*
+ * Replays, sharing and the results: the replay's controls in the room, the share buttons on the end poster, the
+ * Replays list and the Leaderboard's Stats rows in the page below. Loaded after style.css, whose tokens it uses.
+ */
+
+/* ---------- a replay in the room ---------- */
+.replay-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
+.replay-title > b { font: 800 17px/1.2 var(--h-poster); color: var(--h-ivory); }
+.replay-chip { font: 700 11px/1.6 var(--j-display); padding: 0 8px; border-radius: 999px; background: var(--h-red); color: var(--h-ivory); }
+.replay-title .level { flex-basis: 100%; }
+.hand-pick { height: 32px; border-radius: 999px; padding: 0 32px 0 12px; background-color: rgba(10, 6, 3, 0.6); color: var(--h-text); border: 1px solid var(--h-line); font: 600 13px var(--j-body); }
+.hand-pick option { color: #222; background: #fff; }
+.tbtn:disabled { opacity: 0.4; cursor: default; }
+.route-error { padding: 40px 12px; display: grid; justify-items: center; }
+
+/* ---------- the end poster's buttons: Play again, Share (and its panel), Review and Change the table ---------- */
+.end-actions { display: grid; gap: 8px; padding-top: 4px; }
+.end-actions .cta { width: 100%; min-height: 48px; padding: 0 14px; }
+.end-actions .ic { display: inline-flex; }
+.poster .cta.end-share { background: var(--h-ink); border-color: var(--h-ink); color: var(--h-paper); box-shadow: none; font-weight: 700; }
+.poster .cta.end-share[aria-expanded='true'] { filter: brightness(1.3); }
+.end-more { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.end-more .cta { font-size: 15px; white-space: nowrap; }
+@media (max-width: 759px) { .end-more .cta { font-size: 14px; padding: 0 6px; } }
+.share-wrap { display: grid; gap: 8px; }
+.share-panel { display: grid; gap: 10px; padding: 12px; border-radius: 16px; background: rgba(120, 80, 30, 0.08); border: 1px solid rgba(155, 116, 50, 0.4); animation: rise calc(0.16s * var(--h-motion)) ease-out both; }
+.share-panel[hidden] { display: none; }
+.sp-preview { margin: 0; font-size: 13px; line-height: 1.35; color: #5d503e; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* An even grid: two columns on a phone, three on a wide screen (six tracks, so five buttons make rows of three and two). */
+.sp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sp-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+@media (min-width: 760px) {
+  .sp-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .sp-grid > *, .sp-grid > :last-child:nth-child(odd) { grid-column: span 2; }
+  .sp-grid[data-n='4'] > *, .sp-grid[data-n='5'] > :nth-child(n + 4) { grid-column: span 3; }
+}
+.sp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; height: 44px; padding: 0 10px; border-radius: 12px;
+  border: 1px solid rgba(155, 116, 50, 0.55); background: #fffaf0; color: var(--h-ink); font: 700 14px var(--j-display); white-space: nowrap;
+}
+.sp-btn .lbl { overflow: hidden; text-overflow: ellipsis; }
+.sp-btn .short { display: none; }
+@media (max-width: 759px) { .sp-btn .long { display: none; } .sp-btn .short { display: inline; } }
+.sp-btn .ic { display: inline-flex; flex: none; }
+.sp-btn:hover { border-color: var(--h-brass-deep); background: #fff; }
+.sp-btn:disabled { opacity: 0.55; cursor: progress; }
+.share-status { margin: 0; min-height: 0; font-size: 13px; color: #5d503e; text-align: center; }
+.share-status:empty { display: none; }
+.share-field { width: 100%; box-sizing: border-box; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(155, 116, 50, 0.5); font: 12.5px var(--j-mono); color: var(--h-ink); background: #fff; }
+
+/* ---------- the Replays list (in the page, light or dark with it) ---------- */
+.watch-list { display: grid; gap: 14px; }
+.replay-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.replay-card {
+  display: grid; justify-items: start; gap: 6px; padding: 14px 14px 15px; text-align: left; border-radius: 16px; color: var(--h-text);
+  background: radial-gradient(120% 90% at 50% 0%, #22704f, var(--h-felt) 60%, var(--h-felt-deep)); border: 1px solid rgba(215, 170, 82, 0.35);
+}
+.replay-card:hover { border-color: var(--h-brass); }
+.replay-card .faces img, .replay-card .faces .mono { width: 40px; height: 40px; }
+.rc-title { font: 800 19px/1.15 var(--h-poster); color: var(--h-ivory); }
+.rc-blurb { font-size: 13.5px; line-height: 1.4; color: var(--h-dim); }
+.rc-meta { font-size: 12px; color: var(--h-brass); }
+.rc-empty { margin: 0; padding: 18px; border: 1px dashed var(--j-line); border-radius: 16px; color: var(--j-muted); text-align: center; font-size: 14px; }
+
+/* ---------- the Leaderboard's Stats rows ---------- */
+.lb-more { margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--j-line); background: none; color: var(--j-muted); font: 600 11px var(--j-body); vertical-align: 1px; }
+.lb-more[aria-expanded='true'] { color: var(--j-text); border-color: var(--j-strong-line); }
+.lb-details td { padding: 4px 16px 14px; background: var(--j-soft); }
+.lb-facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 18px; }
+.lb-facts div, .lb-facts dt, .lb-facts dd { margin: 0; }
+.lb-facts dt { font-size: 11.5px; color: var(--j-muted); }
+.lb-facts dd { font: 600 14px var(--j-display); font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+
+/* Phones, watching or replaying: the bottom seat holds its cards beside it, not under it, so the room doesn't cut them. */
+@media (max-width: 759px) {
+  .watching .seat[data-slot='bottom'] .hole { position: absolute; top: 4px; left: calc(50% + var(--av) * 0.5 - 2px); margin: 0; }
+  .replay-title > b { font-size: 15px; }
+}
+
+/* The review's Download clip: what it is doing. */
+.review-head .clip-status { flex-basis: 100%; min-height: 0; font-size: 13px; color: var(--h-dim); text-align: right; }
+.review-head .clip-status:empty { display: none; }

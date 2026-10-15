@@ -1,0 +1,141 @@
+{
+  "generatedAt": "2026-10-14T11:34:33.966Z",
+  "game": "holdem",
+  "benchVersion": 1,
+  "metric": {
+    "name": "bb/100",
+    "unit": "bb/100",
+    "higherIsBetter": true
+  },
+  "entries": [
+    {
+      "model": "baseline/rock",
+      "name": "Rock (bot)",
+      "games": 4,
+      "metric": {
+        "mean": -6.668,
+        "stdError": 101.776,
+        "best": 211.25
+      },
+      "meanLatencyMs": null,
+      "fallbackRate": 0,
+      "costPerGame": null,
+      "via": "systemone",
+      "extra": {
+        "hands": 480,
+        "VPIP %": 5,
+        "PFR %": 2.9,
+        "Aggression factor": 4.4,
+        "Fold to 3-bet %": 16.7,
+        "Went to showdown %": 41.5,
+        "Won at showdown %": 54.5,
+        "Bluff rate %": 25,
+        "bb/100 vs rock": -0.48,
+        "bb/100 vs station": -3.01,
+        "bb/100 vs maniac": -3.18,
+        "Fallback %": 0,
+        "refusals": 0,
+        "invalid answers": 0,
+        "timeouts": 0,
+        "errors": 0
+      }
+    },
+    {
+      "model": "baseline/station",
+      "name": "Station (bot)",
+      "games": 4,
+      "metric": {
+        "mean": -70.207,
+        "stdError": 159.289,
+        "best": 226.25
+      },
+      "meanLatencyMs": null,
+      "fallbackRate": 0,
+      "costPerGame": null,
+      "via": "systemone",
+      "extra": {
+        "hands": 480,
+        "VPIP %": 88.5,
+        "PFR %": 0.8,
+        "Aggression factor": 0.13,
+        "Fold to 3-bet %": 0,
+        "Went to showdown %": 55.3,
+        "Won at showdown %": 50,
+        "Bluff rate %": 0,
+        "bb/100 vs rock": -9.44,
+        "bb/100 vs station": 30.25,
+        "bb/100 vs maniac": -91.02,
+        "Fallback %": 0,
+        "refusals": 0,
+        "invalid answers": 0,
+        "timeouts": 0,
+        "errors": 0
+      }
+    },
+    {
+      "model": "baseline/maniac",
+      "name": "Maniac (bot)",
+      "games": 4,
+      "metric": {
+        "mean": -350.937,
+        "stdError": 280.752,
+        "best": 115.42
+      },
+      "meanLatencyMs": null,
+      "fallbackRate": 0,
+      "costPerGame": null,
+      "via": "systemone",
+      "extra": {
+        "hands": 480,
+        "VPIP %": 87.9,
+        "PFR %": 70.2,
+        "Aggression factor": 2.83,
+        "Fold to 3-bet %": 13.2,
+        "Went to showdown %": 75.3,
+        "Won at showdown %": 39.7,
+        "Bluff rate %": 46.9,
+        "bb/100 vs rock": 51.67,
+        "bb/100 vs station": -146.55,
+        "bb/100 vs maniac": -256.06,
+        "Fallback %": 0,
+        "refusals": 0,
+        "invalid answers": 0,
+        "timeouts": 0,
+        "errors": 0
+      }
+    },
+    {
+      "model": "baseline/random",
+      "name": "Random",
+      "games": 4,
+      "metric": {
+        "mean": -950.207,
+        "stdError": 336.91,
+        "best": 30
+      },
+      "meanLatencyMs": null,
+      "fallbackRate": 0,
+      "costPerGame": null,
+      "via": "systemone",
+      "extra": {
+        "hands": 480,
+        "VPIP %": 83.3,
+        "PFR %": 70.8,
+        "Aggression factor": 8.16,
+        "Fold to 3-bet %": 14.5,
+        "Went to showdown %": 78,
+        "Won at showdown %": 40.5,
+        "Bluff rate %": 62.3,
+        "bb/100 vs rock": -20.43,
+        "bb/100 vs station": -476.66,
+        "bb/100 vs maniac": -453.12,
+        "Fallback %": 0,
+        "refusals": 0,
+        "invalid answers": 0,
+        "timeouts": 0,
+        "errors": 0
+      }
+    }
+  ],
+  "skipped": []
+}

@@ -1,0 +1,10 @@
+{
+  "slug": "holdem",
+  "name": "AI Hold'em",
+  "tagline": "No-limit Hold'em against AI models that bluff, talk at the table and hide what they hold: ranked in big blinds won per 100 hands.",
+  "category": "Strategy",
+  "author": { "github": "joch" },
+  "license": "AGPL-3.0-or-later",
+  "metric": { "name": "bb/100", "unit": "bb/100", "higherIsBetter": true },
+  "updatedAt": "2026-10-14T00:00:00.000Z"
+}

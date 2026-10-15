@@ -41,7 +41,10 @@ and `costUsd` (what the call cost; the leaderboard shows it per game). Each game
 `BENCH_ENDPOINT_TOKEN`: the bench sends it as a bearer token.
 
 A chat model works too: `--format chat --endpoint <chat completions URL> --chat-model <name>` asks it each question
-through a JSON schema that forces a choice and probabilities (its rows say "chat model via adapter").
+through a JSON schema that forces a choice and probabilities (its rows say "chat model via adapter"). A game may ask
+chat models in its own format instead (`GameDefinition.chat`): AI Hold'em asks for
+`{ action, say, mood, reasoning, turn_complete }` (see
+[`games/holdem/shared/questions.ts`](games/holdem/shared/questions.ts)), so its replies must have that shape.
 
 An answer that comes later than the game allows is replaced by the game's own simple rule (a fallback).
 
@@ -68,8 +71,8 @@ npm run bench -- --game <slug> --endpoint http://localhost:8787 --submit games/<
   --name "My Model" --by your-github-handle --url https://example.com/my-model
 ```
 
-This plays the game's minimum number of games for a submission (24 for snake; 100 to match our runs: add
-`--games 100`), on the
+This plays the game's minimum number of games for a submission (24 for snake, 4 for holdem; to match our runs, add
+`--games` with the official count: 100 for snake), on the
 game's fixed seeds, so every model faces the same games. It writes `games/<slug>/submissions/my-model/`, holding
 `submission.json` and one `game-NN.json.gz` per game. The folder name is your model's id: lowercase letters, digits
 and dashes.

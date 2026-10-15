@@ -1,9 +1,14 @@
 // The bench: plays a game's benchmark against decision models and writes what it found.
 // Entry point: scripts/bench.ts (npm run bench -- --game <slug> ...), which picks the game from games/registry.ts.
 //
-//   --model <id> | --models all|<id>,<id>    listed models (packages/kit/shared/models.ts) through Opper (OPPER_API_KEY)
-//                                            or, for Jev, TypeSafe (TYPESAFE_API_KEY); baseline/<name> plays one of the
-//                                            game's free baselines (no key, no network)
+//   --model <id> | --models all|chat|<id>,<id>
+//                                            listed models (packages/kit/shared/models.ts) through Opper (OPPER_API_KEY,
+//                                            and OPPER_PROJECT for an organization key) or, for Jev, TypeSafe
+//                                            (TYPESAFE_API_KEY); a game's chat models (GameDefinition.chatModels) through
+//                                            Opper's chat completions; `all` is every one of both, `chat` the chat models
+//                                            only; baseline/<name> plays one of the game's free baselines (no key, no
+//                                            network)
+//   --reasoning-effort <low|medium|...>      for chat models: overrides each model's own reasoning effort
 //   --endpoint <url> [--format systemone|chat] [--chat-model <name>]
 //                                            your own model: System One ({ state, questions } in) or OpenAI chat
 //                                            completions through the chat adapter; BENCH_ENDPOINT_TOKEN is sent as a
@@ -19,7 +24,7 @@ import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
-import { devTargetFromEnv } from '../server/systemone.ts';
+import { devTargetFromEnv, OPPER_BASE_URL } from '../server/systemone.ts';
 import type { Entry, Leaderboard } from '../shared/contract.ts';
 import { BASELINE_PREFIX, type GameDefinition, type GameResult } from '../shared/game.ts';
 import { DECISION_MODELS, DEFAULT_MODEL, isModelId, modelName } from '../shared/models.ts';
@@ -44,6 +49,8 @@ interface Contender {
   transport: Transport;
   /** One of the game's baselines: nothing to warm up. */
   baseline?: boolean;
+  /** How long one of its calls may take (a chat model's may be longer: timing.chatTimeoutMs). */
+  timeoutMs: number;
 }
 
 /** The transport of a baseline the game plays itself: never called, since `play` plays it without a model. */
@@ -82,6 +89,7 @@ export async function runBench(game: GameDefinition<unknown, GameResult>, argv: 
       url: { type: 'string' },
       record: { type: 'string' },
       'list-models': { type: 'boolean', default: false },
+      'reasoning-effort': { type: 'string' },
     },
   });
 
@@ -117,35 +125,67 @@ export async function runBench(game: GameDefinition<unknown, GameResult>, argv: 
   }
 
   const timeoutMs = game.timing.callTimeoutMs;
+  const chatTimeoutMs = game.timing.chatTimeoutMs ?? timeoutMs;
+  const chatModels = game.chatModels ?? [];
   const contenders: Contender[] = [];
   if (values.endpoint) {
     const name = values.name ?? values.endpoint;
-    const common = { url: values.endpoint, token: env.BENCH_ENDPOINT_TOKEN, timeoutMs, name };
+    const chat = values.format === 'chat';
+    const common = { url: values.endpoint, token: env.BENCH_ENDPOINT_TOKEN, timeoutMs: chat ? chatTimeoutMs : timeoutMs, name };
     contenders.push({
       model: submit ? basename(values.submit!) : name,
       name,
-      via: values.format === 'chat' ? 'chat-adapter' : 'systemone',
-      transport: values.format === 'chat' ? chatTransport({ ...common, model: values['chat-model']! }) : endpointTransport(common),
+      via: chat ? 'chat-adapter' : 'systemone',
+      transport: chat ? chatTransport({ ...common, model: values['chat-model']!, ...(game.chat ? { format: game.chat } : {}), ...(values['reasoning-effort'] ? { reasoningEffort: values['reasoning-effort'] } : {}) }) : endpointTransport(common),
+      timeoutMs: common.timeoutMs,
     });
   } else {
-    const ids = values.models === 'all' || values.models === '' ? DECISION_MODELS.map((m) => m.id as string) : values.models !== undefined ? values.models.split(',') : [values.model ?? DEFAULT_MODEL];
+    const ids =
+      values.models === 'all' || values.models === ''
+        ? [...DECISION_MODELS.map((m) => m.id as string), ...chatModels.map((m) => m.id)]
+        : values.models === 'chat'
+          ? chatModels.map((m) => m.id)
+          : values.models !== undefined
+            ? values.models.split(',')
+            : [values.model ?? DEFAULT_MODEL];
+    if (!ids.length) fail(`${game.slug} plays no chat models`);
     const baselines = ids.filter((id) => id.startsWith(BASELINE_PREFIX));
     // Baselines are for reference: the official leaderboard ranks decision models only, so they go to a file of their own.
     if (baselines.length && (submit || (leaderboard && (baselines.length !== ids.length || values.out === undefined)))) {
       fail(`baselines never go on the leaderboard or into a submission: play them alone with --out, e.g. --leaderboard --out games/${game.slug}/public/baselines.json`);
     }
-    const target = baselines.length === ids.length ? undefined : devTargetFromEnv(env);
-    if (!target && baselines.length !== ids.length) fail('set OPPER_API_KEY (or TYPESAFE_API_KEY for Jev) to play the listed models');
+    const isChat = (id: string) => chatModels.some((m) => m.id === id);
+    const decisionIds = ids.filter((id) => !id.startsWith(BASELINE_PREFIX) && !isChat(id));
+    const target = decisionIds.length ? devTargetFromEnv(env) : undefined;
+    if (!target && decisionIds.length) fail('set OPPER_API_KEY (or TYPESAFE_API_KEY for Jev) to play the listed models');
+    if (ids.some(isChat) && !env.OPPER_API_KEY) fail('set OPPER_API_KEY to play chat models: they play through Opper');
     for (const id of ids) {
       if (id.startsWith(BASELINE_PREFIX)) {
         const b = game.baselines?.[id.slice(BASELINE_PREFIX.length)];
         if (!b) fail(`${game.slug} has no baseline ${id}; ${Object.keys(game.baselines ?? {}).length ? `one of: ${Object.keys(game.baselines!).map((n) => BASELINE_PREFIX + n).join(', ')}` : 'it has none'}`);
         // A baseline without a transport is played by the game itself: `play` gets its id as `model`.
-        contenders.push({ model: id, name: b!.name, via: 'systemone', transport: b!.transport ? b!.transport() : ownPlayer(id), baseline: true });
+        contenders.push({ model: id, name: b!.name, via: 'systemone', transport: b!.transport ? b!.transport() : ownPlayer(id), baseline: true, timeoutMs });
         continue;
       }
-      if (!isModelId(id)) fail(`Unknown model ${id}; one of: ${DECISION_MODELS.map((m) => m.id).join(', ')}`);
-      contenders.push({ model: id, name: modelName(id), via: 'systemone', transport: systemOneTransport(id, target, timeoutMs, `decision-benchmarks-bench-${game.slug}`) });
+      const chat = chatModels.find((m) => m.id === id);
+      if (chat) {
+        const effort = values['reasoning-effort'] ?? chat.reasoningEffort;
+        const transport = chatTransport({
+          url: `${(env.OPPER_BASE_URL || OPPER_BASE_URL).replace(/\/+$/, '')}/v3/compat/chat/completions`,
+          token: env.OPPER_API_KEY,
+          timeoutMs: chatTimeoutMs,
+          name: chat.name,
+          model: id,
+          ...(game.chat ? { format: game.chat } : {}),
+          ...(effort ? { reasoningEffort: effort } : {}),
+          ...(chat.maxTokens ? { maxTokens: chat.maxTokens } : {}),
+          headers: { 'X-Opper-Name': `decision-benchmarks-bench-${game.slug}`, ...(env.OPPER_PROJECT ? { 'X-Opper-Project': env.OPPER_PROJECT } : {}) },
+        });
+        contenders.push({ model: id, name: chat.name, via: 'chat-adapter', transport, timeoutMs: chatTimeoutMs });
+        continue;
+      }
+      if (!isModelId(id)) fail(`Unknown model ${id}; one of: ${[...DECISION_MODELS.map((m) => m.id), ...chatModels.map((m) => m.id)].join(', ')}`);
+      contenders.push({ model: id, name: modelName(id), via: 'systemone', transport: systemOneTransport(id, target, timeoutMs, `decision-benchmarks-bench-${game.slug}`), timeoutMs });
     }
   }
 
@@ -162,7 +202,7 @@ export async function runBench(game: GameDefinition<unknown, GameResult>, argv: 
   for (const c of contenders) {
     log(`\n${c.name} (${c.model})`);
     // Warm first: a cold model's first answers would come too late and count as fallbacks. A baseline is no model.
-    const problem = c.baseline ? null : await warmUp(c.transport, { fastMs: timeoutMs * 0.9, log });
+    const problem = c.baseline ? null : await warmUp(c.transport, { fastMs: c.timeoutMs * 0.9, log });
     if (problem) {
       if (!leaderboard) fail(`${c.name}: ${problem}`);
       // One unavailable model must not cost the others' results.
@@ -173,7 +213,7 @@ export async function runBench(game: GameDefinition<unknown, GameResult>, argv: 
     }
     const recordings: unknown[] = [];
     const results = await playMany(games, parallel, async (i) => {
-      const { result, recording } = await game.play({ transport: c.transport, seed: seedOf(i), signal: new AbortController().signal, model: c.model });
+      const { result, recording } = await game.play({ transport: c.transport, seed: seedOf(i), signal: new AbortController().signal, model: c.model, via: c.via });
       recordings[i] = recording;
       log(`  game ${i + 1}: ${game.metric.name.toLowerCase()} ${result.score}, calls ${result.calls}, fallbacks ${result.fallbacks}/${result.decisions}, $${result.cost.toFixed(4)}`);
       return result;
