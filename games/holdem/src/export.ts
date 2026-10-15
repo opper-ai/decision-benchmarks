@@ -209,7 +209,7 @@ export function clipFrameItems(f: Frame, info: ClipInfo, hand: ReviewHand, measu
     text(S / 2, 680, `${who} ${actionText(f.last, who === 'You')}`, 28, { weight: 600, color: 'rgba(243, 232, 205, 0.85)' });
   }
   for (const t of f.talk) {
-    const at = SEAT_AT[slots[t.seat]!];
+    const at = seatAt(slots[t.seat]!, n);
     items.push({ kind: 'bubble', x: at.x, y: at.y - 104, text: t.text, size: 34, maxWidth: 360 });
   }
   // The end: the hand's story.
