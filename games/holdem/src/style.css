@@ -253,6 +253,73 @@
 .seat.you .who { display: grid; justify-items: center; }
 .shown-name { position: absolute; left: 50%; top: calc(100% + 4px); transform: translateX(-50%); white-space: nowrap; font: 700 11.5px var(--j-display); color: var(--h-amber); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
 
+/*
+ * Five and six round the table (data-seats on the felt): the side seats lower down the oval, two (or three) across its
+ * top, the board a little smaller. Bets sit between each seat and the middle, the dealer button beside its seat. Talk
+ * shows one bubble at a time at a table this full (views/table.ts); across the top and down the sides it hangs under
+ * the seat.
+ */
+.felt-area:is([data-seats='5'], [data-seats='6']) { --cw-board: 32px; --cw-seat: 24px; --av: 48px; }
+/* Phones: the board and pots lower, in the room under the side seats' bets; the talk of a seat across the top under its
+   cards (one bubble at a time at a table this full: views/table.ts), kept inside the table at the corners. */
+@media (max-width: 759px) {
+  .room .felt-area:is([data-seats='5'], [data-seats='6']) .middle { top: 63%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='top-left'], [data-slot='top'], [data-slot='top-right']) .bubble { top: calc(100% + 8px); bottom: auto; left: 50%; right: auto; translate: -50% 0; max-width: 150px; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='top-left'], [data-slot='top'], [data-slot='top-right']) .bubble::after { top: -4px; bottom: auto; left: calc(50% - 5px); right: auto; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='top-left'] .bubble { left: -12px; translate: none; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='top-left'] .bubble::after { left: 30px; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='top-right'] .bubble { left: auto; right: -12px; translate: none; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='top-right'] .bubble::after { left: auto; right: 30px; }
+}
+.felt-area[data-seats='5'] .seat[data-slot='top-left'] { --x: 26%; --y: 11%; }
+.felt-area[data-seats='5'] .seat[data-slot='top-right'] { --x: 74%; --y: 11%; }
+.felt-area[data-seats='6'] .seat[data-slot='top-left'] { --x: 17%; --y: 13%; }
+.felt-area[data-seats='6'] .seat[data-slot='top'] { --x: 50%; --y: 14%; }
+.felt-area[data-seats='6'] .seat[data-slot='top-right'] { --x: 83%; --y: 13%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: 13%; --y: 51%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 87%; --y: 51%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: 33%; --y: 44%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: 67%; --y: 44%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 30%; --y: 34%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 70%; --y: 34%; }
+.felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: 33%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 9%; --y: 75%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 91%; --y: 75%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 8%; --y: 29%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 92%; --y: 29%; }
+.felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 38%; --y: 25%; }
+@media (min-width: 760px) {
+  .felt-area:is([data-seats='5'], [data-seats='6']) { --cw-board: 54px; --cw-seat: 36px; --av: 64px; }
+  .felt-area[data-seats='5'] .seat[data-slot='top-left'] { --x: 30%; --y: 12%; }
+  .felt-area[data-seats='5'] .seat[data-slot='top-right'] { --x: 70%; --y: 12%; }
+  .felt-area[data-seats='6'] .seat[data-slot='top-left'] { --x: 22%; --y: 14%; }
+  .felt-area[data-seats='6'] .seat[data-slot='top'] { --x: 50%; --y: 13.5%; }
+  .felt-area[data-seats='6'] .seat[data-slot='top-right'] { --x: 78%; --y: 14%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: 7%; --y: 56%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 93%; --y: 56%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: 22%; --y: 56%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: 78%; --y: 56%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 28%; --y: 34%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 72%; --y: 34%; }
+  .felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: 33%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 15%; --y: 74%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 85%; --y: 74%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 12%; --y: 30%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 88%; --y: 30%; }
+  .felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 40%; --y: 30%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:not([data-slot='bottom']) .bubble { top: calc(100% + 8px); bottom: auto; left: 50%; right: auto; translate: -50% 0; max-width: 210px; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:not([data-slot='bottom']) .bubble::after { top: -4px; bottom: auto; left: calc(50% - 5px); right: auto; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='left'], [data-slot='top-left']) .bubble { left: 0; translate: none; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='left'], [data-slot='top-left']) .bubble::after { left: 36px; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='right'], [data-slot='top-right']) .bubble { left: auto; right: 0; translate: none; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='right'], [data-slot='top-right']) .bubble::after { left: auto; right: 36px; }
+}
+/* Phones: the seats across the top hold their cards under the name plate, so neighbours don't meet. */
+@media (max-width: 759px) {
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='top-left'], [data-slot='top'], [data-slot='top-right']) .hole { position: static; justify-content: center; flex-direction: row; margin-top: -3px; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='top-left'], [data-slot='top'], [data-slot='top-right']) .hole .card:nth-child(2) { margin-right: 0; }
+}
+
 /* The tell meter: how sure a decision model was, folded into fold / call / raise. */
 .tell { position: absolute; top: -4px; left: -10px; z-index: 2; display: flex; align-items: flex-end; gap: 2px; height: calc(var(--av) * 0.42); padding: 3px; border-radius: 5px; background: var(--h-panel); border: 1px solid var(--h-line); }
 .seat[data-slot='right'] .tell, .seat[data-slot='top-right'] .tell { left: auto; right: -10px; }

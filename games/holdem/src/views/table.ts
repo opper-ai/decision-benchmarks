@@ -68,6 +68,8 @@ export class TableUI {
       h('div.middle', null, this.pots, this.board),
       this.dealer,
     );
+    // How many seats: style.css places five and six differently round the oval.
+    this.area.dataset.seats = String(o.seats.length);
     this.people.forEach((p, seat) => this.seatEls.push(this.makeSeat(p, seat)));
     this.area.append(this.fx);
     this.el = this.area;
@@ -502,7 +504,10 @@ export class TableUI {
   /** A speech bubble with table talk, gone after a few seconds. */
   say(seat: number, text: string): void {
     const root = this.seatEls[seat]!.root;
-    root.querySelector('.bubble')?.remove();
+    // Five or six round the table leave no room for more than one: the newest talk replaces the others' (the chat
+    // keeps them all).
+    const crowded = this.people.length >= 5;
+    (crowded ? this.area : root).querySelectorAll('.bubble').forEach((b) => b.remove());
     clearTimeout(this.bubbles.get(seat));
     const b = h('div.bubble', { role: 'status' }, h('span.bubble-text', null, `“${text}”`));
     b.title = text;

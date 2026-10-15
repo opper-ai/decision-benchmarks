@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GROUP_NAMES, GROUPS, MODELS, SETS } from '../src/roster';
-import { needsSignIn } from '../src/views/lobby';
+import { needsSignIn, nextSeat, seatRange } from '../src/views/lobby';
 
 const set = (id: string) => SETS.find((s) => s.id === id)!.models;
 
@@ -34,5 +34,26 @@ describe('the seat picker', () => {
     expect(SETS.map((s) => s.name)).toEqual(['Gemini', 'Claude', 'GPT', 'Decision', 'Open models', 'Titans']);
     expect(SETS.filter((s) => s.free).map((s) => s.id)).toEqual(['decision']);
     expect(SETS.find((s) => s.id === 'titans')!.blurb).toBe('Fable, Astra and Argon. Big, expensive, very good.');
+  });
+});
+
+describe('how many seats', () => {
+  it('seats you and one to five models, or two to six models watching', () => {
+    expect(seatRange('play')).toEqual({ min: 1, max: 5 });
+    expect(seatRange('watch')).toEqual({ min: 2, max: 6 });
+  });
+});
+
+describe('an added seat', () => {
+  it('starts with another model of the last seat’s family, one not at the table yet, else any free one', () => {
+    const groupOf = (id: string) => MODELS.find((m) => m.id === id)!.group;
+    const lineup = set('decision').slice(0, 2);
+    const added = nextSeat(lineup);
+    expect(lineup).not.toContain(added);
+    expect(groupOf(added)).toBe(groupOf(lineup.at(-1)!));
+    // Every model of that family taken: the first free one of any.
+    const family = MODELS.filter((m) => m.group === groupOf(lineup.at(-1)!)).map((m) => m.id);
+    expect(family).not.toContain(nextSeat(family));
+    expect(nextSeat(MODELS.map((m) => m.id).slice(0, -1))).toBe(MODELS.at(-1)!.id);
   });
 });

@@ -13,12 +13,16 @@ const SLOTS: Record<number, Slot[]> = {
   2: ['bottom', 'top'],
   3: ['bottom', 'top-left', 'top-right'],
   4: ['bottom', 'left', 'top', 'right'],
+  // Five and six: the side seats lower down the oval, two across its top (and one at its head for six); style.css
+  // places them by the table's seat count (data-seats).
+  5: ['bottom', 'left', 'top-left', 'top-right', 'right'],
+  6: ['bottom', 'left', 'top-left', 'top', 'top-right', 'right'],
 };
 
 /** The slot of each seat: the viewer (or seat 0) at the bottom, the others clockwise from there, as seats go. */
 export function slotsFor(seats: number, viewer: number | null): Slot[] {
   const order = SLOTS[seats];
-  if (!order) throw new Error('a table seats 2 to 4 players');
+  if (!order) throw new Error('a table seats 2 to 6 players');
   const first = viewer ?? 0;
   return Array.from({ length: seats }, (_, seat) => order[(seat - first + seats) % seats]!);
 }

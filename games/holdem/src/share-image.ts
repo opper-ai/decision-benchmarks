@@ -123,14 +123,23 @@ export function shareCardLayout(d: ShareCardData, measure: Measure = estimate): 
   const dy = (titleLines.length - 1) * (size + 2);
   text(cx, py + 124 + dy, d.sub, 21, { color: '#5d503e', align: 'center', width: pw - 80 });
   let y = py + 150 + dy;
-  const rowH = d.standings.length > 3 ? (dy ? 56 : 62) : 70;
-  for (const s of d.standings.slice(0, 4)) {
+  // Up to six rows: tighter as there are more (the moment's box keeps its place at the foot).
+  const rows = d.standings.slice(0, 6);
+  const rowH = rows.length > 4 ? (dy ? 40 : 44) : rows.length > 3 ? (dy ? 56 : 62) : 70;
+  const small = rows.length > 4;
+  for (const s of rows) {
     items.push({ kind: 'rect', x: px + 30, y, w: pw - 60, h: rowH - 8, r: 14, fill: 'rgba(120, 80, 30, 0.08)' });
     const mid = y + (rowH - 8) / 2;
-    text(px + 76, mid + 11, ordinal(s.place), 30, { font: 'Fraunces', weight: 800, color: C.red, align: 'center' });
-    items.push({ kind: 'avatar', cx: px + 140, cy: mid, r: 22, slug: s.slug, label: s.name });
-    text(px + 176, mid - 3, s.name, 24, { font: 'Wix Madefor Display', weight: 700, width: pw - 230 });
-    text(px + 176, mid + 21, s.line, 17, { color: C.muted, width: pw - 230 });
+    text(px + 76, mid + (small ? 8 : 11), ordinal(s.place), small ? 24 : 30, { font: 'Fraunces', weight: 800, color: C.red, align: 'center' });
+    items.push({ kind: 'avatar', cx: px + 140, cy: mid, r: small ? 15 : 22, slug: s.slug, label: s.name });
+    if (small) {
+      // One line each: the name, and how they went out after it.
+      text(px + 168, mid + 7, s.name, 20, { font: 'Wix Madefor Display', weight: 700, width: 220 });
+      text(px + 168 + Math.min(220, measure(s.name, 'Wix Madefor Display', 20, 700)) + 14, mid + 6, s.line, 15, { color: C.muted, width: pw - 230 - Math.min(220, measure(s.name, 'Wix Madefor Display', 20, 700)) - 14 });
+    } else {
+      text(px + 176, mid - 3, s.name, 24, { font: 'Wix Madefor Display', weight: 700, width: pw - 230 });
+      text(px + 176, mid + 21, s.line, 17, { color: C.muted, width: pw - 230 });
+    }
     y += rowH;
   }
   if (d.moment) {
