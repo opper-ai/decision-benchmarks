@@ -237,26 +237,27 @@ export class VisitorLimits {
   }
 
   /**
-   * Takes one request from the visitor's allowance, their /48's and the global one, or says which is spent. A refused
-   * request takes nothing, so one visitor sending too fast does not use up everybody else's allowance.
+   * Takes one request (or `cost` of them, all or none) from the visitor's allowance, their /48's and the global one, or
+   * says which is spent. A refused request takes nothing, so one visitor sending too fast does not use up everybody
+   * else's allowance.
    */
-  take(visitor: string): LimitVerdict {
+  take(visitor: string, cost = 1): LimitVerdict {
     const now = this.now();
     const own = this.bucket(visitorKey(visitor), this.settings, now);
     const net = networkKey(visitor);
     const shared = net === null ? null : this.bucket(net, this.network, now);
-    if (own.tokens < 1 || (shared && shared.tokens < 1)) return 'rate';
+    if (own.tokens < cost || (shared && shared.tokens < cost)) return 'rate';
     refill(this.global, this.globalSettings, now);
-    if (this.global.tokens < 1) {
+    if (this.global.tokens < cost) {
       if (!this.globalBusy) this.log(`[pool] every visitor together is above ${this.globalSettings.ratePerSec} requests a second: signed-out visitors are asked to sign in`);
       this.globalBusy = true;
       return 'busy';
     }
     if (this.globalBusy) this.log('[pool] the global request rate is back under its limit');
     this.globalBusy = false;
-    own.tokens -= 1;
-    if (shared) shared.tokens -= 1;
-    this.global.tokens -= 1;
+    own.tokens -= cost;
+    if (shared) shared.tokens -= cost;
+    this.global.tokens -= cost;
     return 'ok';
   }
 }

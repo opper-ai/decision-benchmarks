@@ -53,7 +53,7 @@ import { chatFormatFor, cleanTalk, MAX_TALK_LINES, QUESTION, readAnswer, request
 import { fallbackKey } from '../shared/bots.ts';
 import type { FallbackReason, Player, RecordedAction, TalkLine } from '../shared/recording.ts';
 import { actSitAndGo, MAX_SEATS, MIN_SEATS, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
-import { finishedHandOf, recordingOf, snapshotOf, type ActionMeta, type Review, type SnapshotReply, type StepReply } from '../shared/table.ts';
+import { finishedHandOf, recordingOf, snapshotOf, type ActionMeta, type Review, type SnapshotReply, type StepReply, type TalkRefused } from '../shared/table.ts';
 import { compactMeta, encodeAction, MAX_HAND_TALK, parseState, rebuild, TABLE_TTL_MS, TOKEN_VERSION, type Table, type TableState } from './token.ts';
 
 /** The token's purpose: sealed under HMAC(SESSION_SECRET, "decision-benchmarks:holdem-table"). */
@@ -144,7 +144,7 @@ function metaOf(x: RecordedAction, reasoning: boolean): ActionMeta {
 }
 
 /** Plays `x` for the seat to act and answers with the table after it. */
-function played(call: GameApiCall, t: Table, x: RecordedAction, now: number, said: readonly TalkLine[] = []): GameApiResponse {
+function played(call: GameApiCall, t: Table, x: RecordedAction, now: number, said: readonly TalkLine[] = [], refused?: TalkRefused): GameApiResponse {
   const g = actSitAndGo(t.g, x.key !== undefined ? { key: x.key } : { kind: 'raise', to: x.to! });
   const hands = t.hands.map((h, i) => (i === t.hands.length - 1 ? [...h, x] : h));
   const next: Table = { ...t, g, hands };
@@ -152,6 +152,7 @@ function played(call: GameApiCall, t: Table, x: RecordedAction, now: number, sai
     token: seal(call, next, now),
     result: { seat: x.seat, key: x.key ?? null, meta: metaOf(x, t.st.mode === 'watch' || spectatorOf(t.st, g)), snapshot: snapshotOf(g, viewerOf(t.st), timeBankOf(t.st)), ...(said.length ? { talk: [...said] } : {}) },
     ...finishedOf(next),
+    ...(refused ? { talkRefused: refused } : {}),
   };
   return { status: 200, body: reply };
 }
@@ -274,27 +275,25 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
   const talkLimits = new VisitorLimits(talkRate, deps.now, UNLIMITED);
   /**
    * The human's lines that come with a request (step, act, next): `talk`, at most MAX_TALK_LINES, each made safe
-   * (cleanTalk) and held to the visitor's talk allowance. Play mode only: watch mode has no human to speak.
+   * (cleanTalk), said now (after the hand's actions so far). Talk never holds up the move: lines past the hand's room
+   * (MAX_HAND_TALK) or over the visitor's talk allowance (the batch is taken whole or not at all) are not said, and the
+   * answer says which (`talkRefused`), so the page can show them as not sent. Lines that are not said cost nothing.
+   * Play mode only: watch mode has no human to speak (400).
    */
-  const talkOf = (call: GameApiCall, st: TableState): string[] | GameApiResponse => {
+  const talkFor = (call: GameApiCall, t: Table): { t: Table; said: TalkLine[]; refused?: TalkRefused } | GameApiResponse => {
     const raw = (call.body as Record<string, unknown>).talk;
-    if (raw === undefined) return [];
-    if (st.mode !== 'play') return fail(400, 'Only a player at the table can talk: watch mode has none');
+    if (raw === undefined) return { t, said: [] };
+    if (t.st.mode !== 'play') return fail(400, 'Only a player at the table can talk: watch mode has none');
     if (!Array.isArray(raw) || raw.length > MAX_TALK_LINES || !raw.every((x) => typeof x === 'string' && x.length <= MAX_RAW_TALK)) return fail(400, `talk is at most ${MAX_TALK_LINES} lines of text`);
     const lines: string[] = (raw as string[]).map(cleanTalk).filter(Boolean);
-    for (let i = 0; i < lines.length; i++) {
-      if (talkLimits.take(call.visitor) !== 'ok') return { status: 429, body: { error: 'Too much table talk for now: give the others a moment' }, headers: retryAfter(talkRate) };
-    }
-    return lines;
-  };
-  /** The table with the human's new lines said now (after the hand's actions so far), and the lines as said. */
-  const withTalk = (t: Table, lines: readonly string[]): { t: Table; said: TalkLine[] } => {
     if (!lines.length) return { t, said: [] };
+    const fits = lines.slice(0, Math.max(0, MAX_HAND_TALK - t.talk.length));
+    if (fits.length && talkLimits.take(call.visitor, fits.length) !== 'ok') return { t, said: [], refused: { lines, why: 'busy' } };
     const human = t.st.seats.indexOf(null);
     const after = (t.hands[t.hands.length - 1] ?? []).length;
-    const said = lines.map((say) => ({ seat: human, after, say }));
-    if (t.talk.length + said.length > MAX_HAND_TALK) return { t, said: [] };
-    return { t: { ...t, talk: [...t.talk, ...said] }, said };
+    const said = fits.map((say) => ({ seat: human, after, say }));
+    const left = lines.slice(fits.length);
+    return { t: { ...t, talk: [...t.talk, ...said] }, said, ...(left.length ? { refused: { lines: left, why: 'full' as const } } : {}) };
   };
   const startLimits = new VisitorLimits(starts, deps.now, UNLIMITED);
   const moveLimits = new VisitorLimits(moves, deps.now, UNLIMITED);
@@ -396,8 +395,8 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     return f.reply.finally(() => call.signal.removeEventListener('abort', leave));
   };
   /** Plays an action and remembers the hand when it ends, with the answer for a retry of the same request. */
-  const play = (call: GameApiCall, t: Table, x: RecordedAction, now: number, token: string, request: string, said: readonly TalkLine[] = []): GameApiResponse => {
-    const r = played(call, t, x, now, said);
+  const play = (call: GameApiCall, t: Table, x: RecordedAction, now: number, token: string, request: string, talk: { said: TalkLine[]; refused?: TalkRefused } = { said: [] }): GameApiResponse => {
+    const r = played(call, t, x, now, talk.said, talk.refused);
     if ((r.body as StepReply).finished) {
       markEnded(call, t, now);
       keepAnswer(t.st.id, token, request, r, now);
@@ -452,9 +451,8 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     if (id === null || id === undefined) return fail(409, 'It is your turn: the AIs wait for you');
     if (stale(t)) return answered(t, request) ?? STALE;
     // The human's lines come first: the model hears them in this very step.
-    const lines = talkOf(call, t.st);
-    if (!Array.isArray(lines)) return lines;
-    const talked = withTalk(t, lines);
+    const talked = talkFor(call, t);
+    if (!('said' in talked)) return talked;
     t = talked.t;
     const model = holdemModel(id)!;
     const payer = payerFor(call, [model]);
@@ -468,7 +466,7 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     // Another request on this token (another instance's retry, a different body) ended the hand meanwhile.
     if (stale(t)) return answered(t, request) ?? STALE;
     call.log(`table ${t.st.id}: hand ${t.g.handIndex + 1}, seat ${seat} ${model.id} (${payer.mode}) ${x.key}${x.by === 'fallback' ? ` [fallback: ${x.why}]` : ''} in ${x.latencyMs} ms${x.costUsd !== undefined ? `, $${Number(x.costUsd.toPrecision(3))}` : ''}`);
-    return play(call, t, x, deps.now(), token, request, talked.said);
+    return play(call, t, x, deps.now(), token, request, talked);
   };
 
   const act = async (call: GameApiCall): Promise<GameApiResponse> => {
@@ -493,13 +491,12 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     } catch (e) {
       return fail(422, `Not a legal action: ${(e as Error).message}`);
     }
-    const lines = talkOf(call, t.st);
-    if (!Array.isArray(lines)) return lines;
-    const talked = withTalk(t, lines);
+    const talked = talkFor(call, t);
+    if (!('said' in talked)) return talked;
     t = talked.t;
     const latencyMs = Math.min(MAX_HUMAN_MS, Math.max(0, now - t.st.at));
     const x: RecordedAction = 'key' in action ? { seat, key: action.key, by: 'human', latencyMs } : { seat, to: action.to, by: 'human', latencyMs };
-    return play(call, t, x, now, token, request, talked.said);
+    return play(call, t, x, now, token, request, talked);
   };
 
   const next = async (call: GameApiCall): Promise<GameApiResponse> => {
@@ -512,12 +509,12 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     if (!isTable(t)) return t;
     if (t.g.over) return fail(409, 'The game is over');
     if (t.g.hand.street !== 'done') return fail(409, 'The hand in play is not over');
-    const lines = talkOf(call, t.st);
-    if (!Array.isArray(lines)) return lines;
     const g = nextHand(t.g);
     // The lines that come with the deal are said at the start of the new hand.
-    const { t: dealt, said } = withTalk({ ...t, g, hands: [...t.hands, []], talk: [] }, lines);
-    const reply: SnapshotReply = { token: seal(call, dealt, now), snapshot: snapshotOf(g, viewerOf(t.st), timeBankOf(t.st)), ...finishedOf(dealt), ...(said.length ? { talk: said } : {}) };
+    const talked = talkFor(call, { ...t, g, hands: [...t.hands, []], talk: [] });
+    if (!('said' in talked)) return talked;
+    const { t: dealt, said } = talked;
+    const reply: SnapshotReply = { token: seal(call, dealt, now), snapshot: snapshotOf(g, viewerOf(t.st), timeBankOf(t.st)), ...finishedOf(dealt), ...(said.length ? { talk: said } : {}), ...(talked.refused ? { talkRefused: talked.refused } : {}) };
     return { status: 200, body: reply };
   };
 

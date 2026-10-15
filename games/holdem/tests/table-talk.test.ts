@@ -6,7 +6,9 @@ import { verifyRecording } from '../shared/recording';
 import { keyFromSeed } from '../shared/rng';
 import { newSitAndGo } from '../shared/sitngo';
 import type { Review, SnapshotReply, StepReply, TableSnapshot } from '../shared/table';
-import { CHAT, DECISION, DECISION2, LOOSE, setup } from './table-server';
+import { purposeKey, seal, unseal } from '../../../packages/kit/server/session';
+import { MAX_HAND_TALK } from '../server/token';
+import { CHAT, DECISION, DECISION2, LOOSE, SECRET, setup } from './table-server';
 
 const PLAY = (...models: string[]) => ({ mode: 'play', seats: [{ kind: 'human', id: 'you' }, ...models.map((id) => ({ kind: 'model', id }))] });
 
@@ -108,7 +110,7 @@ describe('the table hears the human', () => {
     expect(dealt.talk).toEqual([{ seat: 0, after: 0, say: 'New hand, same result.' }]);
   });
 
-  it('refuses more than three lines, overlong text, talk in watch mode; drops empty lines; holds talk to its own per-visitor limit', async () => {
+  it('refuses more than three lines, overlong text, talk in watch mode; drops empty lines; past the talk allowance plays the move and reports the lines not said', async () => {
     const { call } = await setup({ signedIn: true, limits: { ...LOOSE, talk: { ratePerSec: 0.001, burst: 2 } } });
     let { token, snapshot } = (await call('start', PLAY(DECISION))).body as unknown as SnapshotReply;
     ({ token, snapshot } = await toHumanTurn(call, token, snapshot));
@@ -120,9 +122,30 @@ describe('the table hears the human', () => {
     const empty = (await call('act', { token, action, talk: ['  ', '​'] })).body as unknown as StepReply;
     expect(empty.result.talk).toBeUndefined();
     expect((await call('act', { token, action, talk: ['one', 'two'] })).status).toBe(200);
-    expect(await call('act', { token, action, talk: ['three'] })).toMatchObject({ status: 429 });
+    // Over the allowance: the move is still played, and the line comes back as not said.
+    const busy = await call('act', { token, action, talk: ['three'] });
+    expect(busy).toMatchObject({ status: 200, body: { talkRefused: { lines: ['three'], why: 'busy' } } });
+    expect((busy.body as unknown as StepReply).result.talk).toBeUndefined();
     const watch = (await call('start', { mode: 'watch', seats: [{ kind: 'model', id: DECISION }, { kind: 'model', id: CHAT }] })).body as unknown as SnapshotReply;
     expect((await call('step', { token: watch.token, talk: ['hello'] })).status).toBe(400);
+  });
+
+  it("says what fits in a hand and reports the rest; lines not said cost no allowance", async () => {
+    const { call } = await setup({ signedIn: true, limits: { ...LOOSE, talk: { ratePerSec: 0.001, burst: 2 } } });
+    let { token, snapshot } = (await call('start', PLAY(DECISION))).body as unknown as SnapshotReply;
+    ({ token, snapshot } = await toHumanTurn(call, token, snapshot));
+    // A hand that already holds MAX_HAND_TALK - 1 lines.
+    const key = purposeKey(SECRET, 'holdem-table');
+    const st = unseal(token, key) as { t?: [number, string][] };
+    st.t = Array.from({ length: MAX_HAND_TALK - 1 }, () => [0, 'blah']);
+    const full = seal(st, key);
+    const action = { key: passive(snapshot) };
+    const r = (await call('act', { token: full, action, talk: ['a', 'b', 'c'] })).body as unknown as StepReply;
+    expect(r.result.talk?.map((x) => x.say)).toEqual(['a']);
+    expect(r.talkRefused).toEqual({ lines: ['b', 'c'], why: 'full' });
+    // One line was charged: one is left.
+    expect((await call('act', { token, action, talk: ['x'] })).body).not.toHaveProperty('talkRefused');
+    expect((await call('act', { token, action, talk: ['y'] })).body).toMatchObject({ talkRefused: { why: 'busy' } });
   });
 
   it('never says a line twice when the same request is sent again (a retry), and the recording keeps the talk for the review', async () => {

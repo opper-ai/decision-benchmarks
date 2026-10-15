@@ -182,12 +182,22 @@ export interface StartRequest {
 }
 
 /** start and next: the table to come, sealed in `token`, and the hand that just finished (if it ended as it was dealt). */
+/**
+ * The human's lines a request brought that were not said: over the visitor's talk allowance ('busy'), or past what a
+ * hand holds ('full'). The move itself was played.
+ */
+export interface TalkRefused {
+  lines: string[];
+  why: 'busy' | 'full';
+}
+
 export interface SnapshotReply {
   token: string;
   snapshot: TableSnapshot;
   finished?: ReviewHand;
   /** next: the human's lines that came with it, said as the new hand was dealt. */
   talk?: TalkLine[];
+  talkRefused?: TalkRefused;
 }
 
 /** step and act: one action played, and the hand it finished (if it did), every card face up. */
@@ -195,6 +205,7 @@ export interface StepReply {
   token: string;
   result: StepResult;
   finished?: ReviewHand;
+  talkRefused?: TalkRefused;
 }
 
 /** An error: what went wrong, and what the page should do about it. */
