@@ -52,7 +52,7 @@ import { holdemModel, type HoldemModel } from '../shared/models.ts';
 import { chatFormatFor, cleanTalk, MAX_TALK_LINES, QUESTION, readAnswer, requestFor, type TableContext } from '../shared/questions.ts';
 import { fallbackKey } from '../shared/bots.ts';
 import type { FallbackReason, Player, RecordedAction, TalkLine } from '../shared/recording.ts';
-import { actSitAndGo, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
+import { actSitAndGo, MAX_SEATS, MIN_SEATS, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
 import { finishedHandOf, recordingOf, snapshotOf, type ActionMeta, type Review, type SnapshotReply, type StepReply } from '../shared/table.ts';
 import { compactMeta, encodeAction, MAX_HAND_TALK, parseState, rebuild, TABLE_TTL_MS, TOKEN_VERSION, type Table, type TableState } from './token.ts';
 
@@ -407,7 +407,7 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
   const start = async (call: GameApiCall): Promise<GameApiResponse> => {
     const b = call.body;
     if (!isObj(b) || !only(b, ['seats', 'mode']) || (b.mode !== 'play' && b.mode !== 'watch') || !Array.isArray(b.seats)) return fail(400, "Send { seats: [{ kind: 'human' | 'model', id }], mode: 'play' | 'watch' }");
-    if (b.seats.length < 2 || b.seats.length > 4) return fail(400, 'A table seats 2 to 4 players');
+    if (b.seats.length < MIN_SEATS || b.seats.length > MAX_SEATS) return fail(400, `A table seats ${MIN_SEATS} to ${MAX_SEATS} players`);
     const seats: (string | null)[] = [];
     for (const s of b.seats as unknown[]) {
       if (!isObj(s) || !only(s, ['kind', 'id']) || (s.kind !== 'human' && s.kind !== 'model') || typeof s.id !== 'string') return fail(400, "Each seat is { kind: 'human' | 'model', id }");

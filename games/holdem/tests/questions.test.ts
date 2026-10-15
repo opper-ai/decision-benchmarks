@@ -7,8 +7,9 @@ import { botDecide, BOT_NAMES } from '../shared/bots';
 import { formatCard } from '../shared/cards';
 import { applyAction, legalOptions, newHand, observe, toAct, type HandState } from '../shared/engine';
 import { CHAT_MODELS, HOLDEM_MODELS, SETS } from '../shared/models';
-import { CHAT_FORMAT, CHAT_SYSTEM, chatFormatFor, chatSchema, LIVE_CHAT_FORMAT, LIVE_CHAT_SYSTEM, LIVE_TABLE, MAX_REASONING, MAX_SAY, parseChatAnswer, QUESTION, readAnswer, requestFor, stateFor } from '../shared/questions';
-import { deriveSeed } from '../shared/rng';
+import { CHAT_FORMAT, CHAT_SYSTEM, chatFormatFor, chatSchema, LIVE_CHAT_FORMAT, LIVE_CHAT_SYSTEM, LIVE_TABLE, MAX_REASONING, MAX_SAY, parseChatAnswer, QUESTION, questionFor, readAnswer, requestFor, stateFor } from '../shared/questions';
+import { actSitAndGo, newSitAndGo } from '../shared/sitngo';
+import { deriveSeed, keyFromSeed } from '../shared/rng';
 import { deal, act } from './support';
 
 const CARD = /\b[2-9TJQKA][cdhs]\b/g;
@@ -71,6 +72,29 @@ describe('the question', () => {
     expect(state.tableTalk).toEqual(['seat 0 (BTN) Opus: "I have it this time."']);
     expect(state.actions).toEqual(['Preflop: seat 0 (BTN) Opus raises to 5']);
     expect(stateFor(o)).not.toHaveProperty('tableTalk');
+  });
+
+  it('lists all six players of a six-seat live table, with their names, positions, every action and every line said', () => {
+    const names = ['Human', 'Clef', 'Haiku 5.5', 'Jev 1.13', 'Opus 5.5', 'GPT-6.1 Sol'];
+    let g = newSitAndGo({ seats: 6, key: keyFromSeed(4) });
+    const talk: { seat: number; say: string }[] = [];
+    for (let i = 0; i < 4; i++) {
+      talk.push({ seat: toAct(g.hand)!, say: `Line ${i} from ${names[toAct(g.hand)!]}, said out loud at a full table.` });
+      g = actSitAndGo(g, { key: i % 2 ? 'small' : 'call' });
+    }
+    const o = observe(g.hand, toAct(g.hand)!);
+    const state = stateFor(o, { names, talk });
+    const players = state.players as { seat: number; name: string; position: string }[];
+    expect(players.map((p) => p.seat)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(players.map((p) => p.name)).toEqual(names);
+    expect(new Set(players.map((p) => p.position))).toEqual(new Set(['BTN', 'SB', 'BB', 'UTG', 'MP', 'CO']));
+    expect(state.actions).toHaveLength(4);
+    expect(state.tableTalk).toHaveLength(4);
+    for (const t of talk) expect((state.tableTalk as string[]).some((line) => line.endsWith(JSON.stringify(t.say)))).toBe(true);
+    expect(state.level).toBe('Hand 1, level 1: the blinds go up to 15/30 after 12 hands, this one included.');
+    const prompt = LIVE_CHAT_FORMAT.messages(state, questionFor(o)).at(-1)!.content;
+    for (const name of names) expect(prompt).toContain(`"name": "${name}"`);
+    expect(questionFor(o).instructions).toContain('a Sit & Go of 6 players left');
   });
 });
 

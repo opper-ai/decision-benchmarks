@@ -14,12 +14,12 @@ import { holdemModel } from '../shared/models.ts';
 import { isTableKey } from '../shared/rng.ts';
 import { MOODS, type FallbackReason, type Mood, type RecordedAction, type TalkLine } from '../shared/recording.ts';
 import { MAX_SAY } from '../shared/questions.ts';
-import { actSitAndGo, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
+import { actSitAndGo, MAX_SEATS, MIN_SEATS, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
 import { finishedHandOf, type ReviewHand } from '../shared/table.ts';
 
 /** 2: the table key (a 256-bit deal) replaced the 31-bit seed; older tokens are refused. */
 export const TOKEN_VERSION = 2;
-/** A table lasts six hours from its start: a Sit & Go takes 40 to 80 hands, minutes each at worst. */
+/** A table lasts six hours from its start: a Sit & Go takes 40 to 80 hands (up to about 130 at 6 seats), minutes each at worst. */
 export const TABLE_TTL_MS = 6 * 3600_000;
 /** The human's lines kept for one hand: far above what a rate-limited player types in a hand. */
 export const MAX_HAND_TALK = 60;
@@ -112,7 +112,7 @@ export function parseState(v: unknown): TableState | null {
   if (!isObj(v) || v.v !== TOKEN_VERSION || typeof v.id !== 'string' || !isTableKey(v.key) || (v.mode !== 'play' && v.mode !== 'watch')) return null;
   if (!isInt(v.at) || !isInt(v.exp) || !Array.isArray(v.log) || !v.log.length || !v.log.every((h) => typeof h === 'string') || !Array.isArray(v.meta) || !v.meta.every(isObj)) return null;
   const seats = v.seats;
-  if (!Array.isArray(seats) || seats.length < 2 || seats.length > 4 || !seats.every((s) => s === null || (typeof s === 'string' && holdemModel(s)))) return null;
+  if (!Array.isArray(seats) || seats.length < MIN_SEATS || seats.length > MAX_SEATS || !seats.every((s) => s === null || (typeof s === 'string' && holdemModel(s)))) return null;
   if (seats.filter((s) => s === null).length !== (v.mode === 'play' ? 1 : 0)) return null;
   for (const m of v.meta as Record<string, unknown>[]) if (m.m !== undefined && !MOODS.includes(m.m as Mood)) return null;
   if (v.t !== undefined && !(Array.isArray(v.t) && v.t.length <= MAX_HAND_TALK && v.t.every((x) => Array.isArray(x) && x.length === 2 && isInt(x[0]) && typeof x[1] === 'string' && x[1].length <= MAX_SAY))) return null;

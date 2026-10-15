@@ -126,3 +126,40 @@ export function playDuplicate(players: Player[], deals: number, seed: number): {
   }
   return { recording: { format: 1, game: 'holdem', mode: 'cash', players, cash, hands, result: { chips } }, events };
 }
+
+/**
+ * A whole Sit & Go a share link can hold (real model ids), played as a table plays: a "model" mostly checks or calls,
+ * now and then picks any option or falls back; a "human" likewise, with slider raises. Longer than playSitAndGo's
+ * games, so the blinds climb through the levels with antes.
+ */
+export function playTableGame(players: Player[], seed: number): Recording {
+  const coin = coinFrom(seed ^ 0x5eed);
+  const key = keyFromSeed(seed);
+  let g = newSitAndGo({ seats: players.length, key });
+  const hands: Recording['hands'] = [{ actions: [] }];
+  for (;;) {
+    if (toAct(g.hand) === null) {
+      if (g.over) break;
+      g = nextHand(g);
+      hands.push({ actions: [] });
+      continue;
+    }
+    const seat = toAct(g.hand)!;
+    const p = players[seat]!;
+    const o = observe(g.hand, seat);
+    const passive = o.options.find((x) => x.key === 'check' || x.key === 'call')!.key;
+    let d: Omit<RecordedAction, 'seat'>;
+    if (p.kind === 'bot') d = { key: botDecide(p.id as BotName, o), by: 'bot' };
+    else if (p.kind === 'model' && coin() < 0.08) d = { key: fallbackKey(o.options), by: 'fallback', why: 'timeout' };
+    else if (p.kind === 'human' && o.minRaiseTo !== null && coin() < 0.12) d = { to: o.minRaiseTo + Math.floor(coin() * (o.options.at(-1)!.to - o.minRaiseTo + 1)), by: 'human' };
+    else {
+      // Mostly check or call; else a bet or a fold, all-in only now and then.
+      const r = coin();
+      const some = r < 0.97 ? o.options.filter((x) => x.key !== 'allin') : o.options;
+      d = { key: r < 0.75 ? passive : some[Math.floor(coin() * some.length)]!.key, by: p.kind === 'human' ? 'human' : 'answer' };
+    }
+    hands.at(-1)!.actions.push({ seat, ...d });
+    g = actSitAndGo(g, step(d));
+  }
+  return { format: 1, game: 'holdem', mode: 'sitngo', players, sitngo: { key, startingStack: g.startingStack }, hands, result: { chips: g.hand.seats.map((p) => p.stack), places: g.places as number[] } };
+}

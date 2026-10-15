@@ -12,7 +12,10 @@ import type { Review, SeatConfig, StepResult, TableSnapshot, TalkLine } from '..
 export type { ActionMeta, HumanTurn, Review, ReviewHand, SeatConfig, SeatKind, StepResult, TableSnapshot, TalkLine } from '../shared/table.ts';
 
 export interface TableConfig {
-  /** 2 to 4 seats, seat 0 first. Play mode has exactly one human seat; watch mode has none. */
+  /**
+   * 2 to 6 seats (shared/sitngo.ts MIN_SEATS to MAX_SEATS, 4 by default: DEFAULT_SEATS), seat 0 first. Play mode has
+   * exactly one human seat; watch mode has none.
+   */
   seats: SeatConfig[];
   /** The table key (rng.ts) that deals the Sit & Go; the driver picks a random one when left out (the service always does). */
   key?: string;
