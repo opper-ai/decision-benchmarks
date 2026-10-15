@@ -6,6 +6,7 @@
 // (opened from the toolbar's chat button, which counts what came while it was shut). style.css lays it out.
 import type { HandEvent, Street } from '../../shared/engine.ts';
 import type { ActionMeta } from '../../shared/table.ts';
+import { cleanTalk } from '../../shared/questions.ts';
 import { chatLinesOf, SAY_MAX, sayCount, type ActionEvent, type ChatLine } from '../chat-lines.ts';
 import { h } from '../dom.ts';
 import { actionChip, aHand, cardFace, chips, logNote, STREET_NAMES, type SeatPerson } from '../view-model.ts';
@@ -32,8 +33,11 @@ export interface ChatOptions {
   people: readonly SeatPerson[];
   /** Your seat in play (your own talk, "you" in the dealer's lines), else null. */
   viewer: number | null;
-  /** Play mode: a line to type into, and what to do with what was typed. */
-  onSay?: (text: string) => void;
+  /**
+   * Play mode: a line to type into, and what to do with what was typed: the line as the table will say it, or null
+   * when it can't take it now (too many waiting: "Slow down a little").
+   */
+  onSay?: (text: string) => string | null;
 }
 
 export class ChatBox {
@@ -91,10 +95,33 @@ export class ChatBox {
     }
   }
 
-  /** Your own talk, as it is sent. */
+  /** Your lines sent and not yet back from the table: shown dimmed until said() confirms them. */
+  private pending: { text: string; el: HTMLElement }[] = [];
+
+  /** Your own talk, as it is sent: dimmed ("sending") until the table has it. */
   you(text: string): void {
     const p = this.o.viewer !== null ? this.o.people[this.o.viewer] : undefined;
-    this.add(h('article.chat-msg.you', null, p ? avatarEl(p, 'relaxed', 'chat-face') : null, h('div.chat-main', null, h('div.chat-who', null, h('b', null, 'You')), h('q.chat-said', null, text))), true);
+    const el = h('article.chat-msg.you.pending', { 'aria-busy': 'true' }, p ? avatarEl(p, 'relaxed', 'chat-face') : null, h('div.chat-main', null, h('div.chat-who', null, h('b', null, 'You'), h('span.chat-state', null, 'sending…')), h('q.chat-said', null, text)));
+    this.pending.push({ text, el });
+    this.add(el, true);
+  }
+
+  /** The table has your lines (the driver's onSaid): each one's message is said, not sending. */
+  said(lines: readonly { seat: number; say: string }[]): void {
+    for (const l of lines) {
+      if (l.seat !== this.o.viewer) continue;
+      const i = this.pending.findIndex((p) => p.text === l.say);
+      const p = i >= 0 ? this.pending.splice(i, 1)[0]! : null;
+      if (!p) continue;
+      p.el.classList.remove('pending');
+      p.el.removeAttribute('aria-busy');
+      p.el.querySelector('.chat-state')?.remove();
+    }
+  }
+
+  /** A short line from the chat itself, under your talk ("Slow down a little"). */
+  private hint(text: string): void {
+    this.add(h('p.chat-hint', { role: 'status' }, text), true);
   }
 
   private lineEl(l: ChatLine, meta: ActionMeta | undefined): HTMLElement {
@@ -146,21 +173,23 @@ export class ChatBox {
     }
   }
 
-  private sayForm(onSay: (text: string) => void): HTMLElement {
+  private sayForm(onSay: (text: string) => string | null): HTMLElement {
     const count = h('span.chat-count', { 'aria-hidden': 'true' }, sayCount(''));
+    // The counter counts what the table will say (cleanTalk: spaces folded, odd characters gone).
+    const counted = (text: string) => sayCount(cleanTalk(text));
     const input = h('input.chat-input', { type: 'text', maxlength: String(SAY_MAX), placeholder: 'Say something to the table…', 'aria-label': 'Say something to the table', autocomplete: 'off', enterkeyhint: 'send' }) as HTMLInputElement;
     this.input = input;
-    input.addEventListener('input', () => (count.textContent = sayCount(input.value)));
+    input.addEventListener('input', () => (count.textContent = counted(input.value)));
     // The action bar's keys (F, C, R, A) must not fire while typing here: actions.ts skips text inputs.
     const form = h('form.chat-say', null, input, count, h('button.chat-send', { type: 'submit', 'aria-label': 'Send' }, '↑'));
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const text = input.value.trim().slice(0, SAY_MAX);
-      if (!text) return;
+      if (!cleanTalk(input.value)) return;
+      const line = onSay(input.value);
+      if (line === null) return this.hint('Slow down a little: your last lines are still on their way.');
       input.value = '';
-      count.textContent = sayCount('');
-      this.you(text);
-      onSay(text);
+      count.textContent = counted('');
+      this.you(line);
     });
     return form;
   }

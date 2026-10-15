@@ -31,3 +31,24 @@ describe('the table chat: what the dealer says', () => {
     expect(sayCount('x'.repeat(95))).toBe('95/90');
   });
 });
+
+describe('your talk in practice', () => {
+  it('is taken as the table takes it, goes with the next move, and comes back through onSaid', async () => {
+    const watch = new LocalDriver({ thinkScale: 0, sleep: async () => {} });
+    await watch.start({ seed: 1, seats: [{ kind: 'model', id: 'sference/clef' }, { kind: 'model', id: 'typesafe/jev-1.13.0' }] });
+    expect(watch.say('hello')).toBeNull();
+
+    const d = new LocalDriver({ thinkScale: 0, sleep: async () => {} });
+    const heard: { seat: number; say: string }[] = [];
+    d.onSaid = (lines) => heard.push(...lines);
+    let s = await d.start({ seed: 1, seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: 'aws/claude-opus-5-5' }] });
+    expect(d.say('   ')).toBeNull();
+    expect(d.say('  Fold   now. ')).toBe('Fold now.');
+    expect(heard).toEqual([]);
+    s = s.turn ? (await d.act({ key: 'call' })).snapshot : (await d.step()).snapshot;
+    expect(heard).toEqual([expect.objectContaining({ seat: 0, say: 'Fold now.' })]);
+    for (let i = 0; i < 6; i++) expect(d.say(`line ${i}`)).not.toBeNull();
+    expect(d.say('one too many')).toBeNull();
+    expect(s.hand).toBe(1);
+  });
+});

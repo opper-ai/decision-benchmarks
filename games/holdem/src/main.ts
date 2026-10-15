@@ -256,8 +256,10 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   const chat = new ChatBox({
     people: seats.map(personOf),
     viewer: watching ? null : 0,
-    ...(watching ? {} : { onSay: (text: string) => driver.say?.(text) }),
+    ...(watching ? {} : { onSay: (text: string) => driver.say?.(text) ?? null }),
   });
+  // Your lines back from the table, as it placed them: the chat marks them said.
+  driver.onSaid = (lines) => chat.said(lines);
   if (watching) {
     const group = h('div.speed', { role: 'radiogroup', 'aria-label': 'Speed' });
     for (const s of [1, 2, 4, 8]) {
