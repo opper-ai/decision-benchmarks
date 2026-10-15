@@ -7,7 +7,6 @@ import type { Review, ReviewHand } from '../driver.ts';
 import { describeHighlight, factsOf, highlightsOf, titleOf } from '../highlights.ts';
 import { aHand, chips, handName, personOf, STREET_NAMES, tellBars, type SeatPerson } from '../view-model.ts';
 import { chipEl } from './chat.ts';
-import { clipButton } from './end.ts';
 import { avatarEl, cardEl } from './parts.ts';
 
 
@@ -38,7 +37,6 @@ export function reviewView(o: ReviewOptions): HTMLElement {
       select.append(h('option', { value: String(i), selected: i === index }, `Hand ${x.hand}${hl ? `: ${titleOf(hl)}` : ''}`));
     });
     select.addEventListener('change', () => ((index = Number(select.value)), draw()));
-    const clipStatus = h('span.clip-status', { role: 'status' });
     const head = h(
       'div.review-head',
       null,
@@ -49,10 +47,8 @@ export function reviewView(o: ReviewOptions): HTMLElement {
         h('button.tbtn.icon', { type: 'button', 'aria-label': 'Previous hand', disabled: index === 0, onclick: () => (index--, draw()) }, '‹'),
         select,
         h('button.tbtn.icon', { type: 'button', 'aria-label': 'Next hand', disabled: index === hands.length - 1, onclick: () => (index++, draw()) }, '›'),
-        clipButton(hand, o.review.players, (t) => (clipStatus.textContent = t)),
         h('button.tbtn', { type: 'button', onclick: o.onClose }, 'Back to the table'),
       ),
-      clipStatus,
     );
     root.replaceChildren(head, ...handBody(hand, people, name, o.review.players));
     root.parentElement?.scrollTo?.({ top: 0 });

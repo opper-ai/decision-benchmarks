@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { TableSnapshot } from '../src/driver';
-import { CLIP_SIZE, clipFrameItems, clipInfo, clipTimeline, frameAt } from '../src/export';
 import { LocalDriver } from '../src/local-driver';
 import { SHARE_H, SHARE_W, shareCardData, shareCardLayout, type Item } from '../src/share-image';
 
@@ -25,18 +24,6 @@ describe('a table of six, shared', () => {
     const faces = boxes(items).filter((b) => b.r < SHARE_W / 2);
     expect(faces).toHaveLength(6);
     for (const f of faces) expect(f.b).toBeLessThan(SHARE_H - 34);
-    for (let i = 0; i < faces.length; i++) for (let j = i + 1; j < faces.length; j++) expect(meet(faces[i]!, faces[j]!)).toBe(false);
-  });
-
-  it('draws a hand of six as a clip, every face on the table and none on another', async () => {
-    const { review } = await sixGame();
-    const hand = review.hands[0]!;
-    const info = clipInfo(hand, review.players);
-    const tl = clipTimeline(hand);
-    const items = clipFrameItems(frameAt(hand, tl, tl.beats.at(-1)!.at), info, hand);
-    const faces = boxes(items).filter((b) => b.r - b.l > 100);
-    expect(faces).toHaveLength(6);
-    for (const f of faces) expect(f.l >= 0 && f.t >= 0 && f.r <= CLIP_SIZE && f.b <= CLIP_SIZE).toBe(true);
     for (let i = 0; i < faces.length; i++) for (let j = i + 1; j < faces.length; j++) expect(meet(faces[i]!, faces[j]!)).toBe(false);
   });
 });

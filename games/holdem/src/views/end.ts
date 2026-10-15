@@ -1,11 +1,11 @@
 // The end of the Sit & Go: an ivory poster with the finishing places, who knocked out whom, the biggest pot and the
 // best highlight of the game, then its buttons: Play again (or Watch again), Share, which opens a panel of the ways to
 // share it (X, LinkedIn, the image, a link that replays the whole game (share.ts), the 1200×630 image of this poster
-// (share-image.ts), the best moment as an MP4 clip (export.ts)), and Review the hands and Change the table side by side.
+// (share-image.ts)), and Review the hands and Change the table side by side.
 import { appPath } from '../../../../packages/kit/client/paths.ts';
 import { track } from '../../../../packages/kit/client/track.ts';
 import { h, reducedMotion } from '../dom.ts';
-import type { Review, ReviewHand, TableSnapshot } from '../driver.ts';
+import type { Review, TableSnapshot } from '../driver.ts';
 import { factsOf, momentOf } from '../highlights.ts';
 import { canShare, shareLink } from '../share.ts';
 import { resultFacts, resultText } from '../social.ts';
@@ -138,18 +138,12 @@ function shareMenu(o: EndOptions): HTMLElement | null {
     }
   };
   const imageBtn = h('button.sp-btn', { type: 'button', onclick: () => void image(imageBtn) }, ...face('download', 'Download image', 'Save image')) as HTMLButtonElement;
-  // The clip: the best moment's hand.
-  const best = momentOf(o.review.hands, o.review.players, (s) => personOf(o.review.players[s]!).name);
-  const bestHand = best && o.review.hands.find((x) => x.hand === best.highlight.hand);
-  const clipBtn = bestHand ? clipButton(bestHand, o.review.players, say, 'sp-btn') : null;
-  clipBtn?.replaceChildren(...face('clip', 'Download clip', 'Save clip'));
   // To the networks first (the post: text, link, and the picture where the device can); then the link and the files.
   const buttons = [
     ...networkButtons({ text, url: link, kind: 'result', source, cls: 'sp-btn' }),
     imageShareButton({ image: makeImage, text, url: link, source, say, cls: 'sp-btn' }),
     h('button.sp-btn', { type: 'button', onclick: () => void copy() }, ...face('link', 'Copy link')),
     imageBtn,
-    clipBtn,
   ].filter((b): b is HTMLElement => b !== null);
   const preview = h('p.sp-preview');
   const panel = h(
@@ -193,28 +187,3 @@ function shareMenu(o: EndOptions): HTMLElement | null {
 
 /** Share panels made so far, for their ids. */
 let panels = 0;
-
-/**
- * Download clip: one hand as a short MP4, made in the page. The encoder (export.ts, mediabunny) loads only when asked.
- * `say` shows progress and problems ("This browser cannot make video ...").
- */
-export function clipButton(hand: ReviewHand, players: Review['players'], say: (text: string) => void, cls = 'tbtn'): HTMLButtonElement {
-  const button = h(`button.${cls}`, { type: 'button', title: `Hand ${hand.hand} as a short video` }, 'Download clip') as HTMLButtonElement;
-  button.addEventListener('click', async () => {
-    button.disabled = true;
-    try {
-      const { clipSupported, exportHandClip, clipName } = await import('../export.ts');
-      if (!clipSupported()) return say('This browser cannot make video clips. Try a recent Chrome, Edge or Safari.');
-      say('Making the clip…');
-      const blob = await exportHandClip(hand, players, { asset: appPath, onProgress: (p) => say(`Making the clip… ${Math.round(p * 100)}%`) });
-      download(blob, clipName(hand));
-      track('share', { game: 'holdem', kind: 'clip' });
-      say('Clip saved.');
-    } catch (e) {
-      say(`The clip could not be made: ${(e as Error).message}`);
-    } finally {
-      button.disabled = false;
-    }
-  });
-  return button;
-}

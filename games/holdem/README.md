@@ -7,7 +7,7 @@ No-limit Texas Hold'em against AI models, built (v1) from the plan in
 - the table service (`server/`), where the server deals each table from its own secret 256-bit key (ChaCha20) and
   asks the models, chat models with the live table's prompt;
 - the page (`src/`): play a Sit & Go or watch models play live, the hand review with every AI's cards and reasoning,
-  the end screen with a share image, link and clip, the curated replays, and the leaderboard;
+  the end screen with a share image and link, the curated replays, and the leaderboard;
 - the curated replays and the poster (`scripts/`);
 - the models: the decision models, the Claude, GPT, Gemini, Open models (DeepSeek V4 Pro, Kimi K3, GLM-5.3) and Titans
   sets, and more chat models any seat can pick (Grok, more DeepSeek, Qwen, GLM, MiniMax).
