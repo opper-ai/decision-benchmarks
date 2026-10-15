@@ -168,6 +168,38 @@ describe('LocalDriver', () => {
   });
 });
 
+describe('practice talk', () => {
+  it('settles every line you type: said with a move, or refused once the game is over, never left waiting', async () => {
+    const d = instant();
+    const said: string[] = [];
+    const refused: [string[], string][] = [];
+    d.onSaid = (lines) => said.push(...lines.map((l) => l.say));
+    d.onTalkRefused = (lines, why) => refused.push([lines, why]);
+    let s = await d.start({ seed: 7, seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: 'aws/claude-haiku-5-5-eu' }] });
+    const typed: string[] = [];
+    for (let i = 0; i < 5000 && !s.over; i++) {
+      if (s.view.street === 'done') {
+        s = await d.nextHand();
+        continue;
+      }
+      if (s.turn) {
+        s = (await d.act({ key: s.turn.options.some((o) => o.key === 'allin') ? 'allin' : 'call' })).snapshot;
+        continue;
+      }
+      // A line typed while the AI is still thinking: it goes with the next move, or is refused if this move ends the game.
+      const pending = d.step();
+      const line = `line ${i}`;
+      if (d.say(line)) typed.push(line);
+      s = (await pending).snapshot;
+    }
+    expect(s.over).toBe(true);
+    const settled = [...said, ...refused.flatMap(([lines]) => lines)];
+    expect(typed.every((l) => settled.includes(l))).toBe(true);
+    expect(refused.every(([, why]) => why === 'over')).toBe(true);
+    expect(d.say('after the end')).toBeNull();
+  });
+});
+
 describe('practice, once you are out', () => {
   it('watches the rest as a spectator: every card up, the models’ reasoning with each step', async () => {
     // A table where you shove every hand until you are out and the two models play on (the first seed that goes so).

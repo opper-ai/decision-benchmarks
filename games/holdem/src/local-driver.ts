@@ -241,6 +241,15 @@ export class LocalDriver implements TableDriver {
     this.hands.at(-1)!.push(record);
     this.archive();
     this.turnStart = Date.now();
+    if (next.over && this.talkQueue.length) {
+      // Typed while the last move was being played: the game is over, so it is never said (as RemoteDriver's end()).
+      const left = this.talkQueue.splice(0);
+      try {
+        this.onTalkRefused?.(left, 'over');
+      } catch {
+        // the page's listener must not break the table
+      }
+    }
     return { seat: record.seat, key: record.key ?? null, meta, snapshot: this.snapshot() };
   }
 
@@ -276,6 +285,8 @@ export class LocalDriver implements TableDriver {
 
   /** Told when your lines reached the table (with the next move), as RemoteDriver's are. */
   onSaid: ((lines: TalkLine[]) => void) | null = null;
+  /** Told when lines will never be said: typed while the move that ends the game was being played ('over'). */
+  onTalkRefused: ((lines: string[], why: 'busy' | 'full' | 'refused' | 'over') => void) | null = null;
   private talkQueue: string[] = [];
   /** Your lines per hand, where they were said (for the review and the recording). */
   private talk: TalkLine[][] = [];
