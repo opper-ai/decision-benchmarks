@@ -44,12 +44,22 @@ export interface RecordedAction {
   probabilities?: Partial<Record<OptionKey, number>>;
 }
 
+/** A line of table talk a human typed (a model's talk is its action's `say`): who, after how many of the hand's actions. */
+export interface TalkLine {
+  seat: number;
+  /** The hand's actions played before it was said. */
+  after: number;
+  say: string;
+}
+
 export interface RecordedHand {
   /** Cash only: the hand's deck seed, button, and seating (seat -> index into players). */
   deckSeed?: number;
   button?: number;
   seating?: number[];
   actions: RecordedAction[];
+  /** Metadata, ignored by the replay and the fingerprint: what the human said at the table, in order. */
+  talk?: TalkLine[];
 }
 
 export interface Recording {
@@ -93,6 +103,8 @@ const MAX_ACTIONS = 10_000;
 const MAX_TOTAL_ACTIONS = 200_000;
 const MAX_LATENCY_MS = 600_000;
 const MAX_SAY = 200;
+/** A human's lines in one hand, far above what anyone types. */
+const MAX_TALK = 500;
 const MAX_REASONING = 4000;
 const ACTION_FIELDS = ['seat', 'key', 'to', 'by', 'latencyMs', 'costUsd', 'why', 'say', 'mood', 'reasoning', 'probabilities'];
 
@@ -152,6 +164,12 @@ function shapeProblem(r: Record<string, unknown>): string | null {
     for (let a = 0; a < hand.actions.length; a++) {
       const problem = actionProblem(hand.actions[a]);
       if (problem) return `hand ${h + 1}, action ${a + 1}: ${problem}`;
+    }
+    if (hand.talk !== undefined) {
+      const talk = hand.talk;
+      if (!Array.isArray(talk) || talk.length > MAX_TALK || !talk.every((x: unknown) => isObj(x) && isInt(x.seat, 0, 9) && isInt(x.after, 0, (hand.actions as unknown[]).length) && typeof x.say === 'string' && x.say.length <= MAX_SAY)) {
+        return `hand ${h + 1}: talk must list { seat, after, say } lines of at most ${MAX_SAY} characters`;
+      }
     }
   }
   const res = r.result;

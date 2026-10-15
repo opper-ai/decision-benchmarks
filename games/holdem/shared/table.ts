@@ -8,7 +8,9 @@
 // card at once (fullView). The table key (which deals every hand to come) is only in the recording once the game is over.
 import { formatCard } from './cards.ts';
 import { fullView, legalOptions, observe, visibleEvents, type HandEvent, type Option, type OptionKey, type TableView } from './engine.ts';
-import type { By, FallbackReason, Mood, Player, RecordedAction, Recording } from './recording.ts';
+import type { By, FallbackReason, Mood, Player, RecordedAction, Recording, TalkLine } from './recording.ts';
+
+export type { TalkLine } from './recording.ts';
 import { stacksOf, type Elimination, type SitAndGo } from './sitngo.ts';
 
 export type SeatKind = 'human' | 'model' | 'bot';
@@ -86,6 +88,8 @@ export interface StepResult {
   key: OptionKey | null;
   meta: ActionMeta;
   snapshot: TableSnapshot;
+  /** The human's lines of table talk that came with this request, said just before the action (play mode). */
+  talk?: TalkLine[];
 }
 
 /** A finished hand, everything face up. */
@@ -98,6 +102,8 @@ export interface ReviewHand {
   actions: RecordedAction[];
   /** The five board cards the deck held, dealt or not ('As'), so a review can tell who would have won. */
   runout: string[];
+  /** What the human said during the hand, in order (`after`: the actions played before it). */
+  talk?: TalkLine[];
 }
 
 export interface Review {
@@ -143,15 +149,15 @@ export function snapshotOf(g: SitAndGo, viewer: number | null, timeBankOf: (seat
 }
 
 /** The hand in play, once it is over, for the review: every event (every hole card), its actions and the board's run-out. */
-export function finishedHandOf(g: SitAndGo, actions: readonly RecordedAction[]): ReviewHand {
+export function finishedHandOf(g: SitAndGo, actions: readonly RecordedAction[], talk: readonly TalkLine[] = []): ReviewHand {
   const s = g.hand;
   if (s.street !== 'done') throw new Error('the hand in play is not over');
   const live = s.seats.filter((p) => p.status !== 'empty').length;
-  return { hand: g.handIndex + 1, events: structuredClone(s.events), actions: structuredClone([...actions]), runout: s.deck.slice(2 * live, 2 * live + 5).map(formatCard) };
+  return { hand: g.handIndex + 1, events: structuredClone(s.events), actions: structuredClone([...actions]), runout: s.deck.slice(2 * live, 2 * live + 5).map(formatCard), ...(talk.length ? { talk: structuredClone([...talk]) } : {}) };
 }
 
 /** The whole Sit & Go as a recording, with its table key: only once it is over (the key deals every hand to come). */
-export function recordingOf(g: SitAndGo, players: readonly Player[], hands: readonly (readonly RecordedAction[])[]): Recording {
+export function recordingOf(g: SitAndGo, players: readonly Player[], hands: readonly (readonly RecordedAction[])[], talk: readonly (readonly TalkLine[] | undefined)[] = []): Recording {
   if (!g.over) throw new Error('the Sit & Go is not over');
   return {
     format: 1,
@@ -159,7 +165,7 @@ export function recordingOf(g: SitAndGo, players: readonly Player[], hands: read
     mode: 'sitngo',
     players: players.map((p) => ({ kind: p.kind, id: p.id })),
     sitngo: { key: g.key, startingStack: g.startingStack },
-    hands: hands.map((actions) => ({ actions: structuredClone([...actions]) })),
+    hands: hands.map((actions, h) => ({ actions: structuredClone([...actions]), ...(talk[h]?.length ? { talk: structuredClone([...talk[h]!]) } : {}) })),
     result: { chips: stacksOf(g), places: g.places as number[] },
   };
 }
@@ -177,6 +183,8 @@ export interface SnapshotReply {
   token: string;
   snapshot: TableSnapshot;
   finished?: ReviewHand;
+  /** next: the human's lines that came with it, said as the new hand was dealt. */
+  talk?: TalkLine[];
 }
 
 /** step and act: one action played, and the hand it finished (if it did), every card face up. */
