@@ -489,7 +489,7 @@
 /* ---------- your action bar ---------- */
 .actions { position: relative; z-index: 5; padding: 8px 12px 10px; display: grid; gap: 6px; }
 .actions[hidden] { display: none; }
-.menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 6px; }
+.actions .menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 6px; }
 /*
  * Phones: one row, fold, check or call, Raise… and all-in, each a column, under the sizes' chips (the narrow bar's
  * container query at the end; views/actions.ts marks the menu data-custom when it has Raise…). The bar sticks to the
@@ -500,10 +500,10 @@
     position: sticky; bottom: calc(env(safe-area-inset-bottom) + 8px); padding: 6px 8px 8px; gap: 6px;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0), var(--h-room) 14px); border-radius: 0 0 22px 22px;
   }
-  .menu { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-  .menu .act { min-height: 52px; padding: 4px 3px 5px; }
-  .menu[data-custom] .act.raise { display: none; }
-  .menu .act .verb { display: none; }
+  .actions .menu { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .actions .menu .act { min-height: 52px; padding: 4px 3px 5px; }
+  .actions .menu[data-custom] .act.raise { display: none; }
+  .actions .menu .act .verb { display: none; }
   .act .what { font-size: 11px; }
   .act .amt { font-size: 15px; }
 }
@@ -513,8 +513,8 @@
 }
 /* Wide screens: one compact row, centred, every button the same height. */
 @media (min-width: 760px) {
-  .menu { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-  .menu .act { min-width: 88px; height: 56px; padding: 4px 12px 5px; }
+  .actions .menu { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .actions .menu .act { min-width: 88px; height: 56px; padding: 4px 12px 5px; }
 }
 .act {
   position: relative; display: grid; justify-items: center; align-content: center; gap: 0; min-height: 50px; padding: 5px 10px 6px; border-radius: 12px;
@@ -951,10 +951,10 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .room > .actions { container: bar / inline-size; }
 .quick { display: none; }
 @container bar (max-width: 919px) {
-  .menu { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
-  .menu .act { min-width: 0; height: 48px; min-height: 0; }
-  .menu[data-custom] .act.raise { display: none; }
-  .menu .act .verb { display: none; }
+  .actions .menu { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+  .actions .menu .act { min-width: 0; height: 48px; min-height: 0; }
+  .actions .menu[data-custom] .act.raise { display: none; }
+  .actions .menu .act .verb { display: none; }
   /* The keys are on the chips and buttons; the line spelling them out is left off for room. */
   .actions .hint { display: none; }
   .quick { display: flex; justify-content: center; gap: 6px; height: 32px; }
@@ -976,5 +976,5 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   .qb { padding: 0 6px; gap: 4px; }
   .qw { display: none; }
   .qa::before { margin-right: 4px; }
-  .menu .act { height: 46px; }
+  .actions .menu .act { height: 46px; }
 }
