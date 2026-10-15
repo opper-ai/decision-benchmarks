@@ -112,9 +112,7 @@ export class ChatBox {
     this.el.querySelector('.chat-collapse')?.setAttribute('aria-label', open ? 'Hide the chat' : 'Show the chat');
     this.button.setAttribute('aria-expanded', String(open));
     if (open) {
-      this.unread = 0;
-      this.button.removeAttribute('data-unread');
-      if (this.badge) this.badge.hidden = true;
+      this.resetUnread();
       this.toBottom();
     }
     if (remember && typeof matchMedia === 'function' && matchMedia('(min-width: 1000px)').matches) {
@@ -143,13 +141,33 @@ export class ChatBox {
     this.street = 'preflop';
     this.note.hidden = false;
     this.newer.hidden = true;
+    // The messages counted as unread are gone with them.
+    this.resetUnread();
   }
+
+  private resetUnread(): void {
+    this.unread = 0;
+    this.button.removeAttribute('data-unread');
+    if (this.badge) this.badge.hidden = true;
+  }
+
+  /** Laying out hands already played (history()): their lines are not new, so they don't count as unread. */
+  private quiet = false;
 
   /**
    * Hands' chat as they went: finished hands a replay jumped past, or the hand in play after a resume (its events so
    * far with the driver's handSoFar()).
    */
   history(hands: readonly Parameters<typeof playedHandLines>[0][]): void {
+    this.quiet = true;
+    try {
+      this.layOut(hands);
+    } finally {
+      this.quiet = false;
+    }
+  }
+
+  private layOut(hands: readonly Parameters<typeof playedHandLines>[0][]): void {
     for (const hand of hands)
       for (const p of playedHandLines(hand) as PlayedLine[]) {
         if ('talk' in p) this.heard(p.talk.seat, p.talk.say);
@@ -253,7 +271,7 @@ export class ChatBox {
     while (this.scroller.childElementCount > KEEP + 1) this.scroller.children[1]!.remove();
     if (follow) this.toBottom();
     else this.newer.hidden = false;
-    if (!this.el.classList.contains('open') && el.matches('.chat-msg') && !mine) {
+    if (!this.quiet && !this.el.classList.contains('open') && el.matches('.chat-msg') && !mine) {
       this.unread++;
       this.button.dataset.unread = String(Math.min(this.unread, 9));
       this.badge.hidden = false;
