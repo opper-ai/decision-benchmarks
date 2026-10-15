@@ -338,7 +338,8 @@
 .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 92%; --y: calc(var(--top-edge) + 16px); }
 .felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 38%; --y: 25%; }
 @media (min-width: 760px) {
-  .felt-area:is([data-seats='5'], [data-seats='6']) { --cw-board: 54px; --cw-seat: 36px; --av: 64px; }
+  /* (Faces and cards: the wide screen's own sizes, from the felt's height.) */
+  .felt-area:is([data-seats='5'], [data-seats='6']) { --av: clamp(52px, calc((var(--fw) * 0.5875 - 230px) / 3.2), 78px); --cw-board: clamp(42px, calc(var(--av) * 0.8), 62px); --cw-seat: clamp(32px, calc(var(--av) * 0.55), 42px); }
   .felt-area[data-seats='5'] .seat[data-slot='top-left'] { --x: 30%; --y: 12%; }
   .felt-area[data-seats='5'] .seat[data-slot='top-right'] { --x: 70%; --y: 12%; }
   .felt-area[data-seats='6'] .seat[data-slot='top-left'] { --x: 22%; --y: 14%; }
