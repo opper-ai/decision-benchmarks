@@ -60,7 +60,7 @@
  * (overflow: clip, unlike hidden, leaves the page as the bar's scroller).
  */
 @media (max-width: 759px) {
-  .room { overflow: clip; --tb-h: 40px; --bar-h: 98px; }
+  .room { overflow: clip; --tb-h: 40px; --bar-h: 88px; }
   .room.watching { --tb-h: 64px; --bar-h: 0px; } /* the hand on one line, the speeds and buttons on the next */
   .room.watching:has(.replay-title) { --tb-h: 134px; } /* a replay: its title, the hand, and two lines of controls */
 }
@@ -320,26 +320,32 @@
 /* Phones: the board and pots lower, in the room under the side seats' bets. */
 @media (max-width: 759px) {
   .room .felt-area:is([data-seats='5'], [data-seats='6']) .middle { top: 63%; }
+  /* A crowded table: the bets' chips stacked closer, so a full stack fits between a top seat's cards and a side seat. */
+  .felt-area:is([data-seats='5'], [data-seats='6']) .pchips { height: calc(var(--chip, 16px) + var(--n, 1) * 2px); }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .pchips .pchip { bottom: calc(var(--i) * 2px); }
 }
 .felt-area[data-seats='5'] .seat[data-slot='top-left'] { --x: 26%; --y: 11%; }
 .felt-area[data-seats='5'] .seat[data-slot='top-right'] { --x: 74%; --y: 11%; }
 .felt-area[data-seats='6'] .seat[data-slot='top-left'] { --x: 17%; --y: 13%; }
 .felt-area[data-seats='6'] .seat[data-slot='top'] { --x: 50%; --y: 14%; }
 .felt-area[data-seats='6'] .seat[data-slot='top-right'] { --x: 83%; --y: 13%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: 18%; --y: 51%; }
+/* The side seats (and their buttons, below) no higher than on a 487 px felt, a phone's before the bar's size chips:
+   under the top seats' bets. */
+.felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: 18%; --y: max(51%, 248px); }
 /* Five or six round the table: every plate takes the short name and the family under it, as on a phone, so the side
    seats stay on the felt ("Decision 1 / Microsoft" rather than "Microsoft Decision 1"). */
 .felt-area:is([data-seats='5'], [data-seats='6']) .plate { max-width: 108px; }
 .felt-area:is([data-seats='5'], [data-seats='6']) .plate .full { display: none; }
 .felt-area:is([data-seats='5'], [data-seats='6']) .plate .short { display: inline; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 82%; --y: 51%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 82%; --y: max(51%, 248px); }
 .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: 40%; --y: 44%; }
 .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: 60%; --y: 44%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 30%; --y: calc(var(--top-edge) + 18px); }
-.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 70%; --y: calc(var(--top-edge) + 18px); }
-.felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: calc(var(--top-edge) + 18px); }
-.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 9%; --y: 75%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 91%; --y: 75%; }
+/* The top seats' bets clear of their shown cards above and the side seats below, with a full stack of chips. */
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 30%; --y: calc(var(--top-edge) + 22px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 70%; --y: calc(var(--top-edge) + 22px); }
+.felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: calc(var(--top-edge) + 22px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 9%; --y: max(75%, 365px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 91%; --y: max(75%, 365px); }
 .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 8%; --y: calc(var(--top-edge) + 16px); }
 .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 92%; --y: calc(var(--top-edge) + 16px); }
 .felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 38%; --y: 25%; }
@@ -497,7 +503,7 @@
  */
 @media (max-width: 759px) {
   .actions {
-    position: sticky; bottom: calc(env(safe-area-inset-bottom) + 8px); padding: 6px 8px 8px; gap: 6px;
+    position: sticky; bottom: calc(env(safe-area-inset-bottom) + 8px); padding: 5px 8px 7px; gap: 4px;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0), var(--h-room) 14px); border-radius: 0 0 22px 22px;
   }
   .actions .menu { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
@@ -972,9 +978,9 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 }
 /* A phone's bar: the chips share its width, the fractions without " pot", and the buttons a little lower. */
 @container bar (max-width: 519px) {
-  .quick { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); height: 30px; }
+  .quick { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); height: 28px; }
   .qb { padding: 0 6px; gap: 4px; }
   .qw { display: none; }
   .qa::before { margin-right: 4px; }
-  .actions .menu .act { height: 46px; }
+  .actions .menu .act { height: 44px; }
 }
