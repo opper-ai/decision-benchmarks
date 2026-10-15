@@ -320,6 +320,9 @@
 /* Phones: the board and pots lower, in the room under the side seats' bets. */
 @media (max-width: 759px) {
   .room .felt-area:is([data-seats='5'], [data-seats='6']) .middle { top: 63%; }
+  /* A crowded table: the bets' chips stacked closer, so a full stack fits between a top seat's cards and a side seat. */
+  .felt-area:is([data-seats='5'], [data-seats='6']) .pchips { height: calc(var(--chip, 16px) + var(--n, 1) * 2px); }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .pchips .pchip { bottom: calc(var(--i) * 2px); }
 }
 .felt-area[data-seats='5'] .seat[data-slot='top-left'] { --x: 26%; --y: 11%; }
 .felt-area[data-seats='5'] .seat[data-slot='top-right'] { --x: 74%; --y: 11%; }
@@ -335,13 +338,15 @@
 .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 82%; --y: 51%; }
 .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: 40%; --y: 44%; }
 .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: 60%; --y: 44%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 30%; --y: calc(var(--top-edge) + 18px); }
-.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 70%; --y: calc(var(--top-edge) + 18px); }
-.felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: calc(var(--top-edge) + 18px); }
+/* The top seats' bets clear of their cards above and the side seats below, with a full stack of chips. */
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 30%; --y: calc(var(--top-edge) + 22px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 70%; --y: calc(var(--top-edge) + 22px); }
+.felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: calc(var(--top-edge) + 22px); }
 .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 9%; --y: 75%; }
 .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 91%; --y: 75%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 8%; --y: calc(var(--top-edge) + 16px); }
-.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 92%; --y: calc(var(--top-edge) + 16px); }
+/* The top corners' buttons clear of a shown hand's name under those seats' cards. */
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 6%; --y: calc(var(--top-edge) + 16px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 94%; --y: calc(var(--top-edge) + 16px); }
 .felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 38%; --y: 25%; }
 @media (min-width: 760px) {
   /* (Faces and cards: the wide screen's own sizes, from the felt's height.) */
