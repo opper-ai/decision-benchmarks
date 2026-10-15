@@ -66,6 +66,9 @@
 .room button { font-family: var(--j-body); }
 .room :focus-visible { outline: 2px solid var(--h-amber); outline-offset: 2px; }
 
+/* The kit's page.css hides every `.lbl` (its leaderboard's phone labels); ours are inline text, so the room shows them. */
+.room .lbl { display: inline; }
+
 /* ---------- toolbar: the hand and level, the controls ---------- */
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 12px 14px 0; position: relative; z-index: 5; }
 .level { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13px; color: var(--h-dim); }
