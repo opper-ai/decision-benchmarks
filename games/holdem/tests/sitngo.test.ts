@@ -3,7 +3,8 @@ import { legalOptions, observe, toAct } from '../shared/engine';
 import { act, deal } from './support';
 import { DECK } from '../shared/cards';
 import { keyBytes, keyedShuffle, keyFromSeed, nextInt } from '../shared/rng';
-import { actSitAndGo, blindsAt, bustPlaces, HANDS_PER_LEVEL, knockedOutBy, levelInfo, newSitAndGo, nextHand, stacksOf, type SitAndGo } from '../shared/sitngo';
+import { actSitAndGo, blindsAt, bustPlaces, DEFAULT_SEATS, HANDS_PER_LEVEL, handsPerLevel, knockedOutBy, levelInfo, MAX_SEATS, MIN_SEATS, newSitAndGo, nextHand, stacksOf, type SitAndGo } from '../shared/sitngo';
+import { positionsOf } from '../shared/engine';
 
 /** Plays a Sit & Go to its end with random options (folds only now and then, so hands get played out). */
 function playRandom(g: SitAndGo, seed: number, onHand?: (g: SitAndGo) => void): SitAndGo {
@@ -40,16 +41,30 @@ describe('blind levels', () => {
     ]);
   });
 
-  it(`goes up every ${HANDS_PER_LEVEL} hands, counting the hand in play`, () => {
-    expect(levelInfo(0)).toEqual({ hand: 1, level: 1, sb: 10, bb: 20, ante: 0, handsUntilNextLevel: 8, next: { sb: 15, bb: 30, ante: 0 } });
-    expect(levelInfo(7)).toMatchObject({ hand: 8, level: 1, handsUntilNextLevel: 1 });
-    expect(levelInfo(8)).toMatchObject({ hand: 9, level: 2, sb: 15, bb: 30, handsUntilNextLevel: 8 });
-    expect(levelInfo(40)).toMatchObject({ level: 6, sb: 100, bb: 200, ante: 25 });
+  it(`goes up every ${HANDS_PER_LEVEL} hands at a table of 2 to 4, counting the hand in play`, () => {
+    for (const seats of [2, 3, 4]) {
+      expect(levelInfo(0, seats)).toEqual({ hand: 1, level: 1, sb: 10, bb: 20, ante: 0, handsUntilNextLevel: 8, next: { sb: 15, bb: 30, ante: 0 } });
+      expect(levelInfo(7, seats)).toMatchObject({ hand: 8, level: 1, handsUntilNextLevel: 1 });
+      expect(levelInfo(8, seats)).toMatchObject({ hand: 9, level: 2, sb: 15, bb: 30, handsUntilNextLevel: 8 });
+      expect(levelInfo(40, seats)).toMatchObject({ level: 6, sb: 100, bb: 200, ante: 25 });
+    }
+  });
+
+  it('lasts two orbits at a table of 5 or 6: 10 and 12 hands, the same blinds and antes', () => {
+    expect([2, 3, 4, 5, 6].map(handsPerLevel)).toEqual([8, 8, 8, 10, 12]);
+    expect(levelInfo(0, 6)).toEqual({ hand: 1, level: 1, sb: 10, bb: 20, ante: 0, handsUntilNextLevel: 12, next: { sb: 15, bb: 30, ante: 0 } });
+    expect(levelInfo(11, 6)).toMatchObject({ hand: 12, level: 1, handsUntilNextLevel: 1 });
+    expect(levelInfo(12, 6)).toMatchObject({ hand: 13, level: 2, sb: 15, bb: 30, handsUntilNextLevel: 12 });
+    expect(levelInfo(60, 6)).toMatchObject({ level: 6, sb: 100, bb: 200, ante: 25 });
+    expect(levelInfo(9, 5)).toMatchObject({ hand: 10, level: 1, handsUntilNextLevel: 1 });
+    expect(levelInfo(10, 5)).toMatchObject({ hand: 11, level: 2, handsUntilNextLevel: 10 });
+    expect(levelInfo(50, 5)).toMatchObject({ level: 6, sb: 100, bb: 200, ante: 25 });
   });
 });
 
 describe('a Sit & Go', () => {
-  it('seats 2 to 4 players with 1500 chips each and deals the first hand from the table key', () => {
+  it('seats 2 to 6 players (4 by default) with 1500 chips each and deals the first hand from the table key', () => {
+    expect([MIN_SEATS, DEFAULT_SEATS, MAX_SEATS]).toEqual([2, 4, 6]);
     const g = newSitAndGo({ seats: 4, key: keyFromSeed(5) });
     expect(g.hand.seats.map((p) => p.start)).toEqual([1500, 1500, 1500, 1500]);
     // The whole deck comes from the key's keystream for hand 0; the engine's deck seed plays no part.
@@ -60,8 +75,16 @@ describe('a Sit & Go', () => {
     expect(observe(g.hand, 0).level).toMatchObject({ handsUntilNextLevel: 8 });
     expect(newSitAndGo({ seats: 4, key: keyFromSeed(5) })).toEqual(g);
     expect(newSitAndGo({ seats: 2, key: keyFromSeed(5), startingStack: 300 }).hand.seats.map((p) => p.start)).toEqual([300, 300]);
-    expect(() => newSitAndGo({ seats: 5, key: keyFromSeed(1) })).toThrow();
-    expect(() => newSitAndGo({ seats: 1, key: keyFromSeed(1) })).toThrow();
+    expect(() => newSitAndGo({ seats: 7, key: keyFromSeed(1) })).toThrow(/2 to 6/);
+    expect(() => newSitAndGo({ seats: 1, key: keyFromSeed(1) })).toThrow(/2 to 6/);
+    expect(() => newSitAndGo({ seats: 4.5, key: keyFromSeed(1) })).toThrow(/2 to 6/);
+    for (const seats of [5, 6]) {
+      const big = newSitAndGo({ seats, key: keyFromSeed(5) });
+      expect(big.hand.seats.map((p) => p.start)).toEqual(Array(seats).fill(1500));
+      expect(big.places).toEqual(Array(seats).fill(null));
+      expect(observe(big.hand, 0).level).toMatchObject({ handsUntilNextLevel: 2 * seats });
+      expect(new Set(Array.from({ length: 60 }, (_, i) => newSitAndGo({ seats, key: keyFromSeed(i) }).button)).size).toBe(seats);
+    }
     // The first button comes from the key.
     expect(new Set(Array.from({ length: 40 }, (_, i) => newSitAndGo({ seats: 4, key: keyFromSeed(i) }).button)).size).toBe(4);
   });
@@ -93,11 +116,28 @@ describe('a Sit & Go', () => {
     expect(g.hand.deck).toEqual(keyedShuffle(DECK, keyBytes(keyFromSeed(11)), 1));
   });
 
-  it('raises the blinds every 8 hands', () => {
-    let g = newSitAndGo({ seats: 4, key: keyFromSeed(3) });
-    const seen: [number, number][] = [];
-    g = playRandom(g, 1, (h) => seen.push([h.handIndex, h.hand.bb]));
-    for (const [i, bb] of seen) expect(bb).toBe(blindsAt(Math.floor(i / HANDS_PER_LEVEL)).bb);
+  it('raises the blinds every 8 hands, every 10 at a table of 5 and 12 at a table of 6, as players bust too', () => {
+    for (const [seats, per] of [[4, 8], [5, 10], [6, 12]] as const) {
+      // The first of these random games that lasts past two levels.
+      let seen: [number, number, number][] = [];
+      for (let k = 0; seen.length <= 2 * per; k++) {
+        seen = [];
+        playRandom(newSitAndGo({ seats, key: keyFromSeed(3 + k) }), k, (h) => seen.push([h.handIndex, h.hand.bb, h.hand.ante]));
+      }
+      for (const [i, bb, ante] of seen) {
+        expect(bb).toBe(blindsAt(Math.floor(i / per)).bb);
+        expect(ante).toBe(blindsAt(Math.floor(i / per)).ante);
+      }
+    }
+  });
+
+  it('names six seats BTN, SB, BB, UTG, MP and CO, and fewer as players bust', () => {
+    const g = newSitAndGo({ seats: 6, key: keyFromSeed(8) });
+    const b = g.button;
+    const names = positionsOf(g.hand);
+    expect([0, 1, 2, 3, 4, 5].map((k) => names[(b + k) % 6])).toEqual(['BTN', 'SB', 'BB', 'UTG', 'MP', 'CO']);
+    expect(positionsOf(deal({ stacks: [100, 100, 100, 100, 100], button: 4 }))).toEqual(['SB', 'BB', 'UTG', 'CO', 'BTN']);
+    expect(positionsOf(deal({ stacks: [100, 0, 100, 100, 0, 100], button: 0 }))).toEqual(['BTN', '', 'SB', 'BB', '', 'UTG']);
   });
 
   it('places busted players: a bigger stack at the start of the hand places higher, then seat order', () => {
@@ -106,6 +146,8 @@ describe('a Sit & Go', () => {
     // Equal stacks: the lower seat places higher.
     expect(bustPlaces([400, 400, 400, 0], [1200, 0, 0, 0])).toEqual([null, 2, 3, null]);
     expect(bustPlaces([400, 400, 400], [400, 800, 0])).toEqual([null, null, 3]);
+    // Six seated, five bust at once: places 2 to 6 by the chips they started the hand with, then by seat.
+    expect(bustPlaces([1500, 300, 900, 1500, 900, 1500], [6600, 0, 0, 0, 0, 0])).toEqual([null, 6, 4, 2, 5, 3]);
   });
 
   it('credits a knockout to the winner of the last pot the busted player could win', () => {
@@ -118,8 +160,8 @@ describe('a Sit & Go', () => {
 
   it('ends when one player has every chip, with every place given once', () => {
     let doubleBusts = 0;
-    for (let i = 0; i < 60; i++) {
-      const seats = 2 + (i % 3);
+    for (let i = 0; i < 100; i++) {
+      const seats = 2 + (i % 5);
       const g = playRandom(newSitAndGo({ seats, key: keyFromSeed(1000 + i) }), i, (h) => {
         if (h.hand.seats.filter((p) => p.start > 0 && p.stack === 0).length > 1) doubleBusts++;
       });

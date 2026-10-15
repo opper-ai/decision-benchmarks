@@ -7,7 +7,7 @@
 import { botDecide, fallbackKey, isBotName, type BotName } from './bots.ts';
 import { applyAction, isOptionKey, legalOptions, newHand, observe, toAct, type Action, type HandEvent, type HandState, type OptionKey } from './engine.ts';
 import { hashText, isTableKey } from './rng.ts';
-import { actSitAndGo, newSitAndGo, nextHand, type SitAndGo } from './sitngo.ts';
+import { actSitAndGo, MAX_SEATS, newSitAndGo, nextHand, type SitAndGo } from './sitngo.ts';
 
 export type PlayerKind = 'model' | 'bot' | 'human';
 /** Who plays: a model by its id, a bot by its name (bots.ts), a human by any name. */
@@ -55,7 +55,10 @@ export interface RecordedHand {
 export interface Recording {
   format: 1;
   game: 'holdem';
-  /** sitngo: one Sit & Go, players[i] in seat i. cash: independent hands with stacks reset, e.g. duplicate deals. */
+  /**
+   * sitngo: one Sit & Go of 2 to 6, players[i] in seat i. cash: independent hands with stacks reset, e.g. duplicate
+   * deals (the benchmark's are 4-handed: bench.ts verifyBench refuses any other field).
+   */
   mode: 'sitngo' | 'cash';
   players: Player[];
   /** The table key (64 hex digits, rng.ts) deals every hand of a Sit & Go. */
@@ -124,7 +127,8 @@ function shapeProblem(r: Record<string, unknown>): string | null {
   if (r.format !== 1 || r.game !== 'holdem') return "not a format 1 AI Hold'em recording";
   if (r.mode !== 'sitngo' && r.mode !== 'cash') return 'mode must be sitngo or cash';
   const players = r.players;
-  if (!Array.isArray(players) || players.length < 2 || players.length > (r.mode === 'sitngo' ? 4 : 10)) return `players must list 2 to ${r.mode === 'sitngo' ? 4 : 10} players`;
+  const most = r.mode === 'sitngo' ? MAX_SEATS : 10;
+  if (!Array.isArray(players) || players.length < 2 || players.length > most) return `players must list 2 to ${most} players`;
   for (let i = 0; i < players.length; i++) {
     const p: unknown = players[i];
     if (!isObj(p) || (p.kind !== 'model' && p.kind !== 'bot' && p.kind !== 'human')) return `player ${i + 1}: kind must be model, bot or human`;

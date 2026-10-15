@@ -179,6 +179,11 @@ describe('verify', () => {
       [(r) => (r.bench.version = 99), /version/],
       [(r) => (r.bench.seed = 1), /seed/],
       [(r) => ((r.players[1] as { id: string }).id = 'station'), /field/],
+      // The benchmark stays 4-handed, though a Sit & Go now seats up to 6.
+      [(r) => r.players.push({ kind: 'bot', id: 'rock' }), /field/],
+      [(r) => r.players.push({ kind: 'bot', id: 'rock' }, { kind: 'bot', id: 'station' }), /field/],
+      [(r) => r.players.pop(), /field/],
+      [(r) => Object.assign(r, { mode: 'sitngo' }), /cash hands/],
       [(r) => (r.players[0] = { kind: 'bot', id: 'rock' }), /model under test/],
       [(r) => (r.players[0] = { kind: 'model', id: 'someone-else' }), /as bench.model names it/],
       [(r) => (r.cash = { ...CASH, stack: 400 }), /cash hands/],
