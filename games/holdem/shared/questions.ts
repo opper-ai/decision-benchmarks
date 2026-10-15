@@ -78,8 +78,8 @@ export const MAX_TALK_LINES = 3;
  * A human's line of table talk, made safe to put in a model's state: control and invisible formatting characters
  * (bidi overrides, zero-width) taken out, whitespace (newlines included) collapsed to single spaces, anything that
  * looks like prompt or chat-template structure (```, <|...|>, <tags>) defused, and the result cut to MAX_SAY at a word
- * boundary, never inside a character, ending in "...". Emoji sequences (joiners, flag tags) survive; bidi controls and
- * other invisible formatting don't. Idempotent: cleanTalk(cleanTalk(x)) === cleanTalk(x), so the page and the server,
+ * boundary, never inside a character, ending in "...". Emoji sequences (joiners between pictographs, a flag's tags)
+ * survive; hidden tag characters, stray joiners, bidi controls and other invisible formatting don't. Idempotent: cleanTalk(cleanTalk(x)) === cleanTalk(x), so the page and the server,
  * which both clean a line, agree on it. The state then carries it JSON-encoded, as every other line of talk. '' when
  * nothing is left.
  */
@@ -95,7 +95,14 @@ export function cleanTalk(text: string): string {
   return t;
 }
 
-/** Keeps the format characters emoji are made of: the zero-width joiner, and the tags of subdivision flags. */
+/**
+ * Tag characters (U+E0000-E007F) are invisible to the player and the page but readable by a model ("ASCII smuggling"):
+ * they stay only inside a real emoji tag sequence, a flag (U+1F3F4, 1 to 6 tag letters, the cancel tag), and go
+ * everywhere else. A zero-width joiner stays only between two pictographs (an emoji sequence such as 🤦‍♂️).
+ */
+const TAG_OR_FLAG = /\u{1F3F4}[\u{E0061}-\u{E007A}]{1,6}\u{E007F}|[\u{E0000}-\u{E007F}]/gu;
+const STRAY_JOINER = /(?<!\p{Extended_Pictographic}\uFE0F?)\u200D|\u200D(?!\p{Extended_Pictographic})/gu;
+/** The format characters left after that are part of an emoji: kept. */
 const KEEP_FORMAT = (c: string): boolean => c === '\u200D' || (c.codePointAt(0)! >= 0xe0020 && c.codePointAt(0)! <= 0xe007f);
 
 function cleanOnce(text: string): string {
@@ -103,6 +110,8 @@ function cleanOnce(text: string): string {
     .replace(LONE_SURROGATE, '')
     .normalize('NFKC')
     .replace(/[\p{Cc}\p{Co}\u2028\u2029]/gu, ' ')
+    .replace(TAG_OR_FLAG, (m) => (m.startsWith('\u{1F3F4}') ? m : ''))
+    .replace(STRAY_JOINER, '')
     .replace(/\p{Cf}/gu, (c) => (KEEP_FORMAT(c) ? c : ' '))
     .replace(/`{2,}/g, "'")
     .replace(/<\|?|\|?>/g, (m) => m.replace('<', '\u2039').replace('>', '\u203a'))
