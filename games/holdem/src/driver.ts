@@ -34,4 +34,9 @@ export interface TableDriver {
    * review. Never the hand in play, and never the seed (it deals the hands to come).
    */
   review(): Promise<Review>;
+  /**
+   * Play mode: a line of your own table talk (at most 90 characters), sent with the next request; the models may
+   * answer it. Absent where the table takes no talk.
+   */
+  say?(text: string): void;
 }

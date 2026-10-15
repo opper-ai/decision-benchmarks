@@ -1,7 +1,6 @@
 // A recorded game played back in the room: a share link (#/r/<code>) or a curated replay (#/demo/<file>). Every card
 // face up, as a spectator sees a finished game, with play and pause, a move at a time, the speed, and a jump to any
 // hand; at the end, the end poster with its share buttons.
-import type { HandEvent } from '../shared/engine.ts';
 import type { Recording } from '../shared/recording.ts';
 import { audio } from './audio.ts';
 import { focusDialog, h, reducedMotion, wait } from './dom.ts';
@@ -11,7 +10,8 @@ import { endView } from './views/end.ts';
 import { reviewView } from './views/review.ts';
 import { TableUI } from './views/table.ts';
 import { aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
-import { ThinkingLog } from './views/thinking-log.ts';
+import { ChatBox } from './views/chat.ts';
+import type { ActionMeta } from './driver.ts';
 
 export interface ReplayOptions {
   recording: Recording;
@@ -73,18 +73,15 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     jump = Number(handSelect.value);
     nudge();
   });
-  const thinking = new ThinkingLog({ label: 'What the models said and why', people: seats.map(personOf) });
-  const log = thinking.el;
-  const thinkingBtn = h('button.tbtn', { type: 'button', 'aria-pressed': 'false', onclick: () => {
-    log.hidden = !log.hidden;
-    thinkingBtn.setAttribute('aria-pressed', String(!log.hidden));
-  } }, 'Show thinking');
+  // The table chat: the dealer's lines, and what the models said and why (every card is up in a replay).
+  const chat = new ChatBox({ people: seats.map(personOf), viewer: null });
+  let said: { seat: number; meta: ActionMeta } | undefined;
   const reviewBtn = h('button.tbtn', { type: 'button', onclick: () => void openReview() }, 'Review');
   const toolbar = h(
     'div.toolbar',
     null,
     h('div.replay-title', null, h('span.replay-chip', null, 'Replay'), h('b', null, o.title), level),
-    h('div.tools', null, playBtn, stepBtn, speedGroup, handSelect, thinkingBtn, reviewBtn, h('button.tbtn', { type: 'button', onclick: o.onLeave }, 'Leave')),
+    h('div.tools', null, playBtn, stepBtn, speedGroup, handSelect, chat.button, reviewBtn, h('button.tbtn', { type: 'button', onclick: o.onLeave }, 'Leave')),
   );
   drawPlay();
   const onKey = (e: KeyboardEvent) => {
@@ -102,7 +99,7 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
   let ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion });
   const tableHost = h('div.replay-table', null, ui.el);
   host.classList.add('watching');
-  host.replaceChildren(toolbar, tableHost, log);
+  host.replaceChildren(toolbar, tableHost, chat.el);
 
   let overlay: HTMLElement | null = null;
   const closeOverlay = () => {
@@ -141,6 +138,8 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
   const playNew = async (s: TableSnapshot) => {
     const fresh = s.events.slice(shown);
     shown = s.events.length;
+    chat.feed(fresh, s.hand, said);
+    said = undefined;
     snap = s;
     await ui.play(fresh, s);
     drawLevel(s);
@@ -199,8 +198,7 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     ui.stopThinking(seat);
     const r = await driver.step();
     ui.showMeta(r.seat, r.meta);
-    const act = r.snapshot.events.slice(shown).find((e): e is Extract<HandEvent, { type: 'action' }> => e.type === 'action');
-    if (act) thinking.add({ hand: r.snapshot.hand, events: r.snapshot.events, act, person: ui.person(r.seat), meta: r.meta });
+    said = { seat: r.seat, meta: r.meta };
     await playNew(r.snapshot);
   }
 

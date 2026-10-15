@@ -6,7 +6,7 @@ import { h } from '../dom.ts';
 import type { Review, ReviewHand } from '../driver.ts';
 import { describeHighlight, factsOf, highlightsOf, titleOf } from '../highlights.ts';
 import { aHand, chips, handName, personOf, STREET_NAMES, tellBars, type SeatPerson } from '../view-model.ts';
-import { chipEl } from './thinking-log.ts';
+import { chipEl } from './chat.ts';
 import { clipButton } from './end.ts';
 import { avatarEl, cardEl } from './parts.ts';
 

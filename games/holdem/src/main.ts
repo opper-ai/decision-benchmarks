@@ -7,10 +7,9 @@ import { appPath } from '../../../packages/kit/client/paths.ts';
 import { warmUp } from '../../../packages/kit/client/transport.ts';
 import { ModelWarming } from '../../../packages/kit/client/warming.ts';
 import { track, trackClicks } from '../../../packages/kit/client/track.ts';
-import type { HandEvent } from '../shared/engine.ts';
 import { audio } from './audio.ts';
 import { focusDialog, h, reducedMotion, wait } from './dom.ts';
-import type { StepResult, TableDriver, TableSnapshot } from './driver.ts';
+import type { ActionMeta, StepResult, TableDriver, TableSnapshot } from './driver.ts';
 import { LocalDriver } from './local-driver.ts';
 import { reconnectBanner } from './views/reconnect.ts';
 import { choiceOf, retryChoice } from './reconnect.ts';
@@ -24,7 +23,7 @@ import { lobbyView, seatsOf, type LobbyAccess, type LobbyChoice } from './views/
 import { reviewView } from './views/review.ts';
 import { TableUI } from './views/table.ts';
 import { aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
-import { ThinkingLog } from './views/thinking-log.ts';
+import { ChatBox } from './views/chat.ts';
 import { confirmDialog } from './views/confirm.ts';
 import { preloadFaces } from './views/parts.ts';
 
@@ -48,7 +47,6 @@ const SPEAKER_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden
 /** The hand review (a list), and leaving the table (out through a door). */
 const REVIEW_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="6" r="1.4" fill="currentColor"/><circle cx="4" cy="12" r="1.4" fill="currentColor"/><circle cx="4" cy="18" r="1.4" fill="currentColor"/></svg>';
 const LEAVE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M14 4H6v16h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><path d="M11 12h10M17 8l4 4-4 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const THINK_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><path d="M8 10h8M8 13h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 /** An icon from its markup (ours, above). */
 function svg(markup: string): HTMLElement {
   const el = h('span.ic', { 'aria-hidden': 'true' });
@@ -254,8 +252,12 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   // ---------- the toolbar ----------
   const level = h('div.level', { 'aria-live': 'polite' });
   const tools = h('div.tools');
-  const thinking = new ThinkingLog({ label: 'What the models are thinking', people: seats.map(personOf) });
-  const log = thinking.el;
+  // The table chat: the dealer's lines, the models' talk (and why, once the cards are up), and in play your own.
+  const chat = new ChatBox({
+    people: seats.map(personOf),
+    viewer: watching ? null : 0,
+    ...(watching ? {} : { onSay: (text: string) => driver.say?.(text) }),
+  });
   if (watching) {
     const group = h('div.speed', { role: 'radiogroup', 'aria-label': 'Speed' });
     for (const s of [1, 2, 4, 8]) {
@@ -274,12 +276,8 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     }
     tools.append(group);
   }
-  // What the models think, as they act: watching, and in play once you are out (the snapshot says spectating).
-  const thinkingBtn = h('button.tbtn.word', { type: 'button', 'aria-pressed': 'false', 'aria-label': 'Show thinking', title: 'What the models are thinking', hidden: !watching, onclick: () => {
-    log.hidden = !log.hidden;
-    thinkingBtn.setAttribute('aria-pressed', String(!log.hidden));
-  } }, svg(THINK_ICON), h('span.lbl', null, 'Show thinking'));
-  tools.append(thinkingBtn);
+  // A phone opens the chat from here (a wide screen has it beside the table).
+  tools.append(chat.button);
   // Off until the table has started: before that there is nothing to review.
   // Review and Leave: words on a wide screen, icons on a phone, where the toolbar is one line (style.css).
   const reviewBtn = h('button.tbtn.word', { type: 'button', disabled: true, 'aria-label': 'Review', title: 'Review the hands', onclick: () => void openReview() }, svg(REVIEW_ICON), h('span.lbl', null, 'Review')) as HTMLButtonElement;
@@ -315,7 +313,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   if (signal.aborted) return;
   host.classList.toggle('watching', watching);
   host.classList.remove('all-up');
-  host.replaceChildren(toolbar, ui.el, actions, log, reconnect.el);
+  host.replaceChildren(toolbar, ui.el, actions, chat.el, reconnect.el);
 
   const drawLevel = (s: TableSnapshot) => {
     const t = levelText(s.view.level);
@@ -353,9 +351,10 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     restore = focusDialog(overlay);
   };
 
-  const logStep = (r: StepResult, events: readonly HandEvent[]) => {
-    const act = events.find((e): e is Extract<HandEvent, { type: 'action' }> => e.type === 'action' && e.seat === r.seat);
-    if (act) thinking.add({ hand: r.snapshot.hand, events: r.snapshot.events, act, person: ui.person(r.seat), meta: r.meta });
+  /** The answer's own move, its words and why: the chat puts them on its move (playNew). */
+  let said: { seat: number; meta: ActionMeta } | undefined;
+  const logStep = (r: StepResult) => {
+    said = { seat: r.seat, meta: r.meta };
   };
 
   // ---------- the game ----------
@@ -388,10 +387,11 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   let shown = 0;
   let knockedOut = 0;
   /** Play mode, out of the game: every card face up and the models' thinking from now on, as in watch mode. */
+  let seeingAll = false;
   const spectate = () => {
-    if (watching || !thinkingBtn.hidden) return;
+    if (watching || seeingAll) return;
+    seeingAll = true;
     ui.seeAll();
-    thinkingBtn.hidden = false;
     host.classList.add('all-up');
   };
   const playNew = async (s: TableSnapshot) => {
@@ -399,6 +399,8 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     shown = s.events.length;
     snap = s;
     if (s.spectating) spectate();
+    chat.feed(fresh, s.hand, said);
+    said = undefined;
     await ui.play(fresh, s);
     drawLevel(s);
   };
@@ -489,7 +491,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
       ui.showMeta(r.seat, r.meta);
     }
     if (signal.aborted) return;
-    logStep(r, r.snapshot.events.slice(shown));
+    logStep(r);
     await playNew(r.snapshot);
   }
 
@@ -557,7 +559,8 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
         resolve();
       };
       const onKey = (e: KeyboardEvent) => {
-        if (overlay || host.querySelector('.confirm-veil') || e.metaKey || e.ctrlKey || e.altKey) return;
+        const t = e.target as HTMLElement | null;
+        if (overlay || host.querySelector('.confirm-veil') || e.metaKey || e.ctrlKey || e.altKey || t?.tagName === 'INPUT') return;
         if (e.key === 'n' || e.key === 'N') go();
       };
       const deal = h('button.cta', { type: 'button', onclick: go }, 'Deal the next hand');

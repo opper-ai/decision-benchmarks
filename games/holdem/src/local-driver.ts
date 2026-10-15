@@ -108,6 +108,9 @@ function moodFor(verb: Verb, strength: number, r: number): Mood {
   return r < 0.65 ? 'confident' : 'nervous';
 }
 
+/** What a practice stand-in says back to your talk. */
+const RETORTS: readonly string[] = ['Big words. Show me the cards.', 'Talk is cheap. Chips are not.', 'Noted. Still calling.', 'You sound nervous.', 'Bold. Let us see.', 'I have heard that before.'];
+
 export class LocalDriver implements TableDriver {
   thinkScale: number;
   private sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
@@ -127,6 +130,8 @@ export class LocalDriver implements TableDriver {
   /** Actions per hand, in order. */
   private hands: RecordedAction[][] = [];
   private finished: ReviewHand[] = [];
+  /** The player's latest table talk, waiting for a chat model to answer it (say()). */
+  private heard: string | null = null;
   /** When the human's current turn began (for latencyMs). */
   private turnStart = 0;
 
@@ -207,7 +212,11 @@ export class LocalDriver implements TableDriver {
       if (who.style === 'chat') {
         const lines = LINES[who.standIn!][verb];
         meta.mood = record.mood = moodFor(verb, strength, coin());
-        if (coin() < 0.7) meta.say = record.say = lines[Math.floor(coin() * lines.length)]!;
+        // Your talk (say()): the next chat model to act may answer it, with a line of its own.
+        const heard = this.heard;
+        this.heard = null;
+        if (heard && coin() < 0.6) meta.say = record.say = RETORTS[Math.floor(coin() * RETORTS.length)]!;
+        else if (coin() < 0.7) meta.say = record.say = lines[Math.floor(coin() * lines.length)]!;
         record.reasoning = `Practice stand-in (${who.standIn} bot). I hold ${o.holeCards.join(' ')}${o.board.length ? ` on ${o.board.join(' ')}` : ''}: ${HAND_WORDS(o)}. ${o.pot} in the pot, ${o.toCall ? `${o.toCall} to call` : 'nothing to call'}. ${verb === 'fold' ? 'Not worth it.' : verb === 'check' ? 'No need to build the pot.' : verb === 'call' ? 'The price is right.' : strength > 0.6 ? 'Value: make them pay.' : 'Pressure: they may fold.'}`;
         if (this.watching || this.humanOut) meta.reasoning = record.reasoning;
       } else {
@@ -258,6 +267,11 @@ export class LocalDriver implements TableDriver {
   /** Who stands in for each seat (null for the human): for the page's practice notice and tests. */
   standIns(): (BotName | null)[] {
     return this.seats.map((s) => s.standIn);
+  }
+
+  /** Your table talk: practice has nobody to send it to, so a stand-in may answer it on its next move. */
+  say(text: string): void {
+    if (this.human !== null && text.trim()) this.heard = text.trim().slice(0, 90);
   }
 
   snapshot(): TableSnapshot {
