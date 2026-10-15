@@ -148,6 +148,27 @@ describe('the table hears the human', () => {
     expect((await call('act', { token, action, talk: ['y'] })).body).toMatchObject({ talkRefused: { why: 'busy' } });
   });
 
+  it('charges talk only once the request is let in: a step refused for want of a payer leaves the allowance untouched', async () => {
+    const s = await setup({ signedIn: true, limits: { ...LOOSE, talk: { ratePerSec: 0.001, burst: 3 } } });
+    let { token, snapshot } = (await s.call('start', PLAY(CHAT))).body as unknown as SnapshotReply;
+    while (snapshot.turn) {
+      const r = (await s.call('act', { token, action: { key: passive(snapshot) } })).body as unknown as StepReply;
+      ({ token } = r);
+      snapshot = r.result.snapshot;
+    }
+    expect(snapshot.view.street).not.toBe('done');
+    const body = JSON.stringify({ token, talk: ['a', 'b', 'c'] });
+    // Signed out now (no cookie): a chat model's step is refused, again and again.
+    for (let i = 0; i < 3; i++) {
+      const res = await fetch(`${s.url}/api/table/step`, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+      expect(res.status).toBe(401);
+    }
+    // Signed in again: the same lines are said, none of the refused attempts having used the allowance.
+    const r = (await s.call('step', { token, talk: ['a', 'b', 'c'] })).body as unknown as StepReply;
+    expect(r.result.talk?.map((x) => x.say)).toEqual(['a', 'b', 'c']);
+    expect(r).not.toHaveProperty('talkRefused');
+  });
+
   it('never says a line twice when the same request is sent again (a retry), and the recording keeps the talk for the review', async () => {
     const { call, up } = await setup({ signedIn: true });
     let { token: t, snapshot: s } = (await call('start', PLAY(CHAT, DECISION, DECISION2))).body as unknown as SnapshotReply;

@@ -277,8 +277,9 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
    * The human's lines that come with a request (step, act, next): `talk`, at most MAX_TALK_LINES, each made safe
    * (cleanTalk), said now (after the hand's actions so far). Talk never holds up the move: lines past the hand's room
    * (MAX_HAND_TALK) or over the visitor's talk allowance (the batch is taken whole or not at all) are not said, and the
-   * answer says which (`talkRefused`), so the page can show them as not sent. Lines that are not said cost nothing.
-   * Play mode only: watch mode has no human to speak (400).
+   * answer says which (`talkRefused`), so the page can show them as not sent. Lines that are not said cost nothing:
+   * each route calls this last, once the request is let in (its turn, its payer and the free credits' allowance), so
+   * a refused request takes no talk. Play mode only: watch mode has no human to speak (400).
    */
   const talkFor = (call: GameApiCall, t: Table): { t: Table; said: TalkLine[]; refused?: TalkRefused } | GameApiResponse => {
     const raw = (call.body as Record<string, unknown>).talk;
@@ -450,10 +451,6 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     const id = t.st.seats[seat];
     if (id === null || id === undefined) return fail(409, 'It is your turn: the AIs wait for you');
     if (stale(t)) return answered(t, request) ?? STALE;
-    // The human's lines come first: the model hears them in this very step.
-    const talked = talkFor(call, t);
-    if (!('said' in talked)) return talked;
-    t = talked.t;
     const model = holdemModel(id)!;
     const payer = payerFor(call, [model]);
     if (!isPayer(payer)) return payer;
@@ -461,6 +458,11 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
       const refused = call.takePool();
       if (refused) return refused;
     }
+    // The human's lines, once the step is let in (so a refused one costs no talk), before the model is asked: the
+    // model hears them in this very step.
+    const talked = talkFor(call, t);
+    if (!('said' in talked)) return talked;
+    t = talked.t;
     const x = await ask(call, t, model, payer, deps);
     if (!('seat' in x)) return x;
     // Another request on this token (another instance's retry, a different body) ended the hand meanwhile.
