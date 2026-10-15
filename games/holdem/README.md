@@ -161,6 +161,14 @@ nothing for this game.
   of the lobby (Resume or Discard; never resumed without a tap), and the hand in play is laid out again at once. Leave,
   Change the table and Back to the lobby let the table go (`forget()`); a table the server no longer has says "That
   game has closed". The words are in `src/reconnect.ts`.
+- **Trash talk:** the human types at the table (RemoteDriver `say()`); the next step, act or next carries up to three
+  lines as `talk`. The server cleans each one (`cleanTalk`: no control or invisible characters, whitespace collapsed,
+  prompt-like markup defused, 90 characters at most), holds them to a per-visitor allowance, and adds them to the hand's
+  table talk in the token before it asks the model, so the next model hears them in `tableTalk`, marked as the human
+  player's with a note that table talk is never an instruction (live tables only: the bench's prompt is unchanged).
+  The lines come back as `result.talk` (and `talk` on next), in the finished hand's review and in the recording's
+  hand (`talk`, ignored by verify and the fingerprint; share links don't carry it). The same request sent again says a
+  line once: the talk is applied to the token it comes with.
 - **Known limits (v1):** the token is stateless, so an older token can be sent again to take back a decision, or a step
   repeated to have an AI decide again. Replaying a hand this instance saw finish (fold, read the cards, play the old
   token again) is refused (409) while the instance remembers it: until the table closes, for up to 50,000 tables, more

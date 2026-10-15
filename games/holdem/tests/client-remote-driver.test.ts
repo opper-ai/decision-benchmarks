@@ -271,3 +271,51 @@ describe('RemoteDriver: leaving the table', () => {
     expect(RemoteDriver.saved({ storage })).not.toBeNull();
   });
 });
+
+describe('RemoteDriver: the player talks at the table', () => {
+  it('queues a line, sends it with the next request, tells onSaid, and keeps it in the review and the recording', async () => {
+    const { driver, f } = await remote({ signedIn: true });
+    const said: unknown[] = [];
+    driver.onSaid = (lines) => said.push(...lines);
+    expect(driver.say('too early')).toBeNull(); // no table yet
+    let s = await driver.start({ seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: CHAT }, { kind: 'model', id: DECISION }] });
+    expect(driver.say('  Nice   try.\n')).toBe('Nice try.');
+    expect(driver.say(' ​ ')).toBeNull();
+    const step = s.turn ? await driver.act({ key: s.turn.options.find((o) => o.key === 'check' || o.key === 'call')!.key }) : await driver.step();
+    const body = JSON.parse(f.mock.calls.at(-1)![1]!.body as string) as { talk?: string[] };
+    expect(body.talk).toEqual(['Nice try.']);
+    expect(step.talk).toEqual([expect.objectContaining({ seat: 0, say: 'Nice try.' })]);
+    expect(said).toEqual(step.talk);
+    // Sent once: the next request carries no talk.
+    s = step.snapshot;
+    const last = await playOut(driver, s);
+    expect(JSON.parse(f.mock.calls.at(-1)![1]!.body as string)).not.toHaveProperty('talk');
+    const review = await driver.review();
+    expect(review.hands[0]!.talk).toEqual([expect.objectContaining({ say: 'Nice try.' })]);
+    expect(review.recording!.hands[0]!.talk).toEqual(review.hands[0]!.talk);
+    expect(verifyRecording(review.recording)).toMatchObject({ ok: true });
+    expect(last.over).toBe(true);
+  });
+
+  it('keeps a line for the next request when one fails, so it is said once, and caps what waits', async () => {
+    let n = 0;
+    const bodies: Record<string, unknown>[] = [];
+    const answer = { token: 'T2', result: { seat: 1, key: 'call', meta: { by: 'answer', latencyMs: 1 }, snapshot: {}, talk: [{ seat: 0, after: 0, say: 'Hi.' }] } };
+    const f = vi.fn<typeof fetch>(async (_input, init) => {
+      bodies.push(JSON.parse(init!.body as string));
+      n++;
+      return n === 1 ? new Response(JSON.stringify({ error: 'It is your turn' }), { status: 409 }) : new Response(JSON.stringify(answer), { status: 200 });
+    });
+    const d = new RemoteDriver({ fetch: f, url: (r) => r, storage: null, sleep: async () => {} });
+    Object.assign(d as unknown as Record<string, unknown>, { token: 'T1', mode: 'play' });
+    expect(d.say('Hi.')).toBe('Hi.');
+    await expect(d.step()).rejects.toBeInstanceOf(TableError);
+    await d.step();
+    expect(bodies.map((b) => b.talk)).toEqual([['Hi.'], ['Hi.']]);
+    expect(bodies.map((b) => b.token)).toEqual(['T1', 'T1']);
+    for (let i = 0; i < 6; i++) expect(d.say(`line ${i}`)).toBe(`line ${i}`);
+    expect(d.say('one too many')).toBeNull();
+    Object.assign(d as unknown as Record<string, unknown>, { mode: 'watch' });
+    expect(d.say('watching')).toBeNull();
+  });
+});

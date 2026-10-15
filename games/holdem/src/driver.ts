@@ -7,9 +7,9 @@
 // Everything is async because real models take seconds. One AI action per step(), so the page animates each action as
 // it arrives.
 import type { Action } from '../shared/engine.ts';
-import type { Review, SeatConfig, StepResult, TableSnapshot } from '../shared/table.ts';
+import type { Review, SeatConfig, StepResult, TableSnapshot, TalkLine } from '../shared/table.ts';
 
-export type { ActionMeta, HumanTurn, Review, ReviewHand, SeatConfig, SeatKind, StepResult, TableSnapshot } from '../shared/table.ts';
+export type { ActionMeta, HumanTurn, Review, ReviewHand, SeatConfig, SeatKind, StepResult, TableSnapshot, TalkLine } from '../shared/table.ts';
 
 export interface TableConfig {
   /** 2 to 4 seats, seat 0 first. Play mode has exactly one human seat; watch mode has none. */
@@ -35,8 +35,10 @@ export interface TableDriver {
    */
   review(): Promise<Review>;
   /**
-   * Play mode: a line of your own table talk (at most 90 characters), sent with the next request; the models may
-   * answer it. Absent where the table takes no talk.
+   * The player says something at the table (play mode; the models hear it, and practice stand-ins may answer): the
+   * line as it will be said, or null when it can't be (nothing left after cleaning, watch mode, too many waiting).
    */
-  say?(text: string): void;
+  say?(text: string): string | null;
+  /** Told when the player's lines reached the table, as the table placed them (with say). */
+  onSaid?: ((lines: TalkLine[]) => void) | null;
 }

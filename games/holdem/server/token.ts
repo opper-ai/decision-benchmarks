@@ -12,7 +12,8 @@
 import type { Action, OptionKey } from '../shared/engine.ts';
 import { holdemModel } from '../shared/models.ts';
 import { isTableKey } from '../shared/rng.ts';
-import { MOODS, type FallbackReason, type Mood, type RecordedAction } from '../shared/recording.ts';
+import { MOODS, type FallbackReason, type Mood, type RecordedAction, type TalkLine } from '../shared/recording.ts';
+import { MAX_SAY } from '../shared/questions.ts';
 import { actSitAndGo, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
 import { finishedHandOf, type ReviewHand } from '../shared/table.ts';
 
@@ -20,6 +21,8 @@ import { finishedHandOf, type ReviewHand } from '../shared/table.ts';
 export const TOKEN_VERSION = 2;
 /** A table lasts six hours from its start: a Sit & Go takes 40 to 80 hands, minutes each at worst. */
 export const TABLE_TTL_MS = 6 * 3600_000;
+/** The human's lines kept for one hand: far above what a rate-limited player types in a hand. */
+export const MAX_HAND_TALK = 60;
 
 /** One action's metadata, keys kept short (the token goes back and forth with every request). */
 export interface CompactMeta {
@@ -45,6 +48,8 @@ export interface TableState {
   log: string[];
   /** The hand in play's metadata, one per action so far. */
   meta: CompactMeta[];
+  /** The human's table talk in the hand in play: [actions played before it, the line] (cleanTalk). */
+  t?: [number, string][];
   /** When this token was issued (ms): a human's think time counts from it. */
   at: number;
   /** When the table expires (ms). */
@@ -110,6 +115,7 @@ export function parseState(v: unknown): TableState | null {
   if (!Array.isArray(seats) || seats.length < 2 || seats.length > 4 || !seats.every((s) => s === null || (typeof s === 'string' && holdemModel(s)))) return null;
   if (seats.filter((s) => s === null).length !== (v.mode === 'play' ? 1 : 0)) return null;
   for (const m of v.meta as Record<string, unknown>[]) if (m.m !== undefined && !MOODS.includes(m.m as Mood)) return null;
+  if (v.t !== undefined && !(Array.isArray(v.t) && v.t.length <= MAX_HAND_TALK && v.t.every((x) => Array.isArray(x) && x.length === 2 && isInt(x[0]) && typeof x[1] === 'string' && x[1].length <= MAX_SAY))) return null;
   return v as unknown as TableState;
 }
 
@@ -118,6 +124,8 @@ export interface Table {
   st: TableState;
   g: SitAndGo;
   hands: RecordedAction[][];
+  /** The human's table talk in the hand in play, in order. */
+  talk: TalkLine[];
   /** With `finished`: every hand played to its end, face up, for the review. */
   finished: ReviewHand[];
 }
@@ -127,6 +135,8 @@ export function rebuild(st: TableState, o: { finished?: boolean } = {}): Table {
   let g = newSitAndGo({ seats: st.seats.length, key: st.key });
   const hands: RecordedAction[][] = [];
   const finished: ReviewHand[] = [];
+  const human = st.seats.indexOf(null);
+  const talk: TalkLine[] = (st.t ?? []).map(([after, say]) => ({ seat: human, after, say }));
   st.log.forEach((line, h) => {
     if (h > 0) g = nextHand(g);
     const last = h === st.log.length - 1;
@@ -141,7 +151,7 @@ export function rebuild(st: TableState, o: { finished?: boolean } = {}): Table {
     }
     if (!last && g.hand.street !== 'done') throw new Error(`hand ${h + 1} stops before it ended`);
     hands.push(actions);
-    if (o.finished && g.hand.street === 'done') finished.push(finishedHandOf(g, actions));
+    if (o.finished && g.hand.street === 'done') finished.push(finishedHandOf(g, actions, last ? talk : []));
   });
-  return { st, g, hands, finished };
+  return { st, g, hands, talk, finished };
 }
