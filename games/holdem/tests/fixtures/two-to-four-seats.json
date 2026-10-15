@@ -1,0 +1,78 @@
+{
+  "demos": {
+    "titans.json.gz": {
+      "fingerprint": "59670d5acea32cef09a106878c79d1f5",
+      "replay": "6720f614e0c63b29a20279c90d6df6b0",
+      "walk": "d960630fb8e86a6337e3362c559e5d0d"
+    },
+    "claude-vs-gpt.json.gz": {
+      "fingerprint": "fe1fdc1d132d631730ac41dd332dfefe",
+      "replay": "baf92ca4652cc616635e84043fb636d6",
+      "walk": "07ed484997adc35c2a625b9bd8b42f4d"
+    },
+    "open-models.json.gz": {
+      "fingerprint": "08e83657263636e82eb4e81dc340e486",
+      "replay": "277e6a7d5922cc97f21a6120faa88cb1",
+      "walk": "eb2f9ec958323002d2d12994c07a49e2"
+    },
+    "decision-models.json.gz": {
+      "fingerprint": "ce3d97c4f0a6131ac1e4f3249ca2ba2a",
+      "replay": "68b9e0720c7367fe5e39180c35dc28f9",
+      "walk": "8ba3e60f69379c251cedd962530a4ce4"
+    }
+  },
+  "links": [
+    {
+      "seats": 2,
+      "code": "AgIAiwIJON9tAs2Agxqly73ZqsFVrpwZz9wbKAvJGRBqOsDlMhER-rsSIRERUiEREREhERERIRETIy_b8yIREVIW-JsSMh-qchERIRYkIVJSERERIRERESEWIRMiEyEREhEV_I0oIf7tMiZSFDIUIlL68zRyJSFiH8siNlIREREhEZMhEhERER_vsoIRb-mBgmJiEREhEfuaMv_JEhERESEXIhERERghEREf_-ElIRUhFSghFS4",
+      "recording": "e68c96a8a6e766a9e78235d8b0fb202d",
+      "walk": "d90bf99d813fed74b6de75a4e0f9044c",
+      "token": "5f8177a99ab0912a1d4a41b0d7741234"
+    },
+    {
+      "seats": 2,
+      "code": "AgJAgai_VptPqA-OsLXgycqkkWJi6o0ipdRUOInYfXv589fnISIIICUhESEVJSFSJiMhESICETIZEhESIhghYiInIZEpGSEgJAIFIREpkYAi",
+      "recording": "f8e9bcc3c464f880eff896fc6d0423cd",
+      "walk": "2b184c9dc914f96b57dd23063ae07b13"
+    },
+    {
+      "seats": 3,
+      "code": "AgMAj0IgfD6Iflz_-2S31KD3bGAJtEQ1IaSEYsKSg96c7qKIOyAkYSJCERER_7tCIZGRFwUmJCESFlITIRIVIRFCIR--EhYhMiUhERESFyIREVUlIyEREUImYhERESFSEREh-5UhUhUgJYIyERERIRERWPzJIhMhERIfn1IA-5poIRERUiEREREh_slAIZERESEVIRESEREVYiER-OsSETI1KRH6yyI",
+      "recording": "7e71e640bf9bf55c4cc213277b8a07fc",
+      "walk": "e9c324e9eb4e8dad7adcde1942b952ca"
+    },
+    {
+      "seats": 3,
+      "code": "AgOMkJEdc2hu4dN_b1U6OYYJYbyua_uGuqznCkXKqINuKgHkoCKRERQikVgiIREREREWIhEZFCIREiYiERERERIhkRGREWRiIlIhEREZESMiERFiMiEyIlJCERYCEyERkIUyERERJSERQpkhERERVEIRQhEpERERUhFygpEyUCGREWIhERERKRERESUpEREYIREyESERERUiERERklIRQhEhFSFSEYIyERFCIRERYiEyYhEpEWITIhGRUhEhEREWIhERYjJQIWIVIRIZEZYoIRERYiGWIRMiMjIRkYApGVeCERkREhYhERIRYhMhEhERETJSERGRciERNS4",
+      "recording": "5deaa3359d0d25c9dc40b50777285545",
+      "walk": "2925b79af1efcdd78d97699ea80d86d4",
+      "token": "06dbfece508719bb1a2d2235e860e900"
+    },
+    {
+      "seats": 4,
+      "code": "AgQAgIpAFco1Tqm1OwHXK741ZovxFfwLtqsAmj-Zl31IfCESnRkiERERNiIyIiJiIRFCJQIRERECEZGREiGTIhH7yjAiH4vSIRMiEREREiH8iBYhGfxCIpERERIyFwIWIRESP98yERH8gSIkj6UCIiEhJSERKSElIiKCkZIiIhKCEVIiICYAIiBSMhEiSCERIwJYMRIhFiIiCA",
+      "recording": "607dcaac469c4fcee4696ec107d0fde5",
+      "walk": "ff99365d25634dd188ef8e211824a956"
+    },
+    {
+      "seats": 4,
+      "code": "AgSLio-OV5gdv4mBJyP8RZHzR-6nCMcQORQCGCfkG3k0HYV8NEgiITImIjJCghERGSIhERWCIhNiERMiGREVIhEWIRIRaCFSERFSEyERFSERERIRMhERIRMhGTghERERIRGTIRKRMkIRIRkREVIRGREhEVIRIRFiESEREVIjIZFyMCEVIRUjghEREWIhFiERE1ghERMpEhY1IRkSFSkREjiCMyEUIRYCEREREhGRFTIhETgpGWKRAhERETYiERERZCIRERGSmVBiEREWIhGRERIRGRETCCERFiQiJSIUITgiGRERcikRMkKCEREREhFSJSERmRIRERESEREREhERERIREVIRIhERERIRkRMu",
+      "recording": "afbbde811d2c7783bebe13693c607346",
+      "walk": "50dc42974f4c666841b477083e70b6c3",
+      "token": "6f76743b41f384a6bf045f05f5b845b1"
+    },
+    {
+      "seats": 4,
+      "code": "AgQAgYWDAIBwMuOL-QgvLJEPzBsplsXn_rLG1zNf13zI8xf6Z8gmIiEVIiERERESIhERFgL_piciIhERlSIREiEVIhUiEyYiOGYlAhEWMyQjQhkRESGRGREmIREREhWCEREREyERERghERkRghERERIRkRMlKREUJiERFiIRERkSEREREhFjIWIRYhERESEyERMoIyEREVIlghETJiIRYhkRIRERVCYkIRkSERE1IRglIREREhERkZgpGRERKRERESGREREhERQkQgIREREWKTIhEZMhkhERVSEVIRERMiFQIRGRESGRFIgCEREREhERERKRERMiEREREhERERKRkZMiEZERNgIRETI4IyEREZJiERGRDg",
+      "recording": "d851689e7bdd49ff96232d4eb5fa5506",
+      "walk": "76272cfe9575eee25c583392657afdb7",
+      "token": "b158ee12c33d46872411ca429d31f5b4"
+    },
+    {
+      "seats": 4,
+      "code": "AgRBQkNAXatDNY0G6LqMF2WVVaE_837MufQzrqY4DoNfuHNqtww",
+      "recording": "2710698762aada0d927f6ef745f75fc8",
+      "walk": "964e49dc6b33ab86430fa72815dfe252"
+    }
+  ]
+}
