@@ -67,7 +67,10 @@ export const LINK_MODELS: readonly string[] = [
   'vertexai/gemini-3.5-flash-lite-eu',
 ];
 
-/** Far above a real game (a Sit & Go is 40 to 80 hands), so a link can't make the page replay forever. */
+/**
+ * Far above a real game (a Sit & Go is 40 to 80 hands at 4 seats, up to about 130 at 6: a six-handed game of models
+ * is a few hundred characters), so a link can't make the page replay forever.
+ */
 const MAX_CODE_LENGTH = 20_000;
 const KIND = { human: 0, bot: 1, model: 2 } as const;
 const FALLBACK_FOLD = 8;

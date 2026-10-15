@@ -18,7 +18,7 @@ import { finishedHandOf, type ReviewHand } from '../shared/table.ts';
 
 /** 2: the table key (a 256-bit deal) replaced the 31-bit seed; older tokens are refused. */
 export const TOKEN_VERSION = 2;
-/** A table lasts six hours from its start: a Sit & Go takes 40 to 80 hands, minutes each at worst. */
+/** A table lasts six hours from its start: a Sit & Go takes 40 to 80 hands (up to about 130 at 6 seats), minutes each at worst. */
 export const TABLE_TTL_MS = 6 * 3600_000;
 
 /** One action's metadata, keys kept short (the token goes back and forth with every request). */
