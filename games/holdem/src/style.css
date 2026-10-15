@@ -130,9 +130,15 @@
  */
 @media (min-width: 760px) {
   .felt-area {
-    aspect-ratio: 16 / 9.4; --fw: min(100vw - 48px, 1120px);
+    /*
+     * --fh, the felt's height: 0.625 of its width, as tall as the screen allows under the header, the toolbar and the
+     * action bar (taller rooms on a wide screen, so faces, cards and the bar never crowd; the page scrolls on a short one).
+     */
+    --fw: min(100vw - 48px, 1120px);
+    --fh: max(380px, min(calc(var(--fw) * 0.625), calc(100svh - 68px - 52px - var(--bar-h, 108px) - 16px)));
+    aspect-ratio: auto; height: var(--fh);
     /* The felt's height less what doesn't scale (margins, plates, the talk and pots rows) holds two faces and a board card. */
-    --av: clamp(52px, calc((var(--fw) * 0.5875 - 230px) / 3.2), 86px);
+    --av: clamp(52px, calc((var(--fh) - 230px) / 3.2), 86px);
     --cw-board: clamp(42px, calc(var(--av) * 0.8), 68px); --cw-seat: clamp(32px, calc(var(--av) * 0.55), 46px); --cw-you: clamp(56px, calc(var(--av) * 0.9), 76px);
   }
 }
@@ -339,7 +345,7 @@
 .felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 38%; --y: 25%; }
 @media (min-width: 760px) {
   /* (Faces and cards: the wide screen's own sizes, from the felt's height.) */
-  .felt-area:is([data-seats='5'], [data-seats='6']) { --av: clamp(52px, calc((var(--fw) * 0.5875 - 230px) / 3.2), 78px); --cw-board: clamp(42px, calc(var(--av) * 0.8), 62px); --cw-seat: clamp(32px, calc(var(--av) * 0.55), 42px); }
+  .felt-area:is([data-seats='5'], [data-seats='6']) { --av: clamp(52px, calc((var(--fh) - 230px) / 3.2), 78px); --cw-board: clamp(42px, calc(var(--av) * 0.8), 62px); --cw-seat: clamp(32px, calc(var(--av) * 0.55), 42px); }
   .felt-area[data-seats='5'] .seat[data-slot='top-left'] { --x: 30%; --y: 12%; }
   .felt-area[data-seats='5'] .seat[data-slot='top-right'] { --x: 70%; --y: 12%; }
   .felt-area[data-seats='6'] .seat[data-slot='top-left'] { --x: 22%; --y: 14%; }
@@ -904,7 +910,7 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   .room.watching > .chat:not(.open) { bottom: 12px; }
   .chat:not(.open) .chat-think { display: none; }
   .room > .chat.open { animation: chat-up calc(0.22s * var(--h-motion)) ease-out both; transform-origin: bottom right; }
-  .felt-area { aspect-ratio: auto; height: calc(var(--fw) * 0.5875); }
+
   .chat-btn { display: none; }
 }
 /* A phone or a tablet: a sheet over the table's lower part, opened from the toolbar's chat button. */
