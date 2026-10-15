@@ -10,7 +10,8 @@ import { ReplayDriver } from './replay-driver.ts';
 import { endView } from './views/end.ts';
 import { reviewView } from './views/review.ts';
 import { TableUI } from './views/table.ts';
-import { actionText, aHand, chips, levelText, ordinal, paced } from './view-model.ts';
+import { aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
+import { ThinkingLog } from './views/thinking-log.ts';
 
 export interface ReplayOptions {
   recording: Recording;
@@ -72,7 +73,8 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     jump = Number(handSelect.value);
     nudge();
   });
-  const log = h('div.log', { hidden: true, 'aria-label': 'What the models said and why' });
+  const thinking = new ThinkingLog({ label: 'What the models said and why', people: seats.map(personOf) });
+  const log = thinking.el;
   const thinkingBtn = h('button.tbtn', { type: 'button', 'aria-pressed': 'false', onclick: () => {
     log.hidden = !log.hidden;
     thinkingBtn.setAttribute('aria-pressed', String(!log.hidden));
@@ -198,10 +200,7 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     const r = await driver.step();
     ui.showMeta(r.seat, r.meta);
     const act = r.snapshot.events.slice(shown).find((e): e is Extract<HandEvent, { type: 'action' }> => e.type === 'action');
-    if (act && (r.meta.say || r.meta.reasoning)) {
-      log.prepend(h('p', null, h('b', null, ui.nameOf(r.seat)), ` ${actionText(act)}. `, r.meta.say ? h('span.said', null, `“${r.meta.say}” `) : null, r.meta.reasoning ?? ''));
-      while (log.childElementCount > 40) log.lastElementChild!.remove();
-    }
+    if (act) thinking.add({ hand: r.snapshot.hand, events: r.snapshot.events, act, person: ui.person(r.seat), meta: r.meta });
     await playNew(r.snapshot);
   }
 

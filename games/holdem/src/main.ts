@@ -23,7 +23,9 @@ import { endView } from './views/end.ts';
 import { lobbyView, seatsOf, type LobbyAccess, type LobbyChoice } from './views/lobby.ts';
 import { reviewView } from './views/review.ts';
 import { TableUI } from './views/table.ts';
-import { actionText, aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
+import { aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
+import { ThinkingLog } from './views/thinking-log.ts';
+import { confirmDialog } from './views/confirm.ts';
 import { preloadFaces } from './views/parts.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -252,7 +254,8 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   // ---------- the toolbar ----------
   const level = h('div.level', { 'aria-live': 'polite' });
   const tools = h('div.tools');
-  const log = h('div.log', { hidden: true, 'aria-label': 'What the models are thinking' });
+  const thinking = new ThinkingLog({ label: 'What the models are thinking', people: seats.map(personOf) });
+  const log = thinking.el;
   if (watching) {
     const group = h('div.speed', { role: 'radiogroup', 'aria-label': 'Speed' });
     for (const s of [1, 2, 4, 8]) {
@@ -287,7 +290,23 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   };
   drawSound();
   signal.addEventListener('abort', audio.onChange(drawSound), { once: true });
-  tools.append(reviewBtn, soundBtn, h('button.tbtn.word', { type: 'button', 'aria-label': 'Leave', title: 'Leave the table', onclick: nav.lobby }, svg(LEAVE_ICON), h('span.lbl', null, 'Leave')));
+  /** A game is on (it has started and is not over): Leave asks first, as leaving ends it (the table is not kept). */
+  let live = false;
+  const askLeave = () => {
+    if (!live) return nav.lobby();
+    if (host.querySelector('.confirm-veil')) return;
+    const looking = watching || spectating;
+    host.append(
+      confirmDialog({
+        title: looking ? 'Stop watching this table?' : 'Leave this table?',
+        text: looking ? 'The game will end.' : 'Your game will end.',
+        yes: 'Leave',
+        no: looking ? 'Keep watching' : 'Keep playing',
+        onYes: nav.lobby,
+      }),
+    );
+  };
+  tools.append(reviewBtn, soundBtn, h('button.tbtn.word', { type: 'button', 'aria-label': 'Leave', title: 'Leave the table', onclick: askLeave }, svg(LEAVE_ICON), h('span.lbl', null, 'Leave')));
   if (PRACTICE) tools.prepend(h('span.practice', { title: 'Bots stand in for the models (?practice)' }, 'Practice'));
   const toolbar = h('div.toolbar', null, level, tools);
   const actions = h('div.actions', { hidden: true });
@@ -336,9 +355,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
 
   const logStep = (r: StepResult, events: readonly HandEvent[]) => {
     const act = events.find((e): e is Extract<HandEvent, { type: 'action' }> => e.type === 'action' && e.seat === r.seat);
-    if (!act || (!r.meta.say && !r.meta.reasoning)) return;
-    log.prepend(h('p', null, h('b', null, ui.nameOf(r.seat)), ` ${actionText(act, r.seat === snap.viewer)}. `, r.meta.say ? h('span.said', null, `“${r.meta.say}” `) : null, r.meta.reasoning ?? ''));
-    while (log.childElementCount > 40) log.lastElementChild!.remove();
+    if (act) thinking.add({ hand: r.snapshot.hand, events: r.snapshot.events, act, person: ui.person(r.seat), meta: r.meta });
   };
 
   // ---------- the game ----------
@@ -365,6 +382,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   }
   let snap = resume && driver instanceof RemoteDriver ? await driver.resume() : await driver.start({ seats });
   nav.started?.();
+  live = !snap.over;
   reviewBtn.disabled = false;
   track(resume ? 'play_resume' : 'play_start', { game: 'holdem', mode: choice.mode, set: choice.setId, opponents: choice.models.join(',') });
   let shown = 0;
@@ -407,6 +425,8 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
       await endOfHand();
       if (signal.aborted) return;
       if (snap.over) {
+        live = false;
+        host.querySelector('.confirm-veil')?.remove();
         await wait(paced(1200, speed, reducedMotion()));
         if (signal.aborted) return;
         const review = await driver.review();
@@ -537,7 +557,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
         resolve();
       };
       const onKey = (e: KeyboardEvent) => {
-        if (overlay || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (overlay || host.querySelector('.confirm-veil') || e.metaKey || e.ctrlKey || e.altKey) return;
         if (e.key === 'n' || e.key === 'N') go();
       };
       const deal = h('button.cta', { type: 'button', onclick: go }, 'Deal the next hand');

@@ -8,7 +8,7 @@ import { audio } from '../audio.ts';
 import { h, wait } from '../dom.ts';
 import type { ActionMeta, SeatConfig, TableSnapshot } from '../driver.ts';
 import { applyEvent, emptyModel, potsOfModel, type TableModel } from '../table-model.ts';
-import { actionTag, chips, handName, ordinal, paced, personOf, potLabels, slotsFor, tellBars, type SeatPerson, type Slot } from '../view-model.ts';
+import { actionTag, bubbleMs, chips, handName, ordinal, paced, personOf, potLabels, slotsFor, tellBars, type SeatPerson, type Slot } from '../view-model.ts';
 import { avatarEl, cardEl, chipsEl, flipUp, preloadFaces, setFaceMood } from './parts.ts';
 
 interface SeatEls {
@@ -504,9 +504,11 @@ export class TableUI {
     const root = this.seatEls[seat]!.root;
     root.querySelector('.bubble')?.remove();
     clearTimeout(this.bubbles.get(seat));
-    const b = h('div.bubble', { role: 'status' }, text);
+    const b = h('div.bubble', { role: 'status' }, h('span.bubble-text', null, `“${text}”`));
+    b.title = text;
     root.querySelector('.who')!.append(b);
-    const life = paced(3600, this.o.speed(), false);
+    // Long enough to read: longer for more words, shorter when the table is sped up (view-model.ts).
+    const life = bubbleMs(text, this.o.speed());
     this.bubbles.set(
       seat,
       window.setTimeout(() => {
