@@ -241,3 +241,37 @@ export function menuButtons(options: readonly { key: OptionKey; kind: ActionKind
     return { key: o.key, look: 'raise', what: `${verb} ${size}`, verb, size, amount: chips(o.to), shortcut: null, label: o.label };
   });
 }
+
+export interface QuickBet {
+  key: OptionKey;
+  /** The chip's words: the size ("½", "2.5 BB", "Pot") and, where there is room, " pot" after a fraction. */
+  size: string;
+  word: string;
+  /** Raise (or bet) to this many chips. */
+  to: number;
+  amount: string;
+  /** Its key, 1 to 4 in menu order. */
+  shortcut: string;
+  /** The engine's own words, for screen readers. */
+  label: string;
+}
+
+/**
+ * The menu's sizes as one-tap chips over a narrow bar (and keys 1 to 4 on any bar): menu order, without a size that
+ * is the all-in (the bar has its own button) or one that repeats a smaller size's amount.
+ */
+export function quickBets(options: readonly { key: OptionKey; kind: ActionKind; to: number; add: number; label: string }[]): QuickBet[] {
+  const allin = options.find((o) => o.key === 'allin')?.to ?? Infinity;
+  const seen = new Set<number>();
+  const out: QuickBet[] = [];
+  for (const b of menuButtons(options)) {
+    if (b.look !== 'raise') continue;
+    const o = options.find((x) => x.key === b.key)!;
+    if (o.to >= allin || seen.has(o.to)) continue;
+    seen.add(o.to);
+    const size = b.size ?? '';
+    const word = / pot$/.test(size) ? ' pot' : '';
+    out.push({ key: b.key, size: size.slice(0, size.length - word.length), word, to: o.to, amount: chips(o.to), shortcut: String(out.length + 1), label: o.label });
+  }
+  return out.slice(0, 4);
+}

@@ -60,7 +60,7 @@
  * (overflow: clip, unlike hidden, leaves the page as the bar's scroller).
  */
 @media (max-width: 759px) {
-  .room { overflow: clip; --tb-h: 40px; --bar-h: 72px; }
+  .room { overflow: clip; --tb-h: 40px; --bar-h: 98px; }
   .room.watching { --tb-h: 64px; --bar-h: 0px; } /* the hand on one line, the speeds and buttons on the next */
   .room.watching:has(.replay-title) { --tb-h: 134px; } /* a replay: its title, the hand, and two lines of controls */
 }
@@ -487,12 +487,13 @@
 @media (min-width: 760px) { .banner { top: 66%; font-size: 17px; } }
 
 /* ---------- your action bar ---------- */
-.actions { position: relative; z-index: 5; padding: 10px 12px 14px; display: grid; gap: 10px; }
+.actions { position: relative; z-index: 5; padding: 8px 12px 10px; display: grid; gap: 6px; }
 .actions[hidden] { display: none; }
 .menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 6px; }
 /*
- * Phones: one row, fold, check or call, Raise… and all-in, each a column; the sizes are quick picks in Raise…'s panel
- * (views/actions.ts marks the menu data-custom when it has Raise…). The bar sticks to the bottom of the screen.
+ * Phones: one row, fold, check or call, Raise… and all-in, each a column, under the sizes' chips (the narrow bar's
+ * container query at the end; views/actions.ts marks the menu data-custom when it has Raise…). The bar sticks to the
+ * bottom of the screen.
  */
 @media (max-width: 759px) {
   .actions {
@@ -508,7 +509,7 @@
 }
 /* Touch screens: no keys to show. */
 @media (pointer: coarse) {
-  .act kbd, .actions .hint { display: none; }
+  .act kbd, .qb kbd, .actions .hint { display: none; }
 }
 /* Wide screens: one compact row, centred, every button the same height. */
 @media (min-width: 760px) {
@@ -581,13 +582,6 @@
 .rp-tick::before { content: ''; position: absolute; top: -2px; left: 50%; width: 1.5px; height: 6px; background: var(--h-brass); }
 .rp-tick:hover { color: var(--h-ivory); }
 .rp-tick.mark-only { width: 12px; height: 14px; }
-/* The menu's sizes as quick picks over the slider: phones only, where the bar leaves them out. */
-.rp-quick { display: none; }
-.rp-pick { height: 38px; border-radius: 999px; border: 1px solid var(--h-brass); background: rgba(215, 170, 82, 0.1); color: var(--h-ivory); font: 700 13px var(--j-display); white-space: nowrap; }
-.rp-pick[aria-pressed='true'] { background: var(--h-brass); color: var(--h-ink); }
-@media (max-width: 759px) {
-  .rp-quick { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
-}
 .rp-ends { display: flex; justify-content: space-between; margin-top: -6px; font-size: 11px; color: var(--h-dim); }
 .rp-go {
   min-height: 46px; border-radius: 12px; border: 1px solid #e0685d; color: var(--h-ivory);
@@ -949,15 +943,38 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 }
 
 /*
- * The action bar by its own width, not the window's: narrower than the full row of buttons (the table's column beside
- * the chat, 1000 to 1300 px windows), it is the phone's row (Fold, Check or Call, Raise…, All-in) with the sizes as
- * quick picks in Raise…'s panel, so it never wraps onto a second row.
+ * The action bar by its own width, not the window's: narrower than the full row of buttons (a phone, the table's
+ * column beside the chat in 1000 to 1300 px windows), it is the short row (Fold, Check or Call, Raise…, All-in) under
+ * a slim row of the menu's sizes as chips, one tap each, so it never wraps onto a second row. The chips' row keeps its
+ * place when it is empty (no raise), and the bar its height (--bar-h), so nothing moves from one turn to the next.
  */
 .room > .actions { container: bar / inline-size; }
+.quick { display: none; }
 @container bar (max-width: 919px) {
   .menu { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
-  .menu .act { min-width: 0; }
+  .menu .act { min-width: 0; height: 48px; min-height: 0; }
   .menu[data-custom] .act.raise { display: none; }
   .menu .act .verb { display: none; }
-  .rp-quick { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+  /* The keys are on the chips and buttons; the line spelling them out is left off for room. */
+  .actions .hint { display: none; }
+  .quick { display: flex; justify-content: center; gap: 6px; height: 32px; }
+  .qb {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: 100%; padding: 0 12px;
+    border-radius: 999px; border: 1px solid var(--h-brass); background: rgba(215, 170, 82, 0.1); color: var(--h-ivory);
+    font: 700 12.5px/1 var(--j-display); white-space: nowrap; transition: background 0.15s, transform 0.08s;
+  }
+  .qb:hover { background: rgba(215, 170, 82, 0.24); }
+  .qb:active { transform: translateY(1px); }
+  .qs { color: #f0d49a; }
+  .qa { font: 800 14px/1 var(--h-poster); font-variant-numeric: tabular-nums; }
+  .qa::before { content: '·'; margin-right: 6px; color: var(--h-dim); font: 400 13px var(--j-body); }
+  .qb kbd { font: 700 9.5px var(--j-mono); color: inherit; opacity: 0.5; margin-left: 1px; }
+}
+/* A phone's bar: the chips share its width, the fractions without " pot", and the buttons a little lower. */
+@container bar (max-width: 519px) {
+  .quick { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); height: 30px; }
+  .qb { padding: 0 6px; gap: 4px; }
+  .qw { display: none; }
+  .qa::before { margin-right: 4px; }
+  .menu .act { height: 46px; }
 }

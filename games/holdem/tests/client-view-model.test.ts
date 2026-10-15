@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { legalOptions, visibleEvents } from '../shared/engine';
 import { LocalDriver } from '../src/local-driver';
 import { applyEvent, emptyModel } from '../src/table-model';
-import { actionText, cardFace, chips, chipStack, hueOf, levelText, menuButtons, ordinal, personOf, potLabels, slotsFor, tellBars } from '../src/view-model';
+import { actionText, cardFace, chips, chipStack, hueOf, levelText, menuButtons, ordinal, personOf, potLabels, quickBets, slotsFor, tellBars } from '../src/view-model';
 import { placeholderFace } from '../src/views/parts';
 import { act, deal } from './support';
 
@@ -119,6 +119,31 @@ describe('the action menu', () => {
     ]);
     s = act(s, 'call', 'call', 'check');
     expect(menuButtons(legalOptions(s)).map((b) => b.what)).toEqual(['Check', 'Bet ⅓ pot', 'Bet ½ pot', 'Bet ¾ pot', 'Bet Pot', 'All-in']);
+  });
+
+  it('offers the sizes as one-tap chips with keys 1 to 4', () => {
+    let s = deal({ stacks: [1000, 1000, 1000], button: 0 });
+    expect(quickBets(legalOptions(s)).map((q) => [q.key, q.size, q.word, q.amount, q.to, q.shortcut])).toEqual([
+      ['small', '½', ' pot', '45', 45, '1'],
+      ['three_quarters', '¾', ' pot', '58', 58, '2'],
+      ['pot', 'Pot', '', '70', 70, '3'],
+    ]);
+    expect(quickBets(legalOptions(s))[0]!.label).toBe('Raise to 45 (half pot)');
+    // After the flop all four sizes are there: ⅓, ½, ¾ and the pot, keys 1 to 4.
+    s = act(s, 'call', 'call', 'check');
+    expect(quickBets(legalOptions(s)).map((q) => `${q.shortcut}:${q.size}${q.word} ${q.amount}`)).toEqual(['1:⅓ pot 20', '2:½ pot 30', '3:¾ pot 45', '4:Pot 60']);
+  });
+
+  it('leaves out a size that is the all-in or repeats another, and has none when no raise is legal', () => {
+    const o = (key: 'fold' | 'call' | 'small' | 'half' | 'three_quarters' | 'pot' | 'allin', to: number, label: string) => ({ key, kind: key === 'fold' ? ('fold' as const) : key === 'call' ? ('call' as const) : key === 'allin' ? ('allin' as const) : ('raise' as const), to, add: to, label });
+    const options = [o('fold', 0, 'Fold'), o('call', 100, 'Call 100'), o('small', 250, 'Raise to 250 (2.5 big blinds)'), o('half', 250, 'Raise to 250 (half pot)'), o('three_quarters', 400, 'Raise to 400 (three quarters of the pot)'), o('pot', 600, 'Raise to 600 (pot)'), o('allin', 600, 'All-in for 600')];
+    // The half pot repeats 2.5 BB's 250; the pot is the all-in. The keys run on in what is left.
+    expect(quickBets(options).map((q) => [q.key, q.size + q.word, q.shortcut])).toEqual([
+      ['small', '2.5 BB', '1'],
+      ['three_quarters', '¾ pot', '2'],
+    ]);
+    expect(quickBets([o('fold', 0, 'Fold'), o('call', 600, 'Call 600 (all-in)')])).toEqual([]);
+    expect(quickBets([o('fold', 0, 'Fold'), o('call', 100, 'Call 100'), o('allin', 300, 'All-in for 300')])).toEqual([]);
   });
 });
 

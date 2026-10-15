@@ -21,7 +21,7 @@ describe('the raise panel', () => {
     expect(plan).toMatchObject({ min: 40, max: 1000, step: 20, currentBet: 20, bet: false });
     // Unopened four-handed, half the pot (45) is less than 2.5 big blinds, so it is the smallest size.
     expect(plan.ticks.map((t) => [t.label, t.to])).toEqual([['½', 45], ['¾', 58], ['Pot', 70]]);
-    // On a phone the sizes are quick picks in the panel, named in full.
+    // The sizes named in full, as the size buttons say them.
     expect(plan.quick.map((t) => [t.label, t.to])).toEqual([['½ pot', 45], ['¾ pot', 58], ['Pot', 70]]);
     // A size as a share of the pot: what it adds over the call, against the pot after calling.
     expect(plan.share(70)).toBe(Math.round((100 * 50) / 50));
