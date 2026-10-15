@@ -345,15 +345,15 @@
   .felt-area[data-seats='6'] .seat[data-slot='top-left'] { --x: 22%; --y: 14%; }
   .felt-area[data-seats='6'] .seat[data-slot='top'] { --x: 50%; --y: 13.5%; }
   .felt-area[data-seats='6'] .seat[data-slot='top-right'] { --x: 78%; --y: 14%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: 7%; --y: 60%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 93%; --y: 60%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: calc(7% + var(--av) * 0.5 + var(--cw-seat) * 2 + 32px); --y: 60%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: calc(93% - var(--av) * 0.5 - var(--cw-seat) * 2 - 32px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: max(8%, 60px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: min(92%, 100% - 60px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: calc(max(8%, 60px) + var(--av) * 0.5 + var(--cw-seat) * 2 + 32px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: calc(min(92%, 100% - 60px) - var(--av) * 0.5 - var(--cw-seat) * 2 - 32px); --y: 60%; }
   .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 28%; --y: calc(var(--top-edge) + 24px); }
   .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 72%; --y: calc(var(--top-edge) + 24px); }
   .felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: calc(var(--top-edge) + 24px); }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 15%; --y: 74%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 85%; --y: 74%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 15%; --y: calc(60% + (var(--av) + var(--plate-h)) / 2 + 14px); }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 85%; --y: calc(60% + (var(--av) + var(--plate-h)) / 2 + 14px); }
   .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 12%; --y: 30%; }
   .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 88%; --y: 30%; }
   .felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 40%; --y: 30%; }
@@ -577,10 +577,10 @@
 .rp-tick.mark-only { width: 12px; height: 14px; }
 /* The menu's sizes as quick picks over the slider: phones only, where the bar leaves them out. */
 .rp-quick { display: none; }
+.rp-pick { height: 38px; border-radius: 999px; border: 1px solid var(--h-brass); background: rgba(215, 170, 82, 0.1); color: var(--h-ivory); font: 700 13px var(--j-display); white-space: nowrap; }
+.rp-pick[aria-pressed='true'] { background: var(--h-brass); color: var(--h-ink); }
 @media (max-width: 759px) {
   .rp-quick { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
-  .rp-pick { height: 38px; border-radius: 999px; border: 1px solid var(--h-brass); background: rgba(215, 170, 82, 0.1); color: var(--h-ivory); font: 700 13px var(--j-display); white-space: nowrap; }
-  .rp-pick[aria-pressed='true'] { background: var(--h-brass); color: var(--h-ink); }
 }
 .rp-ends { display: flex; justify-content: space-between; margin-top: -6px; font-size: 11px; color: var(--h-dim); }
 .rp-go {
@@ -861,11 +861,21 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .chat-who { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 7px; }
 .chat-who b { font: 700 13px var(--j-display); }
 .chat-said { font: italic 500 14px/1.4 var(--j-body); color: var(--h-ivory); overflow-wrap: anywhere; }
-.chat-why summary { width: max-content; cursor: pointer; list-style: none; font: 600 12px var(--j-body); color: var(--h-brass); }
+.chat-why summary { width: max-content; cursor: pointer; list-style: none; padding: 2px 0; font: 700 12.5px var(--j-display); color: var(--h-brass); }
 .chat-why summary::-webkit-details-marker { display: none; }
-.chat-why summary::before { content: '▸ '; }
-.chat-why[open] summary::before { content: '▾ '; }
-.chat-why p { margin: 4px 0 0; padding-left: 8px; border-left: 2px solid var(--h-brass-deep); font-size: 12.5px; line-height: 1.5; color: rgba(243, 232, 205, 0.7); }
+.chat-why summary::after { content: ' ▸'; }
+.chat-why[open] summary::after { content: ' ▾'; }
+.chat-why summary:hover { color: var(--h-amber); }
+.chat-why p { margin: 4px 0 2px; padding: 6px 10px; border-left: 2px solid var(--h-brass-deep); border-radius: 0 8px 8px 0; background: rgba(0, 0, 0, 0.22); font: 400 13px/1.55 var(--j-body); color: rgba(243, 232, 205, 0.78); }
+/* The header's Show thinking switch. */
+.chat-head { gap: 8px; }
+.chat-head h3 { flex: 1; }
+.chat-think { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 6px; border-radius: 999px; border: 1px solid var(--h-line); background: none; color: var(--h-dim); font: 600 12px var(--j-body); white-space: nowrap; }
+.chat-think .knob { position: relative; width: 26px; height: 15px; border-radius: 999px; background: rgba(255, 240, 210, 0.16); transition: background 0.15s; }
+.chat-think .knob::after { content: ''; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--h-dim); transition: translate 0.15s, background 0.15s; }
+.chat-think[aria-checked='true'] { color: var(--h-text); border-color: var(--h-brass); }
+.chat-think[aria-checked='true'] .knob { background: var(--h-brass-deep); }
+.chat-think[aria-checked='true'] .knob::after { translate: 11px 0; background: var(--h-ivory); }
 .chat-say { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px; border-top: 1px solid rgba(215, 170, 82, 0.16); }
 .chat-input { flex: 1; min-width: 0; height: 34px; box-sizing: border-box; padding: 0 12px; border-radius: 999px; border: 1px solid var(--h-line); background: rgba(0, 0, 0, 0.35); color: var(--h-text); font: 14px var(--j-body); }
 .chat-input::placeholder { color: rgba(243, 232, 205, 0.45); }
@@ -873,6 +883,10 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .chat-count { flex: none; font-size: 11px; color: var(--h-dim); font-variant-numeric: tabular-nums; }
 .chat-send { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--h-brass); color: var(--h-ink); font: 800 16px var(--j-display); }
 .chat-btn { position: relative; }
+.chat-unread { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--h-red); color: var(--h-ivory); font: 700 11px/18px var(--j-display); text-align: center; }
+.chat-unread[hidden] { display: none; }
+@keyframes chat-up { from { opacity: 0; transform: translateY(18px) scale(0.97); } }
+@keyframes chat-dock { from { opacity: 0; transform: translateY(10px); } }
 .chat-btn[data-unread]::after { content: attr(data-unread); position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; border-radius: 999px; background: var(--h-red); color: var(--h-ivory); font: 700 10px/16px var(--j-display); text-align: center; }
 
 /* A wide screen: the chat in a column beside the table, from its top to the room's foot (the action bar's row too). */
@@ -882,7 +896,15 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   .room:has(> .chat) > :is(.felt-area, .replay-table) { grid-column: 1; grid-row: 2; }
   .room:has(> .chat) > .actions { grid-column: 1; grid-row: 3; }
   .room > .chat { grid-column: 2; grid-row: 2 / span 2; contain: size; margin: 10px 12px 14px 0; }
-  .room > .chat:not(.open) { align-self: start; contain: none; }
+  /* Folded: a bar docked at the room's foot on the right (over the felt's corner, above the action bar), and the
+     column's width goes back to the table; opened, it rises from there into the column. The felt keeps its height. */
+  .room:has(> .chat) { transition: grid-template-columns calc(0.22s * var(--h-motion)) ease; }
+  .room:has(> .chat:not(.open)) { grid-template-columns: minmax(0, 1fr) 0px; }
+  .room > .chat:not(.open) { position: absolute; right: 12px; bottom: calc(var(--bar-h, 0px) + 12px); width: 240px; margin: 0; z-index: 16; contain: none; cursor: pointer; box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.7); animation: chat-dock calc(0.2s * var(--h-motion)) ease-out both; }
+  .room.watching > .chat:not(.open) { bottom: 12px; }
+  .chat:not(.open) .chat-think { display: none; }
+  .room > .chat.open { animation: chat-up calc(0.22s * var(--h-motion)) ease-out both; transform-origin: bottom right; }
+  .felt-area { aspect-ratio: auto; height: calc(var(--fw) * 0.5875); }
   .chat-btn { display: none; }
 }
 /* A phone or a tablet: a sheet over the table's lower part, opened from the toolbar's chat button. */
@@ -918,4 +940,18 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
   .felt-area > .bubble.center { top: calc(var(--top-edge) + 4px); max-width: min(64%, 520px); display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
   .felt-area > .bubble.center b { display: inline; flex: none; }
   .felt-area > .bubble.center .bubble-text { -webkit-line-clamp: 1; line-clamp: 1; min-width: 0; }
+}
+
+/*
+ * The action bar by its own width, not the window's: narrower than the full row of buttons (the table's column beside
+ * the chat, 1000 to 1300 px windows), it is the phone's row (Fold, Check or Call, Raise…, All-in) with the sizes as
+ * quick picks in Raise…'s panel, so it never wraps onto a second row.
+ */
+.room > .actions { container: bar / inline-size; }
+@container bar (max-width: 919px) {
+  .menu { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+  .menu .act { min-width: 0; }
+  .menu[data-custom] .act.raise { display: none; }
+  .menu .act .verb { display: none; }
+  .rp-quick { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
 }

@@ -7,7 +7,8 @@
 //
 // Every seat (face, name plate, tag, tell, hole cards), bet, the dealer button and every speech bubble must sit inside
 // the room with MARGIN px to spare, below the toolbar, and above the action bar's row; nothing at the table may
-// overlap another seat's face, plate or cards (a bubble may cover a bet or the button). The room's height is recorded
+// overlap another seat's face, plate or cards (a bubble may cover a bet or the button), and the action bar keeps to one
+// row clear of every seat and the board. The room's height is recorded
 // so a caller can check it does not change during a game.
 
 export const MARGIN = 8;
@@ -53,6 +54,23 @@ export function measure(room: Element = document.querySelector('#room')!): strin
   for (let i = 0; i < parts.length; i++)
     for (let j = i + 1; j < parts.length; j++)
       if (parts[i]!.boxes.some((a) => parts[j]!.boxes.some((b) => meet(a, b)))) out.push(`seat ${parts[i]!.slot} meets seat ${parts[j]!.slot}`);
+  // The action bar: one row, inside the room, clear of every seat and the board.
+  const menu = room.querySelector('.actions:not([hidden]) .menu');
+  if (menu && seen(menu)) {
+    const buttons = [...menu.querySelectorAll('.act')].filter(seen);
+    if (new Set(buttons.map((b) => Math.round(b.getBoundingClientRect().top))).size > 1) out.push('the action bar wraps onto a second row');
+    const M = box(menu);
+    if (M.l < R.l || M.r > R.r || M.b > R.b) out.push('the action bar leaves the room');
+    for (const p of parts) if (p.boxes.some((b) => meet(M, b))) out.push(`the action bar meets seat ${p.slot}`);
+    for (const c of room.querySelectorAll('.board .card, .board .slot')) if (meet(M, box(c))) out.push('the action bar meets the board');
+  }
+  // The folded chat, docked at the room's foot: clear of the seats, the board and the action bar.
+  const dock = room.querySelector('.chat:not(.open)');
+  if (dock && seen(dock) && getComputedStyle(dock).position === 'absolute') {
+    const D = box(dock);
+    for (const p of parts) if (p.boxes.some((b) => meet(D, b))) out.push(`the folded chat meets seat ${p.slot}`);
+    for (const c of room.querySelectorAll('.board .card, .board .slot, .actions:not([hidden]) .act, .bet:not(.empty)')) if (seen(c) && meet(D, box(c))) out.push(`the folded chat meets ${c.closest('.board') ? 'the board' : c.classList.contains('act') ? 'the action bar' : 'a bet'}`);
+  }
   // Bets, the button and the board against the seats (a bet or the button on a face, plate or card).
   const things = [...room.querySelectorAll('.bet:not(.empty), .dealer, .board .card, .board .slot, .pots .pot')].filter(seen);
   for (const t of things)
@@ -145,7 +163,7 @@ export interface MatrixResult {
  * Starts each table from the lobby (practice), lets it play a moment, measures it (spectating: the table with every
  * card up, as after you are out), then leaves. The room's heights seen while it played are returned with the problems.
  */
-export async function matrix(o: { modes?: ('play' | 'watch' | 'spectate')[]; seats?: number[]; playMs?: number } = {}): Promise<MatrixResult[]> {
+export async function matrix(o: { modes?: ('play' | 'watch' | 'spectate')[]; seats?: number[]; playMs?: number; chat?: 'open' | 'folded' } = {}): Promise<MatrixResult[]> {
   const results: MatrixResult[] = [];
   const room = document.querySelector('#room')!;
   for (const mode of o.modes ?? ['play', 'watch', 'spectate']) {
@@ -172,9 +190,15 @@ export async function matrix(o: { modes?: ('play' | 'watch' | 'spectate')[]; sea
       click('#room button.cta', mode === 'watch' ? 'Start the game' : 'Deal me in');
       await until(() => !!room.querySelector('.felt-area .seat'), 8000);
       if (mode === 'spectate') room.classList.add('all-up');
+      // The chat as asked (a wide screen): open beside the table, or folded to its bar.
+      const chat = room.querySelector('.chat');
+      if (o.chat && chat && chat.classList.contains('open') !== (o.chat === 'open')) (chat.querySelector('.chat-collapse') as HTMLElement | null)?.click();
+      await sleep(400);
       const heights = new Set<number>();
       const widths = new Set<number>([innerWidth]);
       const problems = new Set<string>();
+      // Playing: wait for your turn (the action bar), so it is measured too.
+      if (mode === 'play') await until(() => !!room.querySelector('.actions:not([hidden]) .menu'), 8000);
       const end = Date.now() + (o.playMs ?? 6000);
       while (Date.now() < end) {
         heights.add(Math.round(room.getBoundingClientRect().height));

@@ -7,7 +7,7 @@
 import type { HandEvent, Street } from '../../shared/engine.ts';
 import type { ActionMeta } from '../../shared/table.ts';
 import { cleanTalk } from '../../shared/questions.ts';
-import { chatLinesOf, NOT_SAID, PendingTalk, SAY_MAX, sayCount, type ActionEvent, type ChatLine } from '../chat-lines.ts';
+import { chatLinesOf, NOT_SAID, PendingTalk, SAY_MAX, sayCount, showThinking, thinkingKey, type ActionEvent, type ChatLine } from '../chat-lines.ts';
 import { h } from '../dom.ts';
 import { actionChip, aHand, cardFace, chips, logNote, STREET_NAMES, type SeatPerson } from '../view-model.ts';
 import { avatarEl } from './parts.ts';
@@ -31,6 +31,8 @@ function cardsText(cards: readonly string[]): HTMLElement {
 
 export interface ChatOptions {
   people: readonly SeatPerson[];
+  /** Playing, or watching (a replay too): the "Show thinking" switch starts off when playing, on when watching. */
+  mode: 'play' | 'watch';
   /** Your seat in play (your own talk, "you" in the dealer's lines), else null. */
   viewer: number | null;
   /**
@@ -51,6 +53,19 @@ export class ChatBox {
   private street: Street = 'preflop';
   private unread = 0;
   private o: ChatOptions;
+  /** The switch: every thinking fold open. */
+  private thinking = false;
+
+  private setThinking(on: boolean, button: HTMLElement): void {
+    this.thinking = on;
+    button.setAttribute('aria-checked', String(on));
+    for (const d of this.scroller.querySelectorAll<HTMLDetailsElement>('details.chat-why')) d.open = on;
+    try {
+      localStorage.setItem(thinkingKey(this.o.mode), on ? 'on' : 'off');
+    } catch {
+      // storage blocked: the switch holds for this visit
+    }
+  }
 
   constructor(o: ChatOptions) {
     this.o = o;
@@ -60,8 +75,13 @@ export class ChatBox {
     this.scroller.addEventListener('scroll', () => {
       if (this.atBottom()) this.newer.hidden = true;
     });
-    const collapse = h('button.chat-collapse', { type: 'button', 'aria-expanded': 'true', 'aria-label': 'Hide the chat', title: 'Hide the chat', onclick: () => this.toggle() }, chev());
-    const head = h('header.chat-head', null, h('h3', null, 'Table talk'), collapse);
+    const collapse = h('button.chat-collapse', { type: 'button', 'aria-expanded': 'true', 'aria-label': 'Hide the chat', title: 'Hide the chat', onclick: (e: Event) => (e.stopPropagation(), this.toggle(undefined, true)) }, chev());
+    // Show thinking: every "What it was thinking" open, or every one shut; remembered per kind of table.
+    this.thinking = showThinking(o.mode, readStored(thinkingKey(o.mode)));
+    const think = h('button.chat-think', { type: 'button', role: 'switch', 'aria-checked': String(this.thinking), title: 'Open or close every model’s thinking', onclick: () => this.setThinking(!this.thinking, think) }, h('span.knob', { 'aria-hidden': 'true' }), 'Show thinking') as HTMLButtonElement;
+    // Folded on a wide screen, the header is a bar at the room's foot: what came meanwhile, and a tap opens it.
+    this.badge = h('span.chat-unread', { hidden: true, 'aria-label': 'new messages' });
+    const head = h('header.chat-head', { onclick: () => !this.el.classList.contains('open') && this.toggle(true, true) }, h('h3', null, 'Table talk'), this.badge, think, collapse);
     const body = h('div.chat-body', null, this.scroller, this.newer);
     this.el = h('section.chat', { 'aria-label': 'Table talk' }, head, body);
     if (o.onSay) this.el.append(this.sayForm(o.onSay));
@@ -69,24 +89,40 @@ export class ChatBox {
     this.button.innerHTML = CHAT_ICON;
     // Open beside the table on a wide screen; shut (the toolbar's button opens it) on a phone; and again so when the
     // window crosses from one to the other.
+    // On a wide screen it opens as the player last left it (CHAT_OPEN_KEY).
     if (typeof matchMedia === 'function') {
       const wide = matchMedia('(min-width: 1000px)');
-      this.toggle(wide.matches);
+      this.toggle(wide.matches && readStored(CHAT_OPEN_KEY) !== 'off');
       const follow = (e: MediaQueryListEvent) => (this.el.isConnected ? this.toggle(e.matches) : wide.removeEventListener('change', follow));
       wide.addEventListener('change', follow);
     } else this.toggle(false);
   }
 
-  /** The chat as a sheet (a phone) or a panel (wide): open or shut. */
-  toggle(open = !this.el.classList.contains('open')): void {
+  /** The new messages' count on the folded bar. */
+  private badge: HTMLElement;
+
+  /**
+   * The chat as a sheet (a phone) or a panel (wide): open or shut. `remember`: the player's own choice, kept for a wide
+   * screen's next table.
+   */
+  toggle(open = !this.el.classList.contains('open'), remember = false): void {
     this.el.classList.toggle('open', open);
     this.el.classList.toggle('collapsed', !open);
     this.el.querySelector('.chat-collapse')?.setAttribute('aria-expanded', String(open));
+    this.el.querySelector('.chat-collapse')?.setAttribute('aria-label', open ? 'Hide the chat' : 'Show the chat');
     this.button.setAttribute('aria-expanded', String(open));
     if (open) {
       this.unread = 0;
       this.button.removeAttribute('data-unread');
+      if (this.badge) this.badge.hidden = true;
       this.toBottom();
+    }
+    if (remember && typeof matchMedia === 'function' && matchMedia('(min-width: 1000px)').matches) {
+      try {
+        localStorage.setItem(CHAT_OPEN_KEY, open ? 'on' : 'off');
+      } catch {
+        // storage blocked: as it is for this visit
+      }
     }
   }
 
@@ -170,7 +206,7 @@ export class ChatBox {
         null,
         h('div.chat-who', null, h('b', null, name(l.seat)), chipEl(l.act)),
         meta.say ? h('q.chat-said', null, meta.say) : null,
-        meta.reasoning ? h('details.chat-why', null, h('summary', null, 'thinking'), h('p', null, meta.reasoning)) : null,
+        meta.reasoning ? h('details.chat-why', { open: this.thinking }, h('summary', null, 'What it was thinking'), h('p', null, meta.reasoning)) : null,
       ),
     );
   }
@@ -196,6 +232,8 @@ export class ChatBox {
     if (!this.el.classList.contains('open') && el.matches('.chat-msg') && !mine) {
       this.unread++;
       this.button.dataset.unread = String(Math.min(this.unread, 9));
+      this.badge.hidden = false;
+      this.badge.textContent = String(Math.min(this.unread, 99));
     }
   }
 
@@ -229,3 +267,15 @@ function chev(): HTMLElement {
 }
 
 const CHAT_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><path d="M8 10h8M8 13h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+/** Where a wide screen remembers the chat open or folded. */
+const CHAT_OPEN_KEY = 'holdem:chat-open';
+
+/** A stored setting, or null where there is none or storage is blocked. */
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}

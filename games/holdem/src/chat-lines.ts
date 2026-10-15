@@ -70,3 +70,9 @@ export const NOT_SAID: Record<'busy' | 'full' | 'refused' | 'over', string> = {
   refused: 'not sent',
   over: 'not sent: the game is over',
 };
+
+/** Where the chat's "Show thinking" switch is remembered, per kind of table (playing, or watching and replays). */
+export const thinkingKey = (mode: 'play' | 'watch'): string => `holdem:show-thinking:${mode}`;
+
+/** Whether the chat opens every "what it was thinking": as last set for this kind of table, else on when watching. */
+export const showThinking = (mode: 'play' | 'watch', stored: string | null): boolean => (stored === 'on' ? true : stored === 'off' ? false : mode === 'watch');

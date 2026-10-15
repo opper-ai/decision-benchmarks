@@ -255,6 +255,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   // The table chat: the dealer's lines, the models' talk (and why, once the cards are up), and in play your own.
   const chat = new ChatBox({
     people: seats.map(personOf),
+    mode: watching ? 'watch' : 'play',
     viewer: watching ? null : 0,
     ...(watching ? {} : { onSay: (text: string) => driver.say?.(text) ?? null }),
   });

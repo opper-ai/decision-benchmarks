@@ -64,3 +64,15 @@ describe('your lines on their way', () => {
     expect(p.size).toBe(0);
   });
 });
+
+describe('the chat’s Show thinking switch', () => {
+  it('is on when watching and off when playing, until the player sets it, per kind of table', async () => {
+    const { showThinking, thinkingKey } = await import('../src/chat-lines');
+    expect(showThinking('watch', null)).toBe(true);
+    expect(showThinking('play', null)).toBe(false);
+    expect(showThinking('play', 'on')).toBe(true);
+    expect(showThinking('watch', 'off')).toBe(false);
+    expect(showThinking('watch', 'nonsense')).toBe(true);
+    expect(thinkingKey('play')).not.toBe(thinkingKey('watch'));
+  });
+});
