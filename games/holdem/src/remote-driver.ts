@@ -20,9 +20,17 @@
 // localStorage (STORAGE_KEY) after every answer, so a reload or a dropped page can sit back down: RemoteDriver.saved()
 // says what can be resumed, resume() asks the server for the table as that token has it (POST api/table/resume).
 // Cleared when the game is over or the player leaves (forget()).
+//
+// Trash talk: say(text) queues a line (cleaned and capped as the server does); the next request the driver sends anyway
+// (step, act or next) carries up to MAX_TALK_LINES of them as `talk`, and the server adds them to the hand's table talk
+// before it asks the model, so the next model hears them. onSaid gets the lines back as the server placed them, and
+// step and act results carry them (result.talk). A request that fails keeps its lines in front of the queue for the
+// next one, which goes from the same token, so a line is said once however often it is sent. resume() starts with an
+// empty queue: lines typed but not yet sent before a reload are gone.
 import { appPath } from '../../../packages/kit/client/paths.ts';
 import type { Action } from '../shared/engine.ts';
-import type { RecordedAction } from '../shared/recording.ts';
+import { cleanTalk, MAX_TALK_LINES } from '../shared/questions.ts';
+import type { RecordedAction, TalkLine } from '../shared/recording.ts';
 import type { ActionMeta, Review, ReviewHand, SeatConfig, SnapshotReply, StepReply, StepResult, TableErrorBody, TableSnapshot } from '../shared/table.ts';
 import type { TableConfig, TableDriver } from './driver.ts';
 
@@ -77,6 +85,8 @@ export interface RemoteDriverOptions {
   url?: (route: string) => string;
   /** Told when a request is being retried, and when the table answers again (also settable as driver.onConnection). */
   onConnection?: (e: ConnectionEvent) => void;
+  /** Told when the player's queued lines of table talk reached the table (also settable as driver.onSaid). */
+  onSaid?: (lines: TalkLine[]) => void;
   /** How long one call keeps retrying before it gives up (default two minutes). */
   retryForMs?: number;
   /** One attempt's own timeout: past a chat model's 20 s and the server's own work (default 45 s). */
@@ -98,6 +108,8 @@ export const STORAGE_KEY = 'holdem:table';
 export const RESUMABLE_MS = 6 * 3600_000;
 /** The kept table's size cap (characters): the oldest finished hands go first past it. */
 export const MAX_SAVED_CHARS = 400_000;
+/** Lines of talk the driver holds for the next request; past it, say() returns null. */
+export const MAX_QUEUED_TALK = 6;
 
 /** A table kept for a resume. */
 export interface SavedTable {
@@ -181,6 +193,10 @@ const recordedMeta = (m: ActionMeta): Partial<RecordedAction> => ({
 export class RemoteDriver implements TableDriver {
   /** Told when a request is being retried, and when the table answers again. */
   onConnection: ((e: ConnectionEvent) => void) | null;
+  /** Told when the player's queued lines of table talk reached the table, as the server placed them. */
+  onSaid: ((lines: TalkLine[]) => void) | null;
+  /** Lines the player typed, waiting for the next request (cleanTalk'd). */
+  private talkQueue: string[] = [];
   private readonly fetch: typeof fetch;
   private readonly url: (route: string) => string;
   private readonly retryForMs: number;
@@ -202,6 +218,7 @@ export class RemoteDriver implements TableDriver {
     this.fetch = o.fetch ?? ((input, init) => fetch(input, init));
     this.url = o.url ?? ((route) => appPath(`/api/table/${route}`));
     this.onConnection = o.onConnection ?? null;
+    this.onSaid = o.onSaid ?? null;
     this.retryForMs = o.retryForMs ?? RETRY_FOR_MS;
     this.attemptTimeoutMs = o.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS;
     this.sleep = o.sleep ?? defaultSleep;
@@ -366,6 +383,39 @@ export class RemoteDriver implements TableDriver {
     return r.snapshot;
   }
 
+  /**
+   * The player says something at the table: the line, cleaned and capped as the server will (cleanTalk), queued for the
+   * next request. Returns the line as it will be said, or null when there is nothing to say, no table to play at (watch
+   * mode has no human), or MAX_QUEUED_TALK lines are already waiting.
+   */
+  say(text: string): string | null {
+    const line = cleanTalk(text);
+    if (!line || !this.token || this.mode !== 'play' || this.talkQueue.length >= MAX_QUEUED_TALK) return null;
+    this.talkQueue.push(line);
+    return line;
+  }
+
+  /** Sends a request with the queued talk; on success tells onSaid, on failure puts the lines back in front. */
+  private async withTalk<T extends { talk?: TalkLine[]; result?: { talk?: TalkLine[] } }>(route: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+    const talk = this.talkQueue.splice(0, MAX_TALK_LINES);
+    let r: T;
+    try {
+      r = await this.post<T>(route, talk.length ? { ...body, talk } : body, signal);
+    } catch (e) {
+      this.talkQueue.unshift(...talk);
+      throw e;
+    }
+    const said = r.result?.talk ?? r.talk;
+    if (said?.length) {
+      try {
+        this.onSaid?.(said);
+      } catch {
+        // the page's listener must not break the table
+      }
+    }
+    return r;
+  }
+
   private played(r: StepReply): StepResult {
     this.token = r.token;
     this.metas.push(r.result.meta);
@@ -375,15 +425,15 @@ export class RemoteDriver implements TableDriver {
   }
 
   async step(signal?: AbortSignal): Promise<StepResult> {
-    return this.played(await this.post<StepReply>('step', { token: this.tokenOrThrow() }, signal));
+    return this.played(await this.withTalk<StepReply>('step', { token: this.tokenOrThrow() }, signal));
   }
 
   async act(action: Action): Promise<StepResult> {
-    return this.played(await this.post<StepReply>('act', { token: this.tokenOrThrow(), action }));
+    return this.played(await this.withTalk<StepReply>('act', { token: this.tokenOrThrow(), action }));
   }
 
   async nextHand(): Promise<TableSnapshot> {
-    const r = await this.post<SnapshotReply>('next', { token: this.tokenOrThrow() });
+    const r = await this.withTalk<SnapshotReply>('next', { token: this.tokenOrThrow() });
     this.token = r.token;
     this.metas = [];
     this.keep(r.finished);
@@ -398,8 +448,11 @@ export class RemoteDriver implements TableDriver {
     const recording = r.recording && {
       ...r.recording,
       hands: r.recording.hands.map((h, i) => {
-        const known = this.finished.get(i + 1)?.actions;
-        return known && known.length === h.actions.length ? { ...h, actions: h.actions.map((x, k) => ({ ...known[k], ...x })) } : h;
+        const kept = this.finished.get(i + 1);
+        const known = kept?.actions;
+        const talk = h.talk ?? kept?.talk;
+        const withTalk = talk?.length ? { ...h, talk } : h;
+        return known && known.length === h.actions.length ? { ...withTalk, actions: h.actions.map((x, k) => ({ ...known[k], ...x })) } : withTalk;
       }),
     };
     return { players: r.players, hands, recording };

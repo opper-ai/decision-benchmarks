@@ -9,7 +9,7 @@
 import type { Action } from '../shared/engine.ts';
 import type { Review, SeatConfig, StepResult, TableSnapshot } from '../shared/table.ts';
 
-export type { ActionMeta, HumanTurn, Review, ReviewHand, SeatConfig, SeatKind, StepResult, TableSnapshot } from '../shared/table.ts';
+export type { ActionMeta, HumanTurn, Review, ReviewHand, SeatConfig, SeatKind, StepResult, TableSnapshot, TalkLine } from '../shared/table.ts';
 
 export interface TableConfig {
   /** 2 to 4 seats, seat 0 first. Play mode has exactly one human seat; watch mode has none. */
@@ -34,4 +34,9 @@ export interface TableDriver {
    * review. Never the hand in play, and never the seed (it deals the hands to come).
    */
   review(): Promise<Review>;
+  /**
+   * The player says something at the table (RemoteDriver only: the models hear it): the line as it will be said, or
+   * null when it can't be (nothing left after cleaning, watch mode, too many waiting).
+   */
+  say?(text: string): string | null;
 }
