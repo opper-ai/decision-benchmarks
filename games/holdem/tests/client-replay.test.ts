@@ -82,3 +82,27 @@ describe('ReplayDriver', () => {
     expect(() => new ReplayDriver({ ...rec, result: { chips: [1, 2, 3, 4], places: [1, 2, 3, 4] } })).toThrow(/claims/);
   });
 });
+
+describe('a replay of a game with your table talk', () => {
+  it('keeps the talk in each finished hand it hands the review', async () => {
+    const d = new LocalDriver({ thinkScale: 0, sleep: async () => {} });
+    let s = await d.start({ seed: 4, seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: 'aws/claude-opus-5-5' }] });
+    let said = 0;
+    while (!s.over) {
+      if (s.view.street === 'done') s = await d.nextHand();
+      else if (s.turn) {
+        if (said < 3 && d.say(`line ${said}`)) said++;
+        s = (await d.act({ key: s.turn.options.some((o) => o.key === 'allin') ? 'allin' : 'call' })).snapshot;
+      } else s = (await d.step()).snapshot;
+    }
+    const recording = (await d.review()).recording!;
+    const talked = recording.hands.flatMap((h, i) => (h.talk?.length ? [i + 1] : []));
+    expect(talked.length).toBeGreaterThan(0);
+
+    const r = new ReplayDriver(recording);
+    await r.jumpTo(r.hands);
+    while (r.snapshot().view.toAct !== null) await r.step();
+    const review = await r.review();
+    for (const n of talked) expect(review.hands.find((h) => h.hand === n)?.talk).toEqual(recording.hands[n - 1]!.talk);
+  });
+});
