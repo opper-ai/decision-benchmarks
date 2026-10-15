@@ -1,14 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { crossSite, handleCallback, handleLogin, handleLogout, handleMe, json, loginConfigured, opperExchange, redirect, sessionFrom, type AuthConfig, type HttpRequest, type HttpResponse } from './auth.ts';
+import { clearSessionCookie, crossSite, handleCallback, handleLogin, handleLogout, handleMe, header, json, loginConfigured, opperExchange, redirect, sessionFrom, type AuthConfig, type HttpRequest, type HttpResponse } from './auth.ts';
 import { answerKey, answerVerifier } from './answers.ts';
 import { handleDecideRequest, poolLimitRequest, rejectDecideRequest, resolveKey, type DecideContext, type PoolAccess } from './decide.ts';
 import { accountHash, cleanInitials, HighScores, highScoresStore, visitorHash } from './highscores.ts';
-import { clientIp, globalLimitsFromEnv, MAX_POOL_BODY_BYTES, poolFromEnv, trustedProxiesFromEnv, visitorKey, VisitorLimits } from './pool.ts';
+import { clientIp, globalLimitsFromEnv, MAX_POOL_BODY_BYTES, POOL_BUSY_MESSAGE, POOL_EMPTY_MESSAGE, poolFromEnv, trustedProxiesFromEnv, visitorKey, VisitorLimits } from './pool.ts';
 import { issueSeed, seedKey, seedVerifier } from './seeds.ts';
+import { purposeKey, seal, unseal } from './session.ts';
 import { devTargetFromEnv, type Target } from './systemone.ts';
 import { normalizeBasePath } from '../shared/base-path.ts';
-import type { GameServer } from '../shared/game.ts';
+import type { GameApiCall, GameApiResponse, GameServer } from '../shared/game.ts';
 
 /** Largest /api/decide body read for a player or dev key; a game state plus five questions is a few KB. */
 export const MAX_BODY_BYTES = 256 * 1024;
@@ -17,6 +18,8 @@ export const MAX_SCORE_BODY_BYTES = 1536 * 1024;
 /** Entries one account (or, signed out, one address) may send an hour, per game. */
 const SCORE_ENTRIES_PER_HOUR = 20;
 const MAX_LOG_CHARS = 300;
+/** The kit's own routes below a game's path: a game's API (GameServer.api) may not take them. */
+const KIT_API_PATHS = ['/api/me', '/api/decide', '/api/warm', '/api/highscores', '/api/seed'];
 /** Senders whose recent entries are remembered, per game; past it the one idle longest is forgotten. */
 const MAX_SCORE_SENDERS = 50_000;
 const HOUR_MS = 3_600_000;
@@ -322,9 +325,83 @@ export function createGameMiddleware(game: GameServer, env: Record<string, strin
       .finally(() => checking.delete(sender));
   };
 
+  const api = game.api;
+  for (const route of Object.keys(api?.routes ?? {})) {
+    if (!route.startsWith('/api/') || KIT_API_PATHS.includes(route)) throw new Error(`${game.slug}: an API route must be below /api/ and not one of the kit's (${KIT_API_PATHS.join(', ')}), not ${route}`);
+  }
+  const apiKeys = new Map<string, Buffer>();
+  const apiKey = (purpose: string) => apiKeys.get(purpose) ?? apiKeys.set(purpose, purposeKey(cfg.sessionSecret, `${game.slug}-${purpose}`)).get(purpose)!;
+  const sendApi = (res: ServerResponse, r: GameApiResponse) => send(res, json(r.status, r.body, r.clearSession ? [clearSessionCookie(cfg)] : [], r.headers ?? {}));
+
+  /**
+   * One of the game's own API routes: POST JSON only, same-site, the body capped and parsed, then the route answers with
+   * what the kit lends it (who pays, the free-credits allowance, sealing, the client's signal).
+   */
+  const serveApi = (req: IncomingMessage, res: ServerResponse, http: HttpRequest, route: (call: GameApiCall) => Promise<GameApiResponse>) => {
+    if (http.method !== 'POST') return send(res, json(405, { error: 'POST only' }, [], { Allow: 'POST' }));
+    if (crossSite(http, cfg)) return send(res, json(403, { error: 'Cross-site request refused' }));
+    if (!header(http, 'content-type').toLowerCase().startsWith('application/json')) return send(res, json(415, { error: 'Expected application/json' }));
+    // The client went away before the answer: a model call in flight is cancelled.
+    const gone = new AbortController();
+    res.on?.('close', () => {
+      if (!res.writableFinished) gone.abort();
+    });
+    readBody(req, api?.maxBodyBytes ?? MAX_BODY_BYTES)
+      .then(async (raw) => {
+        if (raw === null) return send(res, json(413, { error: 'Request body too large' }, [], { Connection: 'close' }));
+        let body: unknown;
+        try {
+          body = JSON.parse(raw);
+        } catch {
+          return send(res, json(400, { error: 'Bad JSON' }));
+        }
+        const session = sessionFrom(http, cfg);
+        const call: GameApiCall = {
+          body,
+          visitor: clientIp(http, trustedProxies),
+          payer: (o = {}) => {
+            const key = resolveKey(session, devKey, cfg.opperUrl, o.pool === false ? undefined : access?.pool);
+            if (!key) return null;
+            const { mode, provider, apiKey: k, baseUrl, project } = key;
+            return { mode, provider, apiKey: k, baseUrl, ...(project ? { project } : {}) };
+          },
+          unpaid: (o = {}) => {
+            // As /api/decide answers: the page asks the visitor to sign in either way.
+            if (o.pool !== false && access) return { status: 402, body: { error: POOL_EMPTY_MESSAGE, signedOut: true, poolEmpty: true } };
+            return { status: 401, body: { error: o.error ?? 'Sign in with Opper to let the AI play', signedOut: true } };
+          },
+          takePool: () => {
+            if (!access) return null;
+            const verdict = access.limits.take(clientIp(http, access.trustedProxies));
+            if (verdict === 'rate') return { status: 429, body: { error: 'Too many requests for the free credits; slow down a little' }, headers: { 'Retry-After': '1' } };
+            if (verdict === 'busy') return { status: 429, body: { error: POOL_BUSY_MESSAGE, signedOut: true, poolEmpty: true }, headers: { 'Retry-After': '5' } };
+            return null;
+          },
+          poolSpent: (costUsd, exhausted) => {
+            if (!access) return;
+            if (exhausted) access.pool.exhausted();
+            access.pool.spent(costUsd);
+          },
+          seal: (purpose, value) => seal(value, apiKey(purpose)),
+          open: (purpose, token) => unseal(token, apiKey(purpose)),
+          fetch,
+          log: (line) => logger.info(`[${game.slug}] ${redactSecrets(line)}`, { timestamp: true }),
+          signal: gone.signal,
+        };
+        sendApi(res, await route(call));
+      })
+      .catch((err) => {
+        logger.error(`[${game.slug}] ${(req.url ?? '').split('?')[0]} failed: ${redactSecrets((err as Error)?.message ?? String(err)).slice(0, MAX_LOG_CHARS)}`);
+        if (!res.headersSent) send(res, json(500, { error: 'internal error' }));
+        else abort(res);
+      });
+  };
+
   return (req, res, next) => {
     const path = (req.url ?? '').split('?')[0];
     const http = toHttp(req);
+    const route = api && Object.hasOwn(api.routes, path ?? '') ? api.routes[path!] : undefined;
+    if (route) return serveApi(req, res, http, route);
     if (path === '/api/highscores') {
       if (!scores || !game.highScores) return send(res, json(404, { error: 'This game has no high scores' }));
       if (http.method === 'GET') {

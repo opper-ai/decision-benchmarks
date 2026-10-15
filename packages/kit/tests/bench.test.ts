@@ -7,6 +7,7 @@ import { entryFor } from '../bench/results';
 import { checkSubmissions } from '../bench/submissions';
 import { chatSchema, chatTransport, endpointTransport } from '../bench/transports';
 import { warmUp } from '../bench/warm';
+import type { ChatFormat } from '../shared/chat';
 import { validateLeaderboard } from '../shared/contract';
 import { coinDefinition } from './support/test-game';
 
@@ -59,6 +60,50 @@ describe('transports', () => {
     expect((await t({ state: {}, questions: { a: { type: 'choice', instructions: 'i', criteria: { heads: 'H', tails: 'T' } } } })).answers).toEqual({ a: null });
     const down = chatTransport({ url: 'http://x', model: 'm', timeoutMs: 1000, name: 'm', fetch: async () => new Response('nope', { status: 500 }) });
     await expect(down({ state: {}, questions: { a: { type: 'choice', instructions: 'i', criteria: { x: 'X', y: 'Y' } } } })).rejects.toThrow(/HTTP 500/);
+  });
+});
+
+/** A game's own chat format: the choice under `pick`, with a remark that rides along. */
+const pickFormat: ChatFormat = {
+  messages: (state, q) => [{ role: 'user', content: `${JSON.stringify(state)} ${Object.keys(q.criteria).join('/')}` }],
+  responseFormat: (q) => ({ type: 'json_schema', json_schema: { name: 'pick', strict: true, schema: { type: 'object', properties: { pick: { type: 'string', enum: Object.keys(q.criteria) } } } } }),
+  parse(content, q) {
+    try {
+      const p = JSON.parse(content) as { pick?: unknown; remark?: unknown };
+      return typeof p.pick === 'string' && p.pick in q.criteria ? { type: 'choice', choice: p.pick, remark: p.remark } : null;
+    } catch {
+      return null;
+    }
+  },
+};
+
+describe("chat transport with a game's own format", () => {
+  const question = { a: { type: 'choice' as const, instructions: 'i', criteria: { heads: 'H', tails: 'T' } } };
+  const reply = (body: unknown, headers: Record<string, string> = {}) => vi.fn<typeof fetch>(async () => new Response(JSON.stringify(body), { headers }));
+
+  it("asks with the game's messages and schema, sends reasoning effort and headers, and keeps what the game parses", async () => {
+    const f = reply({ choices: [{ finish_reason: 'stop', message: { content: '{"pick":"heads","remark":"lucky"}' } }], usage: { prompt_tokens: 10, completion_tokens: 4 } }, { 'x-opper-cost': '0.001' });
+    const t = chatTransport({ url: 'http://x', model: 'm', timeoutMs: 1000, name: 'M', fetch: f, now: () => 0, format: pickFormat, reasoningEffort: 'low', headers: { 'X-Opper-Project': 'p1' } });
+    const res = await t({ state: { flips: 2 }, questions: question });
+    const init = f.mock.calls[0]![1]!;
+    const sent = JSON.parse(init.body as string);
+    expect(sent.messages).toEqual([{ role: 'user', content: '{"flips":2} heads/tails' }]);
+    expect(sent.response_format.json_schema.name).toBe('pick');
+    expect(sent.reasoning_effort).toBe('low');
+    expect((init.headers as Record<string, string>)['X-Opper-Project']).toBe('p1');
+    expect(res.answers).toEqual({ a: { type: 'choice', choice: 'heads', remark: 'lucky' } });
+    expect(res.costUsd).toBeCloseTo(0.001);
+    // Without a reasoning effort none is sent.
+    const plain = reply({ choices: [{ message: { content: '{"pick":"tails"}' } }] });
+    await chatTransport({ url: 'http://x', model: 'm', timeoutMs: 1000, name: 'M', fetch: plain, format: pickFormat })({ state: {}, questions: question });
+    expect(JSON.parse(plain.mock.calls[0]![1]!.body as string)).not.toHaveProperty('reasoning_effort');
+  });
+
+  it('answers a refusal as such and a reply the game cannot read as nothing, so the game falls back either way', async () => {
+    const refused = chatTransport({ url: 'http://x', model: 'm', timeoutMs: 1000, name: 'M', fetch: reply({ choices: [{ finish_reason: 'refusal', message: { content: '' } }] }), format: pickFormat });
+    expect((await refused({ state: {}, questions: question })).answers).toEqual({ a: { type: 'refusal' } });
+    const bad = chatTransport({ url: 'http://x', model: 'm', timeoutMs: 1000, name: 'M', fetch: reply({ choices: [{ message: { content: '{"pick":"edge"}' } }] }), format: pickFormat });
+    expect((await bad({ state: {}, questions: question })).answers).toEqual({ a: null });
   });
 });
 
@@ -159,6 +204,52 @@ describe('runBench', () => {
     await expect(runBench(game, ['--models', 'baseline/heads', '--leaderboard'], {}, p, quiet)).rejects.toThrow(/--out/);
     await expect(runBench(game, ['--models', 'baseline/heads,opper/kev-4b'], {}, p, quiet)).rejects.toThrow(/OPPER_API_KEY/);
     await expect(runBench(game, ['--model', 'baseline/tails'], {}, p, quiet)).rejects.toThrow(/no baseline baseline\/tails; one of: baseline\/heads/);
+  });
+
+  it("plays a game's chat models through Opper's chat completions, with their own timeout, format and reasoning effort", async () => {
+    const seen: { url: string; headers: Record<string, string>; body: Record<string, unknown>; signal: AbortSignal | null }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        seen.push({ url, headers: init.headers as Record<string, string>, body: JSON.parse(init.body as string), signal: init.signal ?? null });
+        return new Response(JSON.stringify({ choices: [{ message: { content: '{"pick":"heads"}' } }] }), { headers: { 'x-opper-cost': '0.002' } });
+      }),
+    );
+    const vias: unknown[] = [];
+    const base = coinDefinition();
+    const game = coinDefinition({
+      timing: { decisionTimeoutMs: 1000, callTimeoutMs: 1000, chatTimeoutMs: 30_000, maxInFlight: 1 },
+      chatModels: [{ id: 'azure:eu/gpt-6-luna', name: 'GPT-6 Luna', reasoningEffort: 'low' }],
+      chat: pickFormat,
+      play: (o) => {
+        vias.push(o.via);
+        return base.play(o);
+      },
+    });
+    const p = paths();
+    await runBench(game, ['--models', 'chat', '--leaderboard', '--games', '2'], { OPPER_API_KEY: 'op-test', OPPER_PROJECT: 'proj-1' }, p, quiet);
+    const board = JSON.parse(readFileSync(join(p.publicDir, 'leaderboard.json'), 'utf8'));
+    expect(validateLeaderboard(board, 'coin')).toEqual([]);
+    expect(board.entries).toMatchObject([{ model: 'azure:eu/gpt-6-luna', name: 'GPT-6 Luna', via: 'chat-adapter', games: 2, metric: { mean: 1 }, costPerGame: 0.002 }]);
+    expect(vias).toEqual(['chat-adapter', 'chat-adapter']);
+    // A warm-up, then one call per game, all to the chat endpoint with the game's format and the model's effort.
+    expect(seen).toHaveLength(3);
+    for (const call of seen) {
+      expect(call.url).toBe('https://api.opper.ai/v3/compat/chat/completions');
+      expect(call.headers).toMatchObject({ authorization: 'Bearer op-test', 'X-Opper-Project': 'proj-1', 'X-Opper-Name': 'decision-benchmarks-bench-coin' });
+      expect(call.body).toMatchObject({ model: 'azure:eu/gpt-6-luna', reasoning_effort: 'low' });
+      expect((call.body.response_format as { json_schema: { name: string } }).json_schema.name).toBe('pick');
+    }
+    // --reasoning-effort overrides the model's; a chat model needs an Opper key, whatever else is set.
+    await runBench(game, ['--model', 'azure:eu/gpt-6-luna', '--games', '1', '--reasoning-effort', 'medium'], { OPPER_API_KEY: 'op-test' }, paths(), quiet);
+    expect(seen.at(-1)!.body.reasoning_effort).toBe('medium');
+    await expect(runBench(game, ['--model', 'azure:eu/gpt-6-luna'], { TYPESAFE_API_KEY: 'ts' }, paths(), quiet)).rejects.toThrow(/OPPER_API_KEY to play chat models/);
+    await expect(runBench(coinDefinition(), ['--models', 'chat'], { OPPER_API_KEY: 'k' }, paths(), quiet)).rejects.toThrow(/no chat models/);
+    // `all` is the decision models and then the game's chat models, so one official run writes the whole board.
+    const before = seen.length;
+    await runBench(coinDefinition({ ...game, play: base.play }), ['--models', 'all', '--games', '1'], { OPPER_API_KEY: 'op-test' }, paths(), quiet);
+    expect(seen.slice(before).map((c) => c.body.model).filter((m) => m === 'azure:eu/gpt-6-luna')).toHaveLength(2);
+    expect(seen.slice(before).some((c) => c.url.endsWith('/v3/compat/v1/systemone'))).toBe(true);
   });
 
   it('refuses what it cannot do, before calling anything', async () => {

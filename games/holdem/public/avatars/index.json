@@ -1,0 +1,332 @@
+{
+  "typesafe/jev-1.13.0": {
+    "slug": "typesafe-jev-1-13-0",
+    "name": "Jev 1.13",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "sference/clef": {
+    "slug": "sference-clef",
+    "name": "Clef",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "cloudflare:global/clef-flash": {
+    "slug": "cloudflare-global-clef-flash",
+    "name": "Clef Flash",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "opper/kev-4b": {
+    "slug": "opper-kev-4b",
+    "name": "Kev 4B",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "berget/convaiinnovations/laya": {
+    "slug": "berget-convaiinnovations-laya",
+    "name": "Laya",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "openai/gpt-6-luna-decisions": {
+    "slug": "openai-gpt-6-luna-decisions",
+    "name": "GPT-6 Luna Decisions",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "azure:global/microsoft-decision-1": {
+    "slug": "azure-global-microsoft-decision-1",
+    "name": "Microsoft Decision 1",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "empiriolabs/aplomb-1": {
+    "slug": "empiriolabs-aplomb-1",
+    "name": "Aplomb 1",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "greenpt/metis": {
+    "slug": "greenpt-metis",
+    "name": "Metis",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "aws/claude-haiku-5-5-eu": {
+    "slug": "anthropic-claude-haiku-5-5",
+    "name": "Haiku 5.5",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "vertexai/claude-sonnet-5-5-eu": {
+    "slug": "anthropic-claude-sonnet-5-5",
+    "name": "Sonnet 5.5",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "aws/claude-opus-5-5": {
+    "slug": "anthropic-claude-opus-5-5",
+    "name": "Opus 5.5",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "anthropic/claude-fable-5-1": {
+    "slug": "anthropic-claude-fable-5-1",
+    "name": "Fable 5.1",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "azure:eu/gpt-6-luna": {
+    "slug": "azure-eu-gpt-6-luna",
+    "name": "GPT-6 Luna",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "azure/gpt-5.6-terra": {
+    "slug": "azure-gpt-5-6-terra",
+    "name": "GPT-5.6 Terra",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "azure:eu/gpt-6.1-sol": {
+    "slug": "azure-eu-gpt-6-1-sol",
+    "name": "GPT-6.1 Sol",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "azure/gpt-6-astra-global": {
+    "slug": "azure-gpt-6-astra-global",
+    "name": "GPT-6 Astra",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "vertexai/gemini-3.1-pro-preview": {
+    "slug": "google-gemini-3-1-pro",
+    "name": "Gemini 3.1 Pro",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "vertexai/gemini-3.8-flash-eu": {
+    "slug": "google-gemini-3-8-flash",
+    "name": "Gemini 3.8 Flash",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "vertexai/gemini-3.5-flash-lite-eu": {
+    "slug": "google-gemini-3-5-flash-lite",
+    "name": "Gemini 3.5 Flash Lite",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "vertexai/gemini-4-argon-eu": {
+    "slug": "google-gemini-4-argon",
+    "name": "Gemini 4 Argon",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "xai/grok-4.7": {
+    "slug": "xai-grok-4-7",
+    "name": "Grok 4.7",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "melious/deepseek-v4.1-flash": {
+    "slug": "deepseek-v4-1-flash",
+    "name": "DeepSeek V4.1 Flash",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "nebius/deepseek-ai/DeepSeek-V4-Pro-0813": {
+    "slug": "deepseek-v4-pro",
+    "name": "DeepSeek V4 Pro",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "tensorx/qwen/qwen3.8-flash-next": {
+    "slug": "qwen3-8-flash-next",
+    "name": "Qwen3.8 Flash-Next",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "alibaba:global/qwen3.8-max": {
+    "slug": "qwen3-8-max",
+    "name": "Qwen3.8 Max",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "sference/kimi-k3": {
+    "slug": "moonshot-kimi-k3",
+    "name": "Kimi K3",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "inceptron/zai-org/GLM-5.3-Flash": {
+    "slug": "zhipu-glm-5-3-flash",
+    "name": "GLM-5.3 Flash",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "inceptron/zai-org/GLM-5.3": {
+    "slug": "zhipu-glm-5-3",
+    "name": "GLM-5.3",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "nebius/MiniMaxAI/MiniMax-M3": {
+    "slug": "minimax-m3",
+    "name": "MiniMax M3",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  }
+}

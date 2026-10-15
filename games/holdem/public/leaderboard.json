@@ -1,0 +1,109 @@
+{
+  "generatedAt": "2026-10-14T12:07:30.701Z",
+  "game": "holdem",
+  "benchVersion": 1,
+  "metric": {
+    "name": "bb/100",
+    "unit": "bb/100",
+    "higherIsBetter": true
+  },
+  "entries": [
+    {
+      "model": "sference/clef",
+      "name": "Clef",
+      "games": 4,
+      "metric": {
+        "mean": 137.29,
+        "stdError": 215.405,
+        "best": 617.08
+      },
+      "meanLatencyMs": 195,
+      "fallbackRate": 0,
+      "costPerGame": 0.03521,
+      "via": "systemone",
+      "extra": {
+        "hands": 480,
+        "VPIP %": 25.4,
+        "PFR %": 10,
+        "Aggression factor": 0.65,
+        "Fold to 3-bet %": 41.2,
+        "Went to showdown %": 61.2,
+        "Won at showdown %": 55.3,
+        "Bluff rate %": 46.2,
+        "bb/100 vs rock": -3.12,
+        "bb/100 vs station": 14.29,
+        "bb/100 vs maniac": 126.12,
+        "Fallback %": 0,
+        "refusals": 0,
+        "invalid answers": 0,
+        "timeouts": 0,
+        "errors": 0
+      }
+    },
+    {
+      "model": "azure:eu/gpt-6-luna",
+      "name": "GPT-6 Luna",
+      "games": 4,
+      "metric": {
+        "mean": 44.585,
+        "stdError": 69.674,
+        "best": 245.42
+      },
+      "meanLatencyMs": 3331,
+      "fallbackRate": 0.01,
+      "costPerGame": 0.04641,
+      "via": "chat-adapter",
+      "extra": {
+        "hands": 480,
+        "VPIP %": 33.3,
+        "PFR %": 14.4,
+        "Aggression factor": 0.8,
+        "Fold to 3-bet %": 83.3,
+        "Went to showdown %": 41.1,
+        "Won at showdown %": 56.9,
+        "Bluff rate %": 37.5,
+        "bb/100 vs rock": 0.52,
+        "bb/100 vs station": -25.62,
+        "bb/100 vs maniac": 69.69,
+        "Fallback %": 1,
+        "refusals": 0,
+        "invalid answers": 0,
+        "timeouts": 9,
+        "errors": 0
+      }
+    },
+    {
+      "model": "aws/claude-haiku-5-5-eu",
+      "name": "Haiku 5.5",
+      "games": 4,
+      "metric": {
+        "mean": -374.27,
+        "stdError": 92.191,
+        "best": -102.5
+      },
+      "meanLatencyMs": 2478,
+      "fallbackRate": 0,
+      "costPerGame": 0.12801,
+      "via": "chat-adapter",
+      "extra": {
+        "hands": 480,
+        "VPIP %": 81.5,
+        "PFR %": 30.8,
+        "Aggression factor": 0.51,
+        "Fold to 3-bet %": 17.5,
+        "Went to showdown %": 77.2,
+        "Won at showdown %": 43.7,
+        "Bluff rate %": 23.1,
+        "bb/100 vs rock": -4.43,
+        "bb/100 vs station": -129.55,
+        "bb/100 vs maniac": -240.3,
+        "Fallback %": 0,
+        "refusals": 0,
+        "invalid answers": 0,
+        "timeouts": 0,
+        "errors": 0
+      }
+    }
+  ],
+  "skipped": []
+}

@@ -1,5 +1,6 @@
 import { handleDecide } from '../server/decide.ts';
 import type { Target } from '../server/systemone.ts';
+import { chatReplyAnswer, chatRequestBody, type ChatCompletion, type ChatFormat } from '../shared/chat.ts';
 import { withSignal, type ChoiceQuestion, type DecideResponse, type SystemOneRequest, type Transport } from '../shared/systemone.ts';
 
 /**
@@ -11,7 +12,7 @@ import { withSignal, type ChoiceQuestion, type DecideResponse, type SystemOneReq
 /** A listed decision model through Opper (or jev through TypeSafe), with the key from the environment. */
 export function systemOneTransport(model: string, target: Target | undefined, timeoutMs: number, callName = 'decision-benchmarks-bench'): Transport {
   return async (body, opts) => {
-    const r = await handleDecide({ ...body, model }, { apiKey: target?.apiKey, baseUrl: target?.baseUrl ?? '', provider: target?.provider, fetch, now: () => performance.now(), timeoutMs, callName, ...(opts?.signal ? { signal: opts.signal } : {}) });
+    const r = await handleDecide({ ...body, model }, { apiKey: target?.apiKey, baseUrl: target?.baseUrl ?? '', provider: target?.provider, ...(target?.project ? { project: target.project } : {}), fetch, now: () => performance.now(), timeoutMs, callName, ...(opts?.signal ? { signal: opts.signal } : {}) });
     if (r.status !== 200) throw new Error((r.body as { error?: string }).error ?? `HTTP ${r.status}`);
     return r.body as DecideResponse;
   };
@@ -96,43 +97,54 @@ export interface ChatOptions extends EndpointOptions {
   model: string;
   /** Room for models that reason before they answer. */
   maxTokens?: number;
+  /** The game's own way of asking (GameDefinition.chat); else a choice and a probability per option. */
+  format?: ChatFormat;
+  /** Sent as reasoning_effort when set (low, medium, ...). */
+  reasoningEffort?: string;
+  /** Extra request headers (Opper's X-Opper-Name, X-Opper-Project). */
+  headers?: Record<string, string>;
 }
 
 /**
  * Any OpenAI-compatible chat completions endpoint (Opper's /v3/compat/chat/completions, a local server), forced
- * through a JSON schema to answer each question as System One would. One call per question, in parallel; a request's
- * latency is the slowest, its cost the sum (from x-opper-cost, when the endpoint sends it).
+ * through a JSON schema to answer each question as System One would (or as the game's own format asks). One call per
+ * question, in parallel; a request's latency is the slowest, its cost the sum (from x-opper-cost, when the endpoint
+ * sends it). A refused reply (finish_reason "refusal") answers REFUSAL, which no game takes for a choice.
  */
 export function chatTransport(o: ChatOptions): Transport {
   const f = o.fetch ?? fetch;
   const now = o.now ?? (() => performance.now());
-  const ask = async (state: unknown, q: ChoiceQuestion, signal: AbortSignal) => {
+  const ask = async (state: Record<string, unknown>, q: ChoiceQuestion, signal: AbortSignal) => {
     const options = Object.keys(q.criteria);
     const res = await f(o.url, {
       method: 'POST',
-      headers: authHeaders(o.token),
-      body: JSON.stringify({
-        model: o.model,
-        messages: [
-          { role: 'system', content: SYSTEM },
-          { role: 'user', content: chatPrompt(state, q) },
-        ],
-        response_format: chatSchema(options),
-        max_tokens: o.maxTokens ?? 1200,
-      }),
+      headers: { ...authHeaders(o.token), ...o.headers },
+      body: JSON.stringify(
+        o.format
+          ? chatRequestBody(o, o.format.messages(state, q), o.format.responseFormat(q))
+          : chatRequestBody(
+              o,
+              [
+                { role: 'system', content: SYSTEM },
+                { role: 'user', content: chatPrompt(state, q) },
+              ],
+              chatSchema(options),
+            ),
+      ),
       signal,
     });
     if (!res.ok) throw new Error(`${o.model} returned HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+    const data = (await res.json()) as ChatCompletion;
     const cost = res.headers.get('x-opper-cost');
-    let answer: unknown = null;
-    try {
-      const content = (data.choices?.[0]?.message?.content ?? '').replace(/^```(?:json)?\s*|\s*```$/g, '');
-      const parsed = JSON.parse(content) as { choice?: unknown; probabilities?: unknown };
-      answer = { type: 'choice', choice: parsed.choice, probabilities: parsed.probabilities };
-    } catch {
-      // not JSON: the game's fallback decides
-    }
+    const answer = chatReplyAnswer(data, (content) => {
+      if (o.format) return o.format.parse(content, q);
+      try {
+        const parsed = JSON.parse(content) as { choice?: unknown; probabilities?: unknown };
+        return { type: 'choice', choice: parsed.choice, probabilities: parsed.probabilities };
+      } catch {
+        return null; // not JSON: the game's fallback decides
+      }
+    });
     return { answer, usage: { input_tokens: data.usage?.prompt_tokens ?? 0, output_tokens: data.usage?.completion_tokens ?? 0 }, cost: cost === null ? null : Number(cost) };
   };
   return async (body: SystemOneRequest, opts?: { signal?: AbortSignal }) => {

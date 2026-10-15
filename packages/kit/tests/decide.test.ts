@@ -51,7 +51,14 @@ describe('handleDecide', () => {
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer test-key');
     expect(headers['X-Opper-Name']).toBe('decision-benchmarks');
+    expect(headers['X-Opper-Project']).toBeUndefined();
     expect(JSON.parse(init.body as string)).toEqual({ model: JEV_MODEL, ...body });
+  });
+
+  it("names the project for an organization key (OPPER_PROJECT), which System One needs", async () => {
+    const fetchMock = ok();
+    await handleDecide(body, deps(fetchMock, { project: 'proj-1' }));
+    expect((fetchMock.mock.calls[0]![1]!.headers as Record<string, string>)['X-Opper-Project']).toBe('proj-1');
   });
 
   it('tolerates a trailing slash in the base URL', async () => {

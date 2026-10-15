@@ -187,7 +187,7 @@ export const DEFAULT_LIMITS: LimitSettings = { ratePerSec: 8, burst: 40 };
 /** Every signed-out visitor together: about ten games against four AI ghosts at once. */
 export const DEFAULT_GLOBAL_LIMITS: LimitSettings = { ratePerSec: 400, burst: 1200 };
 /** An IPv6 /48 gets this many visitors' allowance. */
-const NETWORK_FACTOR = 4;
+export const NETWORK_FACTOR = 4;
 /** `rate`: this visitor (or their network) sends too fast; `busy`: every visitor together does. */
 export type LimitVerdict = 'ok' | 'rate' | 'busy';
 const MAX_TRACKED = 50_000;

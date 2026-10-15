@@ -22,6 +22,12 @@ export const REGISTRY: readonly RegisteredGame[] = [
     server: () => import('./fighter/game.server.ts').then((m) => m.default),
     definition: () => import('./fighter/game.ts').then((m) => m.default as unknown as GameDefinition<unknown, GameResult>),
   },
+  {
+    slug: 'holdem',
+    // game.server.ts serves the table (api/table/*): the server deals and asks the models.
+    server: () => import('./holdem/game.server.ts').then((m) => m.default),
+    definition: () => import('./holdem/game.ts').then((m) => m.default as unknown as GameDefinition<unknown, GameResult>),
+  },
 ];
 
 /**

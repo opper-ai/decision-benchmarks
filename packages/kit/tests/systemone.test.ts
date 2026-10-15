@@ -22,6 +22,7 @@ describe('System One targets', () => {
     expect(devTargetFromEnv({ OPPER_API_KEY: 'op' })).toEqual({ provider: 'opper', apiKey: 'op', baseUrl: 'https://api.opper.ai' });
     expect(devTargetFromEnv({ OPPER_API_KEY: 'op', OPPER_BASE_URL: 'https://o.example' })).toMatchObject({ baseUrl: 'https://o.example' });
     expect(devTargetFromEnv({ TYPESAFE_API_KEY: '', OPPER_API_KEY: '' })).toBeUndefined();
+    expect(devTargetFromEnv({ OPPER_API_KEY: 'op', OPPER_PROJECT: 'proj-1' })).toEqual({ provider: 'opper', apiKey: 'op', baseUrl: 'https://api.opper.ai', project: 'proj-1' });
   });
 });
 
