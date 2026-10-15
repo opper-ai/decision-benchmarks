@@ -25,6 +25,12 @@ describe("the table token's contents", () => {
     expect(parseState(state({ seats: [null, null] }))).toBeNull();
     expect(parseState(state({ mode: 'watch' }))).toBeNull();
     expect(parseState(state({ log: [] }))).toBeNull();
+    // 2 to 6 seats.
+    const clef = 'sference/clef';
+    expect(parseState(state({ seats: [null, clef, clef, clef, clef, clef] }))).not.toBeNull();
+    expect(parseState(state({ mode: 'watch', seats: [clef, clef, clef, clef, clef, clef] }))).not.toBeNull();
+    expect(parseState(state({ seats: [null, clef, clef, clef, clef, clef, clef] }))).toBeNull();
+    expect(parseState(state({ seats: [null] }))).toBeNull();
     expect(parseState(null)).toBeNull();
   });
 
@@ -33,5 +39,10 @@ describe("the table token's contents", () => {
     expect(t.hands[0]).toHaveLength(1);
     expect(() => rebuild(state({ log: ['c', 'x'] }))).toThrow(/stops before it ended/);
     expect(() => rebuild(state({ log: ['zz'] }))).toThrow(/no action/);
+    // A six-seat table: every seat folds round to the big blind.
+    const six = rebuild(state({ seats: [null, 'sference/clef', 'sference/clef', 'sference/clef', 'sference/clef', 'sference/clef'], log: ['f,f,f,f,f', ''] }));
+    expect(six.g.hand.seats).toHaveLength(6);
+    expect(six.g.handIndex).toBe(1);
+    expect(six.g.hand.level).toMatchObject({ hand: 2, handsUntilNextLevel: 11 });
   });
 });

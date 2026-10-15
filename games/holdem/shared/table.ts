@@ -166,7 +166,10 @@ export function recordingOf(g: SitAndGo, players: readonly Player[], hands: read
 
 // ---------- the service's table API (POST api/table/*): what goes in and what comes back ----------
 
-/** POST api/table/start: the seats in order (2 to 4; play: one human, watch: none). The server picks the table key. */
+/**
+ * POST api/table/start: the seats in order, 2 to 6 (sitngo.ts MIN_SEATS to MAX_SEATS; 4, DEFAULT_SEATS, unless the
+ * player picks another size). Play: one human and 1 to 5 models; watch: 2 to 6 models. The server picks the table key.
+ */
 export interface StartRequest {
   seats: { kind: 'human' | 'model'; id: string }[];
   mode: 'play' | 'watch';

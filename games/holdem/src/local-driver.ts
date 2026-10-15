@@ -9,7 +9,7 @@ import { evaluate } from '../shared/evaluator.ts';
 import { CHAT_TIMEOUT_MS, DECISION_TIMEOUT_MS } from '../shared/models.ts';
 import type { Mood, Player, RecordedAction } from '../shared/recording.ts';
 import { deriveSeed, keyFromSeed, mulberry32 } from '../shared/rng.ts';
-import { actSitAndGo, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
+import { actSitAndGo, MAX_SEATS, MIN_SEATS, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
 import { finishedHandOf, recordingOf, snapshotOf } from '../shared/table.ts';
 import type { ActionMeta, Review, ReviewHand, SeatConfig, StepResult, TableConfig, TableDriver, TableSnapshot } from './driver.ts';
 import { modelById } from './roster.ts';
@@ -137,7 +137,7 @@ export class LocalDriver implements TableDriver {
 
   async start(config: TableConfig): Promise<TableSnapshot> {
     const n = config.seats.length;
-    if (n < 2 || n > 4) throw new Error('a table seats 2 to 4 players');
+    if (n < MIN_SEATS || n > MAX_SEATS) throw new Error(`a table seats ${MIN_SEATS} to ${MAX_SEATS} players`);
     const humans = config.seats.flatMap((s, i) => (s.kind === 'human' ? [i] : []));
     if (humans.length > 1) throw new Error('one human at most');
     this.seats = config.seats.map((s) => {
