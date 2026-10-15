@@ -163,6 +163,7 @@ export class LocalDriver implements TableDriver {
     const key = config.key ?? (config.seed !== undefined ? keyFromSeed(config.seed) : randomKey());
     this.g = newSitAndGo({ seats: n, key });
     this.hands = [[]];
+    this.talk = [[]];
     this.finished = [];
     this.archive();
     this.turnStart = Date.now();
@@ -246,6 +247,7 @@ export class LocalDriver implements TableDriver {
   async nextHand(): Promise<TableSnapshot> {
     this.g = nextHand(this.game());
     this.hands.push([]);
+    this.talk.push([]);
     this.archive();
     this.turnStart = Date.now();
     return this.snapshot();
@@ -255,7 +257,7 @@ export class LocalDriver implements TableDriver {
   private archive(): void {
     const g = this.game();
     if (g.hand.street !== 'done' || this.finished.length > g.handIndex) return;
-    this.finished.push(finishedHandOf(g, this.hands[g.handIndex] ?? []));
+    this.finished.push(finishedHandOf(g, this.hands[g.handIndex] ?? [], this.talk[g.handIndex] ?? []));
   }
 
   private players(): Player[] {
@@ -264,7 +266,7 @@ export class LocalDriver implements TableDriver {
 
   async review(): Promise<Review> {
     const g = this.game();
-    return { players: this.players(), hands: structuredClone(this.finished), recording: g.over ? recordingOf(g, this.players(), this.hands) : null };
+    return { players: this.players(), hands: structuredClone(this.finished), recording: g.over ? recordingOf(g, this.players(), this.hands, this.talk) : null };
   }
 
   /** Who stands in for each seat (null for the human): for the page's practice notice and tests. */
@@ -275,6 +277,8 @@ export class LocalDriver implements TableDriver {
   /** Told when your lines reached the table (with the next move), as RemoteDriver's are. */
   onSaid: ((lines: TalkLine[]) => void) | null = null;
   private talkQueue: string[] = [];
+  /** Your lines per hand, where they were said (for the review and the recording). */
+  private talk: TalkLine[][] = [];
 
   /**
    * Your table talk, as the real table takes it (cleaned, at most 6 waiting): it goes with the next move, and the next
@@ -292,6 +296,7 @@ export class LocalDriver implements TableDriver {
     if (!this.talkQueue.length || this.human === null) return;
     const after = this.hands.at(-1)?.length ?? 0;
     const lines = this.talkQueue.splice(0).map((say) => ({ seat: this.human!, after, say }));
+    this.talk.at(-1)?.push(...lines);
     this.heard = lines.at(-1)!.say;
     try {
       this.onSaid?.(lines);

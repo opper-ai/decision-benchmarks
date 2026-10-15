@@ -62,6 +62,8 @@ export function reviewView(o: ReviewOptions): HTMLElement {
 }
 
 function handBody(hand: ReviewHand, people: SeatPerson[], name: (seat: number) => string, players: Review['players']): HTMLElement[] {
+  /** The player's own table talk, where it was said among the moves. */
+  const talkRow = (t: { seat: number; say: string }) => h('div.tl.talk', null, avatarEl(people[t.seat]!), h('div.line', null, h('b', null, people[t.seat]!.name), h('span.meta', null, 'said')), h('q.said', null, t.say));
   const f = factsOf(hand);
   const shown = new Map(hand.events.flatMap((e) => (e.type === 'showdown' ? e.hands.map((x) => [x.seat, x.category] as const) : [])));
   const held = h('div.who-held');
@@ -98,6 +100,7 @@ function handBody(hand: ReviewHand, people: SeatPerson[], name: (seat: number) =
       const cards = street === 'preflop' ? [] : (streetCards.get(street) ?? []);
       timeline.append(h('div.street-head', null, STREET_NAMES[street], h('span.cards', null, ...cards.map((c) => cardEl(c, true)))));
     }
+    for (const t of hand.talk ?? []) if (t.after === i) timeline.append(talkRow(t));
     const meta = hand.actions[i];
     const p = people[a.seat]!;
     const bars = tellBars(meta?.probabilities);
@@ -118,6 +121,7 @@ function handBody(hand: ReviewHand, people: SeatPerson[], name: (seat: number) =
       ),
     );
   });
+  for (const t of hand.talk ?? []) if (t.after >= f.actions.length) timeline.append(talkRow(t));
   const results = hand.events.flatMap((e) => (e.type === 'award' ? [e] : [])).map((e) => {
     const winners = e.winners.map(name).join(' and ');
     const cat = e.winners.length && shown.get(e.winners[0]!);

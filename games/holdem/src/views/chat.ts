@@ -119,6 +119,12 @@ export class ChatBox {
     }
   }
 
+  /** A line someone said away from a move (a replay's human player): a message from that seat. */
+  heard(seat: number, text: string): void {
+    const p = this.o.people[seat]!;
+    this.add(h('article.chat-msg.you', null, avatarEl(p, 'relaxed', 'chat-face'), h('div.chat-main', null, h('div.chat-who', null, h('b', null, seat === this.o.viewer ? 'You' : p.name)), h('q.chat-said', null, text))));
+  }
+
   /** A short line from the chat itself, under your talk ("Slow down a little"). */
   private hint(text: string): void {
     this.add(h('p.chat-hint', { role: 'status' }, text), true);

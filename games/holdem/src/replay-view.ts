@@ -192,6 +192,8 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     if (jump !== null || signal.aborted) continue;
     const seat = snap!.view.toAct!;
     const next = o.recording.hands[snap!.hand - 1]!.actions[driver.position().move];
+    // The player's own talk said before this move (a recording keeps it: hands[i].talk), in the chat as it was said.
+    for (const t of o.recording.hands[snap!.hand - 1]!.talk ?? []) if (t.after === driver.position().move) chat.heard(t.seat, t.say);
     // A moment to think: the move's own latency, shortened, at the replay's speed.
     ui.thinking(seat, null);
     await wait(paced(Math.min(1400, 350 + (next?.latencyMs ?? 0) / 4), speed, reducedMotion()));
