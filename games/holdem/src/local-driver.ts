@@ -257,6 +257,9 @@ export class LocalDriver implements TableDriver {
     this.g = nextHand(this.game());
     this.hands.push([]);
     this.talk.push([]);
+    // Talk typed between hands is said as the new one starts (as RemoteDriver sends it with next).
+    this.heard = null;
+    this.deliver();
     this.archive();
     this.turnStart = Date.now();
     return this.snapshot();

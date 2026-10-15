@@ -6,6 +6,7 @@
 //   "players": ["anthropic/claude-fable-5-1", "azure/gpt-6-astra-global"], "hands": 41, "recordedAt": "2026-10-20" }] }
 // A file is a Recording (shared/recording.ts) as JSON, gzipped when it ends in .gz.
 import type { Recording } from '../../shared/recording.ts';
+import { MAX_SEATS, MIN_SEATS } from '../../shared/sitngo.ts';
 import { h } from '../dom.ts';
 import { personOf } from '../view-model.ts';
 import { avatarEl } from './parts.ts';
@@ -31,7 +32,7 @@ export function parseDemoIndex(raw: unknown): DemoEntry[] {
   return ((raw as { replays: unknown[] }).replays).flatMap((e): DemoEntry[] => {
     if (typeof e !== 'object' || e === null) return [];
     const x = e as Record<string, unknown>;
-    if (!isText(x.file, 90) || !DEMO_FILE.test(x.file) || !isText(x.title, 80) || !Array.isArray(x.players) || !x.players.every((p) => isText(p, 120)) || x.players.length < 2 || x.players.length > 4) return [];
+    if (!isText(x.file, 90) || !DEMO_FILE.test(x.file) || !isText(x.title, 80) || !Array.isArray(x.players) || !x.players.every((p) => isText(p, 120)) || x.players.length < MIN_SEATS || x.players.length > MAX_SEATS) return [];
     return [{ file: x.file, title: x.title, blurb: isText(x.blurb) ? x.blurb : '', players: x.players as string[], hands: Number.isInteger(x.hands) ? (x.hands as number) : 0, recordedAt: isText(x.recordedAt, 40) ? x.recordedAt : '' }];
   });
 }

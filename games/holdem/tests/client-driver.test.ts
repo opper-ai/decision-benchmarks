@@ -200,6 +200,19 @@ describe('practice talk', () => {
   });
 });
 
+describe('practice talk between hands', () => {
+  it('says a line typed between hands at the start of the next one', async () => {
+    const d = instant();
+    const said: { after: number; say: string }[] = [];
+    d.onSaid = (lines) => said.push(...lines);
+    let s = await d.start({ seed: 3, seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: 'aws/claude-haiku-5-5-eu' }] });
+    while (s.view.street !== 'done') s = s.turn ? (await d.act({ key: 'fold' })).snapshot : (await d.step()).snapshot;
+    expect(d.say('Next hand is mine.')).toBe('Next hand is mine.');
+    await d.nextHand();
+    expect(said).toEqual([expect.objectContaining({ after: 0, say: 'Next hand is mine.' })]);
+  });
+});
+
 describe('practice, once you are out', () => {
   it('watches the rest as a spectator: every card up, the models’ reasoning with each step', async () => {
     // A table where you shove every hand until you are out and the two models play on (the first seed that goes so).
