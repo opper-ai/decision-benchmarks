@@ -326,6 +326,31 @@ describe('RemoteDriver: the player talks at the table', () => {
     expect(d.say('watching')).toBeNull();
   });
 
+  it('keeps the lines of a step the page gave up on for the next request, and drops them only when the player leaves', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    let hang = true;
+    const answer = { token: 'T2', result: { seat: 1, key: 'call', meta: { by: 'answer', latencyMs: 1 }, snapshot: { over: false }, talk: [{ seat: 0, after: 0, say: 'Hi.' }] } };
+    const f = vi.fn<typeof fetch>((_input, init) => {
+      bodies.push(JSON.parse(init!.body as string));
+      if (!hang) return Promise.resolve(new Response(JSON.stringify(answer), { status: 200 }));
+      return new Promise((_, reject) => init!.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+    });
+    const refused: unknown[] = [];
+    const d = new RemoteDriver({ fetch: f, url: (r) => r, storage: null, sleep: async () => {}, onTalkRefused: (lines, why) => refused.push([lines, why]) });
+    Object.assign(d as unknown as Record<string, unknown>, { token: 'T1', mode: 'play' });
+    expect(d.say('Hi.')).toBe('Hi.');
+    const ac = new AbortController();
+    const cancelled = d.step(ac.signal);
+    setTimeout(() => ac.abort(), 10);
+    await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' });
+    hang = false;
+    const r = await d.step();
+    // The next request, from the same token, carries the line again: said once, nothing refused.
+    expect(bodies.map((b) => [b.token, b.talk])).toEqual([['T1', ['Hi.']], ['T1', ['Hi.']]]);
+    expect(r.talk).toEqual([expect.objectContaining({ say: 'Hi.' })]);
+    expect(refused).toEqual([]);
+  });
+
   it("reports the lines the table did not say (over the allowance, or past a hand's room) and the ones left when the game ends", async () => {
     const reply = { token: 'T2', result: { seat: 0, key: 'call', meta: { by: 'human', latencyMs: 1 }, snapshot: { over: false }, talk: [{ seat: 0, after: 1, say: 'a' }] }, talkRefused: { lines: ['b'], why: 'full' } };
     let over = false;

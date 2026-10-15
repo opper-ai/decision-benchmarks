@@ -422,9 +422,9 @@ export class RemoteDriver implements TableDriver {
   /**
    * Sends a request with the queued talk. The answer says which lines were said (onSaid) and which not (onTalkRefused,
    * after the said ones: the server places a batch's lines in order). A request that could not get through (no
-   * connection, too fast) keeps its lines in front of the queue for the next one, which goes from the same token; one
-   * the table refused takes its lines with it (onTalkRefused 'refused'). Once the game is over, what still waits is not
-   * said ('over').
+   * connection, too fast), or a step the page cancelled, keeps its lines in front of the queue for the next one, which
+   * goes from the same token; one the table refused takes its lines with it (onTalkRefused 'refused'). Leaving the table
+   * drops them. Once the game is over, what still waits is not said ('over').
    */
   private async withTalk<T extends { talk?: TalkLine[]; talkRefused?: TalkRefused; result?: { talk?: TalkLine[]; snapshot: TableSnapshot }; snapshot?: TableSnapshot }>(route: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
     const talk = this.talkQueue.splice(0, MAX_TALK_LINES);
@@ -434,7 +434,11 @@ export class RemoteDriver implements TableDriver {
     } catch (e) {
       if (e instanceof TableError && e.kind !== 'failed' && e.kind !== 'rate') {
         if (talk.length) this.tell(this.onTalkRefused, talk, 'refused');
-      } else if ((e as Error)?.name !== 'AbortError') this.talkQueue.unshift(...talk);
+      } else if (!this.leaving.signal.aborted) {
+        // Not through (no connection, too fast), or a step the page gave up on: the next request goes from the same
+        // token and carries the lines, so they are said once. Only leaving the table drops them (forget()).
+        this.talkQueue.unshift(...talk);
+      }
       throw e;
     }
     const said = r.result?.talk ?? r.talk;
