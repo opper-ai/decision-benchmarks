@@ -509,9 +509,13 @@ export class TableUI {
     const crowded = this.people.length >= 5;
     (crowded ? this.area : root).querySelectorAll('.bubble').forEach((b) => b.remove());
     clearTimeout(this.bubbles.get(seat));
-    const b = h('div.bubble', { role: 'status' }, h('span.bubble-text', null, `“${text}”`));
+    // A table of five or six has no room beside the seats: the talk goes over the middle, with the name.
+    const middle = crowded;
+    const b = middle
+      ? h('div.bubble.center', { role: 'status' }, h('b', null, this.people[seat]!.short), h('span.bubble-text', null, `“${text}”`))
+      : h('div.bubble', { role: 'status' }, h('span.bubble-text', null, `“${text}”`));
     b.title = text;
-    root.querySelector('.who')!.append(b);
+    (middle ? this.area : root.querySelector('.who')!).append(b);
     // Long enough to read: longer for more words, shorter when the table is sped up (view-model.ts).
     const life = bubbleMs(text, this.o.speed());
     this.bubbles.set(

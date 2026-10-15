@@ -84,6 +84,7 @@
 .tbtn[aria-pressed='true'] { background: rgba(215, 170, 82, 0.22); border-color: var(--h-brass); }
 .tbtn.icon { width: 32px; padding: 0; justify-content: center; }
 .tbtn[hidden] { display: none; }
+.room.watching .level { height: 18px; } /* its line is there before the first hand is drawn: the room keeps its height */
 .tbtn svg { flex: none; }
 /* Review and Leave: words; icons on a phone (below). */
 .tbtn .ic { display: none; }
@@ -123,8 +124,19 @@
   .room:not(.watching) .middle { top: 56%; }
   .room:not(.watching) .seat[data-slot='bottom'] { --y: 90%; }
 }
-@media (min-width: 760px) { .felt-area { aspect-ratio: 16 / 9.4; --cw-board: 62px; --cw-seat: 42px; --cw-you: 70px; --av: 78px; } }
-@media (min-width: 1000px) { .felt-area { --cw-board: 68px; --cw-seat: 46px; --cw-you: 76px; --av: 86px; } }
+/*
+ * A wide screen: the faces and cards scale with the felt's width (--fw: the room's, less the chat column beside it from
+ * 1000 px), so a top seat, its talk under it, the board and the bottom seat always fit the felt's height.
+ */
+@media (min-width: 760px) {
+  .felt-area {
+    aspect-ratio: 16 / 9.4; --fw: min(100vw - 48px, 1120px);
+    /* The felt's height less what doesn't scale (margins, plates, the talk and pots rows) holds two faces and a board card. */
+    --av: clamp(52px, calc((var(--fw) * 0.5875 - 230px) / 3.2), 86px);
+    --cw-board: clamp(42px, calc(var(--av) * 0.8), 68px); --cw-seat: clamp(32px, calc(var(--av) * 0.55), 46px); --cw-you: clamp(56px, calc(var(--av) * 0.9), 76px);
+  }
+}
+@media (min-width: 1000px) { .felt-area { --fw: calc(min(100vw - 48px, 1120px) - 300px); } }
 .watching .felt-area, .all-up .felt-area { --cw-seat: 30px; }
 @media (min-width: 760px) { .watching .felt-area, .all-up .felt-area { --cw-seat: 50px; } }
 .rail {
@@ -154,8 +166,11 @@
 
 /* ---------- the middle: pots and the board ---------- */
 .middle { position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 8px; z-index: 2; }
-@media (min-width: 760px) { .middle { top: 47%; gap: 10px; } }
+/* A wide screen: the pots and board centred between a top seat's talk (under it) and the bottom seat. */
+@media (min-width: 760px) { .middle { top: calc((var(--top-edge) + 58px + 100% - var(--bottom-edge) - 10px) / 2); gap: 10px; } }
 .seat.you .shown-name { top: auto; bottom: calc(100% + 2px); }
+/* The bottom seat's shown hand under its cards, beside the face: under the plate is the felt's edge. */
+.seat[data-slot='bottom']:not(.you) .shown-name { top: calc(var(--cw-seat) * 1.4 + 10px); left: calc(50% + var(--av) * 0.5 + 4px); transform: none; }
 .pots { display: flex; gap: 8px; min-height: 26px; align-items: center; }
 .pot { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; background: rgba(8, 20, 14, 0.55); font: 700 13px var(--j-display); font-variant-numeric: tabular-nums; }
 .pot .lbl { font: 500 11px var(--j-body); color: var(--h-dim); }
@@ -194,6 +209,35 @@
 .seat[data-slot='right'] { --x: 85%; --y: 37%; }
 .seat[data-slot='top-left'] { --x: 25%; --y: 13%; }
 .seat[data-slot='top-right'] { --x: 75%; --y: 13%; }
+/*
+ * The seats across the top hang from the felt's top edge, and the bottom seat stands on its bottom edge, whatever the
+ * table's height: every face, plate and card stays inside the room, clear of the toolbar (tests/fit/fit-check.ts).
+ */
+.seat:is([data-slot='top'], [data-slot='top-left'], [data-slot='top-right']) { top: 14px; transform: translate(-50%, 0); }
+.seat[data-slot='bottom'] { top: auto; bottom: 10px; transform: translate(-50%, 0); }
+/*
+ * Where those seats end, for what sits next to them: --top-edge is the foot of a top seat (its face, plate and, on a
+ * phone, the cards under the plate), --bottom-edge the head of the bottom seat, from the felt's foot (your big cards
+ * included). Bets go just inside them, the dealer button beside the face.
+ */
+.felt-area { --plate-h: 48px; --under: 0px; --top-edge: calc(14px + var(--av) + var(--plate-h) + var(--under)); --bottom-edge: calc(10px + max(var(--av) + var(--plate-h), var(--cw-you) * 1.4)); }
+@media (max-width: 759px) { .felt-area { --plate-h: 44px; --under: calc(var(--cw-seat) * 1.4); } }
+.felt-area .bet:is([data-slot='top'], [data-slot='top-left'], [data-slot='top-right']) { --y: calc(var(--top-edge) + 24px); }
+.felt-area .bet[data-slot='bottom'] { --y: calc(100% - var(--bottom-edge) - 24px); }
+.felt-area .dealer:is([data-slot='top'], [data-slot='top-left'], [data-slot='top-right']) { --y: calc(14px + var(--av) * 0.5); }
+.felt-area .dealer[data-slot='bottom'] { --x: calc(50% - max(var(--av) * 0.5 + 30px, var(--cw-you) + 90px)); --y: calc(100% - 10px - var(--av) * 0.5); }
+/* The side seats' bets just past their cards, toward the middle. */
+.felt-area .bet[data-slot='left'] { --x: calc(15% + 60px); --y: 37%; }
+.felt-area .bet[data-slot='right'] { --x: calc(85% - 60px); --y: 37%; }
+/* The top corners' button outside the face. */
+.felt-area .dealer[data-slot='top-left'] { --x: calc(25% - var(--av) * 0.5 - 20px); }
+.felt-area .dealer[data-slot='top-right'] { --x: calc(75% + var(--av) * 0.5 + 20px); }
+@media (min-width: 760px) {
+  .felt-area .bet[data-slot='left'] { --x: calc(8% + var(--av) * 0.5 + var(--cw-seat) * 2 + 32px); --y: 49%; }
+  .felt-area .bet[data-slot='right'] { --x: calc(92% - var(--av) * 0.5 - var(--cw-seat) * 2 - 32px); --y: 49%; }
+  .felt-area .dealer[data-slot='top-left'] { --x: calc(27% - var(--av) * 0.5 - 24px); }
+  .felt-area .dealer[data-slot='top-right'] { --x: calc(73% + var(--av) * 0.5 + 24px); }
+}
 @media (min-width: 760px) {
   .seat[data-slot='bottom'] { --y: 87%; }
   .seat[data-slot='top'] { --y: 12%; }
@@ -264,20 +308,12 @@
 /*
  * Five and six round the table (data-seats on the felt): the side seats lower down the oval, two (or three) across its
  * top, the board a little smaller. Bets sit between each seat and the middle, the dealer button beside its seat. Talk
- * shows one bubble at a time at a table this full (views/table.ts); across the top and down the sides it hangs under
- * the seat.
+ * shows one bubble at a time at a table this full, over the middle (.bubble.center, below).
  */
 .felt-area:is([data-seats='5'], [data-seats='6']) { --cw-board: 32px; --cw-seat: 24px; --av: 48px; }
-/* Phones: the board and pots lower, in the room under the side seats' bets; the talk of a seat across the top under its
-   cards (one bubble at a time at a table this full: views/table.ts), kept inside the table at the corners. */
+/* Phones: the board and pots lower, in the room under the side seats' bets. */
 @media (max-width: 759px) {
   .room .felt-area:is([data-seats='5'], [data-seats='6']) .middle { top: 63%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='top-left'], [data-slot='top'], [data-slot='top-right']) .bubble { top: calc(100% + 8px); bottom: auto; left: 50%; right: auto; translate: -50% 0; max-width: 150px; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='top-left'], [data-slot='top'], [data-slot='top-right']) .bubble::after { top: -4px; bottom: auto; left: calc(50% - 5px); right: auto; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='top-left'] .bubble { left: -12px; translate: none; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='top-left'] .bubble::after { left: 30px; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='top-right'] .bubble { left: auto; right: -12px; translate: none; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='top-right'] .bubble::after { left: auto; right: 30px; }
 }
 .felt-area[data-seats='5'] .seat[data-slot='top-left'] { --x: 26%; --y: 11%; }
 .felt-area[data-seats='5'] .seat[data-slot='top-right'] { --x: 74%; --y: 11%; }
@@ -291,15 +327,15 @@
 .felt-area:is([data-seats='5'], [data-seats='6']) .plate .full { display: none; }
 .felt-area:is([data-seats='5'], [data-seats='6']) .plate .short { display: inline; }
 .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 82%; --y: 51%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: 33%; --y: 44%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: 67%; --y: 44%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 30%; --y: 34%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 70%; --y: 34%; }
-.felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: 33%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: 40%; --y: 44%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: 60%; --y: 44%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 30%; --y: calc(var(--top-edge) + 18px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 70%; --y: calc(var(--top-edge) + 18px); }
+.felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: calc(var(--top-edge) + 18px); }
 .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 9%; --y: 75%; }
 .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 91%; --y: 75%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 8%; --y: 29%; }
-.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 92%; --y: 29%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 8%; --y: calc(var(--top-edge) + 16px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 92%; --y: calc(var(--top-edge) + 16px); }
 .felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 38%; --y: 25%; }
 @media (min-width: 760px) {
   .felt-area:is([data-seats='5'], [data-seats='6']) { --cw-board: 54px; --cw-seat: 36px; --av: 64px; }
@@ -308,24 +344,18 @@
   .felt-area[data-seats='6'] .seat[data-slot='top-left'] { --x: 22%; --y: 14%; }
   .felt-area[data-seats='6'] .seat[data-slot='top'] { --x: 50%; --y: 13.5%; }
   .felt-area[data-seats='6'] .seat[data-slot='top-right'] { --x: 78%; --y: 14%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: 7%; --y: 56%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 93%; --y: 56%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: 22%; --y: 56%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: 78%; --y: 56%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 28%; --y: 34%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 72%; --y: 34%; }
-  .felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: 33%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: 7%; --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 93%; --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: calc(7% + var(--av) * 0.5 + var(--cw-seat) * 2 + 32px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: calc(93% - var(--av) * 0.5 - var(--cw-seat) * 2 - 32px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 28%; --y: calc(var(--top-edge) + 24px); }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 72%; --y: calc(var(--top-edge) + 24px); }
+  .felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: calc(var(--top-edge) + 24px); }
   .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 15%; --y: 74%; }
   .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 85%; --y: 74%; }
   .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 12%; --y: 30%; }
   .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 88%; --y: 30%; }
   .felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 40%; --y: 30%; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:not([data-slot='bottom']) .bubble { top: calc(100% + 8px); bottom: auto; left: 50%; right: auto; translate: -50% 0; max-width: 210px; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:not([data-slot='bottom']) .bubble::after { top: -4px; bottom: auto; left: calc(50% - 5px); right: auto; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='left'], [data-slot='top-left']) .bubble { left: 0; translate: none; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='left'], [data-slot='top-left']) .bubble::after { left: 36px; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='right'], [data-slot='top-right']) .bubble { left: auto; right: 0; translate: none; }
-  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='right'], [data-slot='top-right']) .bubble::after { left: auto; right: 36px; }
 }
 /* Phones: the seats across the top hold their cards under the name plate, so neighbours don't meet. */
 @media (max-width: 759px) {
@@ -364,6 +394,7 @@
 .seat[data-slot='right'] .bubble::after { left: auto; right: 22px; }
 /* Wide screens: the top and bottom seats' talk beside the face, on the side away from their cards and clear of the bets. */
 @media (min-width: 760px) {
+  .seat:is([data-slot='left'], [data-slot='right']) .bubble { max-width: 196px; }
   .seat:is([data-slot='top'], [data-slot='bottom']) .bubble { top: 6px; bottom: auto; left: auto; right: calc(100% + 10px); translate: none; }
   .seat:is([data-slot='top'], [data-slot='bottom']) .bubble::after { top: 16px; bottom: auto; left: auto; right: -4px; }
 }
@@ -373,12 +404,12 @@
  */
 @media (max-width: 759px) {
   .bubble { max-width: 140px; padding: 5px 9px 6px; font-size: 13.5px; }
-  .seat[data-slot='left'] .bubble { left: -14px; }
+  .seat:is([data-slot='left'], [data-slot='right']) .bubble { max-width: 118px; }
+  .seat[data-slot='left'] .bubble { left: -10px; }
   .seat[data-slot='left'] .bubble::after { left: 38px; }
-  .seat[data-slot='right'] .bubble { right: -14px; }
+  .seat[data-slot='right'] .bubble { right: -10px; }
   .seat[data-slot='right'] .bubble::after { right: 38px; }
-  .seat[data-slot='top'] .bubble { top: 2px; left: calc(100% + 8px); translate: none; max-width: 128px; }
-  .seat[data-slot='top'] .bubble::after { top: 14px; left: -4px; }
+  .seat[data-slot='top'] .bubble { max-width: 150px; }
   /* Watching, the bottom seat's bet sits above it: its talk goes beside the face, on the side away from its cards. */
   .seat[data-slot='bottom'] .bubble { top: 2px; bottom: auto; left: auto; right: calc(100% + 8px); translate: none; max-width: 128px; }
   .seat[data-slot='bottom'] .bubble::after { top: 14px; bottom: auto; left: auto; right: -4px; }
@@ -865,3 +896,25 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 /* (!important: the kit's page.css hides every [hidden] with !important; this one keeps its place, unseen.) */
 .room:not(.watching) > .actions[hidden] { display: grid !important; visibility: hidden; }
 @media (min-width: 760px) { .room { --bar-h: 108px; } }
+
+/* A table of five or six: one bubble at a time, over the middle with the speaker's name (views/table.ts); on a wide
+   screen one line, under the seats across the top. */
+.felt-area > .bubble.center { left: 50%; top: calc(var(--top-edge) + 40px); translate: -50% 0; max-width: 136px; text-align: center; }
+.felt-area > .bubble.center::after { display: none; }
+.bubble.center b { display: block; font: 700 11.5px var(--j-display); font-style: normal; color: var(--h-brass-deep); }
+
+/* A wide screen's toolbar never re-wraps during a game (the room keeps its height): the hand and blinds clipped to
+   their space beside the buttons; a replay's title and hand on a line of their own, its controls on the next. */
+@media (min-width: 760px) {
+  .room .toolbar { flex-wrap: nowrap; }
+  .room .toolbar > .level { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+  .room .toolbar > .tools { flex: none; flex-wrap: nowrap; }
+  .room .toolbar:has(.replay-title) { flex-wrap: wrap; }
+  .room .toolbar:has(.replay-title) > .replay-title { flex: 1 0 100%; }
+  .room .toolbar:has(.replay-title) > .tools { flex: 1 0 100%; justify-content: flex-end; }
+}
+@media (min-width: 760px) {
+  .felt-area > .bubble.center { top: calc(var(--top-edge) + 4px); max-width: min(64%, 520px); display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+  .felt-area > .bubble.center b { display: inline; flex: none; }
+  .felt-area > .bubble.center .bubble-text { -webkit-line-clamp: 1; line-clamp: 1; min-width: 0; }
+}
