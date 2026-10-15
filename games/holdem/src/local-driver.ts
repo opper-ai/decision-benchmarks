@@ -7,9 +7,10 @@ import { parseCard, rankOf, type Card } from '../shared/cards.ts';
 import { observe, type Action, type Observation, type OptionKey } from '../shared/engine.ts';
 import { evaluate } from '../shared/evaluator.ts';
 import { CHAT_TIMEOUT_MS, DECISION_TIMEOUT_MS } from '../shared/models.ts';
-import type { Mood, Player, RecordedAction } from '../shared/recording.ts';
+import { cleanTalk } from '../shared/questions.ts';
+import type { Mood, Player, RecordedAction, TalkLine } from '../shared/recording.ts';
 import { deriveSeed, keyFromSeed, mulberry32 } from '../shared/rng.ts';
-import { actSitAndGo, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
+import { actSitAndGo, MAX_SEATS, MIN_SEATS, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
 import { finishedHandOf, recordingOf, snapshotOf } from '../shared/table.ts';
 import type { ActionMeta, Review, ReviewHand, SeatConfig, StepResult, TableConfig, TableDriver, TableSnapshot } from './driver.ts';
 import { modelById } from './roster.ts';
@@ -108,6 +109,9 @@ function moodFor(verb: Verb, strength: number, r: number): Mood {
   return r < 0.65 ? 'confident' : 'nervous';
 }
 
+/** What a practice stand-in says back to your talk. */
+const RETORTS: readonly string[] = ['Big words. Show me the cards.', 'Talk is cheap. Chips are not.', 'Noted. Still calling.', 'You sound nervous.', 'Bold. Let us see.', 'I have heard that before.'];
+
 export class LocalDriver implements TableDriver {
   thinkScale: number;
   private sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
@@ -127,6 +131,8 @@ export class LocalDriver implements TableDriver {
   /** Actions per hand, in order. */
   private hands: RecordedAction[][] = [];
   private finished: ReviewHand[] = [];
+  /** The player's latest table talk, waiting for a chat model to answer it (say()). */
+  private heard: string | null = null;
   /** When the human's current turn began (for latencyMs). */
   private turnStart = 0;
 
@@ -137,7 +143,7 @@ export class LocalDriver implements TableDriver {
 
   async start(config: TableConfig): Promise<TableSnapshot> {
     const n = config.seats.length;
-    if (n < 2 || n > 4) throw new Error('a table seats 2 to 4 players');
+    if (n < MIN_SEATS || n > MAX_SEATS) throw new Error(`a table seats ${MIN_SEATS} to ${MAX_SEATS} players`);
     const humans = config.seats.flatMap((s, i) => (s.kind === 'human' ? [i] : []));
     if (humans.length > 1) throw new Error('one human at most');
     this.seats = config.seats.map((s) => {
@@ -157,6 +163,7 @@ export class LocalDriver implements TableDriver {
     const key = config.key ?? (config.seed !== undefined ? keyFromSeed(config.seed) : randomKey());
     this.g = newSitAndGo({ seats: n, key });
     this.hands = [[]];
+    this.talk = [[]];
     this.finished = [];
     this.archive();
     this.turnStart = Date.now();
@@ -172,6 +179,7 @@ export class LocalDriver implements TableDriver {
     const g = this.game();
     const seat = g.hand.toAct;
     if (this.human === null || seat !== this.human) throw new Error('it is not your turn');
+    this.deliver();
     const latencyMs = Math.max(0, Date.now() - this.turnStart);
     const next = actSitAndGo(g, action); // throws on an illegal action, leaving the table as it was
     const record: RecordedAction = 'key' in action ? { seat, key: action.key, by: 'human', latencyMs } : { seat, to: action.to, by: 'human', latencyMs };
@@ -183,6 +191,7 @@ export class LocalDriver implements TableDriver {
     const seat = g.hand.toAct;
     if (seat === null) throw new Error('the hand is over');
     if (seat === this.human) throw new Error('it is the human’s turn');
+    this.deliver();
     const who = this.seats[seat]!;
     const o = observe(g.hand, seat);
     const key = botDecide(who.standIn!, o);
@@ -207,7 +216,11 @@ export class LocalDriver implements TableDriver {
       if (who.style === 'chat') {
         const lines = LINES[who.standIn!][verb];
         meta.mood = record.mood = moodFor(verb, strength, coin());
-        if (coin() < 0.7) meta.say = record.say = lines[Math.floor(coin() * lines.length)]!;
+        // Your talk (say()): the next chat model to act may answer it, with a line of its own.
+        const heard = this.heard;
+        this.heard = null;
+        if (heard && coin() < 0.6) meta.say = record.say = RETORTS[Math.floor(coin() * RETORTS.length)]!;
+        else if (coin() < 0.7) meta.say = record.say = lines[Math.floor(coin() * lines.length)]!;
         record.reasoning = `Practice stand-in (${who.standIn} bot). I hold ${o.holeCards.join(' ')}${o.board.length ? ` on ${o.board.join(' ')}` : ''}: ${HAND_WORDS(o)}. ${o.pot} in the pot, ${o.toCall ? `${o.toCall} to call` : 'nothing to call'}. ${verb === 'fold' ? 'Not worth it.' : verb === 'check' ? 'No need to build the pot.' : verb === 'call' ? 'The price is right.' : strength > 0.6 ? 'Value: make them pay.' : 'Pressure: they may fold.'}`;
         if (this.watching || this.humanOut) meta.reasoning = record.reasoning;
       } else {
@@ -228,12 +241,25 @@ export class LocalDriver implements TableDriver {
     this.hands.at(-1)!.push(record);
     this.archive();
     this.turnStart = Date.now();
+    if (next.over && this.talkQueue.length) {
+      // Typed while the last move was being played: the game is over, so it is never said (as RemoteDriver's end()).
+      const left = this.talkQueue.splice(0);
+      try {
+        this.onTalkRefused?.(left, 'over');
+      } catch {
+        // the page's listener must not break the table
+      }
+    }
     return { seat: record.seat, key: record.key ?? null, meta, snapshot: this.snapshot() };
   }
 
   async nextHand(): Promise<TableSnapshot> {
     this.g = nextHand(this.game());
     this.hands.push([]);
+    this.talk.push([]);
+    // Talk typed between hands is said as the new one starts (as RemoteDriver sends it with next).
+    this.heard = null;
+    this.deliver();
     this.archive();
     this.turnStart = Date.now();
     return this.snapshot();
@@ -243,7 +269,7 @@ export class LocalDriver implements TableDriver {
   private archive(): void {
     const g = this.game();
     if (g.hand.street !== 'done' || this.finished.length > g.handIndex) return;
-    this.finished.push(finishedHandOf(g, this.hands[g.handIndex] ?? []));
+    this.finished.push(finishedHandOf(g, this.hands[g.handIndex] ?? [], this.talk[g.handIndex] ?? []));
   }
 
   private players(): Player[] {
@@ -252,12 +278,45 @@ export class LocalDriver implements TableDriver {
 
   async review(): Promise<Review> {
     const g = this.game();
-    return { players: this.players(), hands: structuredClone(this.finished), recording: g.over ? recordingOf(g, this.players(), this.hands) : null };
+    return { players: this.players(), hands: structuredClone(this.finished), recording: g.over ? recordingOf(g, this.players(), this.hands, this.talk) : null };
   }
 
   /** Who stands in for each seat (null for the human): for the page's practice notice and tests. */
   standIns(): (BotName | null)[] {
     return this.seats.map((s) => s.standIn);
+  }
+
+  /** Told when your lines reached the table (with the next move), as RemoteDriver's are. */
+  onSaid: ((lines: TalkLine[]) => void) | null = null;
+  /** Told when lines will never be said: typed while the move that ends the game was being played ('over'). */
+  onTalkRefused: ((lines: string[], why: 'busy' | 'full' | 'refused' | 'over') => void) | null = null;
+  private talkQueue: string[] = [];
+  /** Your lines per hand, where they were said (for the review and the recording). */
+  private talk: TalkLine[][] = [];
+
+  /**
+   * Your table talk, as the real table takes it (cleaned, at most 6 waiting): it goes with the next move, and the next
+   * chat stand-in to act may answer it. Null in watch mode, once the game is over, or with nothing left after cleaning.
+   */
+  say(text: string): string | null {
+    const line = cleanTalk(text);
+    if (this.human === null || !line || this.g?.over || this.talkQueue.length >= 6) return null;
+    this.talkQueue.push(line);
+    return line;
+  }
+
+  /** The lines waiting go with this move: the stand-ins hear the last of them, and onSaid is told. */
+  private deliver(): void {
+    if (!this.talkQueue.length || this.human === null) return;
+    const after = this.hands.at(-1)?.length ?? 0;
+    const lines = this.talkQueue.splice(0).map((say) => ({ seat: this.human!, after, say }));
+    this.talk.at(-1)?.push(...lines);
+    this.heard = lines.at(-1)!.say;
+    try {
+      this.onSaid?.(lines);
+    } catch {
+      // the page's listener must not break the table
+    }
   }
 
   snapshot(): TableSnapshot {

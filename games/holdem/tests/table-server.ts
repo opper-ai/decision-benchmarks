@@ -106,7 +106,7 @@ export interface Setup {
 }
 
 /** Limits a test's instant play never meets; the defaults are tested on their own, at a person's pace. */
-export const LOOSE: Partial<TableLimits> = { starts: { ratePerSec: 1e6, burst: 1e6 }, moves: { ratePerSec: 1e6, burst: 1e6 }, steps: { ratePerSec: 1e6, burst: 1e6 } };
+export const LOOSE: Partial<TableLimits> = { starts: { ratePerSec: 1e6, burst: 1e6 }, moves: { ratePerSec: 1e6, burst: 1e6 }, steps: { ratePerSec: 1e6, burst: 1e6 }, talk: { ratePerSec: 1e6, burst: 1e6 } };
 
 export async function setup(o: Setup = {}) {
   const up: Upstream = { calls: [], ...o.up };

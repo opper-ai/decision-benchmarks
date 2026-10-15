@@ -51,6 +51,9 @@ describe('the replays list', () => {
     const index = { format: 1, replays: [ok, { ...ok, file: '../secret.json' }, { ...ok, file: 'x.txt' }, { ...ok, players: ['one'] }, { ...ok, title: '' }, null, 'nope'] };
     expect(parseDemoIndex(index)).toEqual([ok]);
     expect(parseDemoIndex({ format: 1, replays: [] })).toEqual([]);
+    // Tables of up to six: a six-player replay is listed, a seventh player is not.
+    const six = { ...ok, players: ['a', 'b', 'c', 'd', 'e', 'f'] };
+    expect(parseDemoIndex({ format: 1, replays: [six, { ...six, players: [...six.players, 'g'] }] })).toEqual([six]);
     expect(parseDemoIndex(null)).toEqual([]);
     expect(['a.json', 'claude-vs-gpt.json.gz'].every((f) => DEMO_FILE.test(f))).toBe(true);
     expect(['A.json', '-x.json', 'x.json.zip', 'x/y.json', '.json'].some((f) => DEMO_FILE.test(f))).toBe(false);

@@ -134,6 +134,56 @@ describe('share links', () => {
     expect(back.ok && back.recording.players.slice(1)).toEqual([{ kind: 'model', id: 'vertexai/gemini-4-argon-eu' }, { kind: 'model', id: 'vertexai/gemini-3.5-flash-lite-eu' }]);
   });
 
+  it('holds a table of 5 or 6 in a version 3 link, and 2 to 4 in version 2 as before', async () => {
+    const seats5 = [{ kind: 'human' as const, id: 'you' }, { kind: 'model' as const, id: 'aws/claude-opus-5-5' }, { kind: 'model' as const, id: 'sference/clef' }, { kind: 'bot' as const, id: 'maniac' }, { kind: 'model' as const, id: 'azure:eu/gpt-6.1-sol' }];
+    const seats6 = [...seats5, { kind: 'model' as const, id: 'typesafe/jev-1.13.0' }];
+    for (const seats of [seats5, seats6]) {
+      const rec = await finishedGame({ seed: 21, seats });
+      expect(rec.players).toHaveLength(seats.length);
+      const code = encodeGame(rec);
+      const bytes = fromBase64Url(code)!;
+      expect([bytes[0], bytes[1]]).toEqual([3, seats.length]);
+      const back = decodeGame(code);
+      if (!back.ok) throw new Error(back.error);
+      expect(moves(back.recording)).toEqual(moves(rec));
+      expect(back.recording.result).toEqual(rec.result);
+      expect([...back.recording.result.places!].sort()).toEqual(seats.map((_, i) => i + 1));
+      expect(fingerprintOf({ ...back.recording, players: rec.players })).toBe(fingerprintOf(rec));
+      expect(encodeGame(back.recording)).toBe(code);
+    }
+    for (const n of [2, 3, 4]) {
+      const rec = await finishedGame({ seed: 30 + n, seats: Array.from({ length: n }, (_, i) => ({ kind: 'bot' as const, id: (['rock', 'station', 'maniac', 'random'] as const)[i]! })) });
+      expect(fromBase64Url(encodeGame(rec))![0]).toBe(2);
+    }
+  });
+
+  it('refuses a seat count its version does not hold: 5 or 6 in version 2, 2 to 4 in version 3, 7 in either', async () => {
+    const six = encodeGame(await finishedGame({ seed: 22, seats: Array.from({ length: 6 }, (_, i) => ({ kind: 'bot' as const, id: (['rock', 'station', 'maniac', 'random'] as const)[i % 4]! })) }));
+    const four = encodeGame(await finishedGame({ seed: 23, seats: [{ kind: 'bot', id: 'rock' }, { kind: 'bot', id: 'station' }, { kind: 'bot', id: 'maniac' }, { kind: 'bot', id: 'random' }] }));
+    expect(decodeGame(six).ok).toBe(true);
+    expect(decodeGame(four).ok).toBe(true);
+    const sixBytes = fromBase64Url(six)!;
+    const fourBytes = fromBase64Url(four)!;
+    expect(decodeGame(toBase64Url(Uint8Array.from([2, ...sixBytes.subarray(1)])))).toMatchObject({ ok: false, error: /not a game/ });
+    expect(decodeGame(toBase64Url(Uint8Array.from([3, ...fourBytes.subarray(1)])))).toMatchObject({ ok: false, error: /not a game/ });
+    const seven = Uint8Array.from([3, 7, ...sixBytes.subarray(2, 8), sixBytes[2]!, ...sixBytes.subarray(8)]);
+    expect(decodeGame(toBase64Url(seven))).toMatchObject({ ok: false, error: /not a game/ });
+    expect(decodeGame(toBase64Url(Uint8Array.from([4, ...sixBytes.subarray(1)])))).toMatchObject({ ok: false, error: /another version/ });
+  });
+
+  it('keeps a six-handed game of models short enough to paste', async () => {
+    const lengths: number[] = [];
+    for (const seed of [1, 2, 3]) {
+      const rec = await finishedGame({ seed, seats: [{ kind: 'human', id: 'you' }, ...['typesafe/jev-1.13.0', 'sference/clef', 'openai/gpt-6-luna-decisions', 'aws/claude-opus-5-5', 'azure:eu/gpt-6.1-sol'].map((id) => ({ kind: 'model' as const, id }))] }, seed);
+      const moves = rec.hands.reduce((a, h) => a + h.actions.length, 0);
+      const code = encodeGame(rec);
+      lengths.push(code.length);
+      expect(code.length).toBeLessThan(moves * 0.75 + 80);
+      expect(decodeGame(code).ok).toBe(true);
+    }
+    console.info(`link lengths for 6-handed games: ${lengths.join(', ')} characters`);
+  });
+
   it('base64url round-trips every length', () => {
     for (let n = 0; n < 20; n++) {
       const b = Uint8Array.from({ length: n }, (_, i) => (i * 37 + n) & 255);

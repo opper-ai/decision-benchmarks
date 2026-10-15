@@ -1,6 +1,6 @@
 // The table service end to end over HTTP: the kit's game middleware with AI Hold'em's table API, against a fake Opper
 // (System One and chat completions) on a local port, called with fetch as the page calls it.
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { SESSION_COOKIE } from '../../../packages/kit/server/auth';
 import { purposeKey, seal, unseal } from '../../../packages/kit/server/session';
 import { formatCard } from '../shared/cards';
@@ -61,6 +61,40 @@ async function playToEnd(call: Awaited<ReturnType<typeof setup>>['call'], start:
 
 const CARD = /"([2-9TJQKA][cdhs])"/g;
 
+/**
+ * Secrecy at a play table (the human in seat 0): replays what every reply showed against what was hidden at that
+ * moment (other seats' hole cards until a showdown shows them, the board to come, the reasoning, the table key), until
+ * the human is out of the game. Returns how many replies it checked.
+ */
+function checkSecrecy(responses: { path: string; text: string }[], finished: ReviewHand[]): number {
+  const byHand = new Map(finished.map((h) => [h.hand, h]));
+  let checked = 0;
+  for (const { path, text } of responses) {
+    const body = JSON.parse(text) as Record<string, unknown>;
+    if (path === 'review') continue;
+    const { finished: _f, token: _t, ...shown } = body;
+    const snap = ((shown.result as StepReply['result'] | undefined)?.snapshot ?? shown.snapshot) as TableSnapshot;
+    expect(snap.spectating).toBe(snap.places[0] !== null ? true : undefined);
+    expect(text).not.toContain(KEY);
+    if (snap.spectating) continue;
+    checked++;
+    const hand = byHand.get(snap.hand)!;
+    const shownAtShowdown = new Set(snap.events.flatMap((e) => (e.type === 'showdown' ? e.hands.map((x) => x.seat) : [])));
+    const hidden = new Set<string>();
+    for (const e of hand.events) if (e.type === 'hole' && e.seat !== 0 && !shownAtShowdown.has(e.seat)) e.cards.forEach((c) => hidden.add(formatCard(c)));
+    // Board cards not dealt yet.
+    hand.runout.slice(snap.view.board.length).forEach((c) => hidden.add(c));
+    const seen = [...JSON.stringify(shown).matchAll(CARD)].map((m) => m[1]!);
+    expect(seen.filter((c) => hidden.has(c)), `${path} in hand ${snap.hand} shows a hidden card`).toEqual([]);
+    for (const e of snap.events) if (e.type === 'hole' && e.seat !== 0 && !shownAtShowdown.has(e.seat)) expect(e.cards).toEqual([]);
+    for (const p of snap.view.players) if (p.seat !== 0 && !shownAtShowdown.has(p.seat)) expect(p.cards).toBeNull();
+    // No reasoning before the hand is over, and no table key before the game is.
+    expect(JSON.stringify(shown)).not.toContain(SECRET_REASONING);
+    expect(text).not.toMatch(/"seed"|c0ffee/);
+  }
+  return checked;
+}
+
 describe('the table: starting', () => {
   it('deals a play table to a signed-out visitor against decision models, on the free credits, and shows only their own cards', async () => {
     const { call } = await setup();
@@ -81,7 +115,14 @@ describe('the table: starting', () => {
     const { call } = await setup({ devKey: true });
     const human = { kind: 'human', id: 'you' };
     const m = (id = DECISION) => ({ kind: 'model', id });
-    expect((await call('start', { mode: 'play', seats: [human, m(), m(), m(), m()] })).status).toBe(400);
+    // 2 to 6 seats: you and up to five AIs, or up to six AIs to watch.
+    expect(await call('start', { mode: 'play', seats: [human, m(), m(), m(), m(), m(), m()] })).toMatchObject({ status: 400, body: { error: 'A table seats 2 to 6 players' } });
+    expect((await call('start', { mode: 'watch', seats: [m(), m(), m(), m(), m(), m(), m()] })).status).toBe(400);
+    expect((await call('start', { mode: 'watch', seats: [m()] })).status).toBe(400);
+    for (const n of [5, 6]) {
+      expect((await call('start', { mode: 'play', seats: [human, ...Array.from({ length: n - 1 }, () => m())] })).status).toBe(200);
+      expect((await call('start', { mode: 'watch', seats: Array.from({ length: n }, () => m()) })).status).toBe(200);
+    }
     expect((await call('start', { mode: 'play', seats: [human] })).status).toBe(400);
     expect((await call('start', { mode: 'play', seats: [human, human, m()] })).status).toBe(400);
     expect((await call('start', { mode: 'watch', seats: [human, m(), m()] })).status).toBe(400);
@@ -413,33 +454,8 @@ describe('the table: a whole game', () => {
     expect(chat.headers['x-opper-name']).toBe('decision-benchmarks-holdem');
     expect(logs.some((l) => /table \S+: hand 1, seat \d .* in \d+ ms, \$/.test(l))).toBe(true);
 
-    // Secrecy: replay what every reply showed against what was hidden at that moment, until the human is out of the
-    // game (from then on they watch with every card up: the next test).
-    const byHand = new Map(game.finished.map((h) => [h.hand, h]));
-    let checked = 0;
-    for (const { path, text } of responses) {
-      const body = JSON.parse(text) as Record<string, unknown>;
-      if (path === 'review') continue;
-      const { finished: _f, token: _t, ...shown } = body;
-      const snap = ((shown.result as StepReply['result'] | undefined)?.snapshot ?? shown.snapshot) as TableSnapshot;
-      expect(snap.spectating).toBe(snap.places[0] !== null ? true : undefined);
-      expect(text).not.toContain(KEY);
-      if (snap.spectating) continue;
-      checked++;
-      const hand = byHand.get(snap.hand)!;
-      const shownAtShowdown = new Set(snap.events.flatMap((e) => (e.type === 'showdown' ? e.hands.map((x) => x.seat) : [])));
-      const hidden = new Set<string>();
-      for (const e of hand.events) if (e.type === 'hole' && e.seat !== 0 && !shownAtShowdown.has(e.seat)) e.cards.forEach((c) => hidden.add(formatCard(c)));
-      // Board cards not dealt yet.
-      hand.runout.slice(snap.view.board.length).forEach((c) => hidden.add(c));
-      const seen = [...JSON.stringify(shown).matchAll(CARD)].map((m) => m[1]!);
-      expect(seen.filter((c) => hidden.has(c)), `${path} in hand ${snap.hand} shows a hidden card`).toEqual([]);
-      for (const e of snap.events) if (e.type === 'hole' && e.seat !== 0 && !shownAtShowdown.has(e.seat)) expect(e.cards).toEqual([]);
-      for (const p of snap.view.players) if (p.seat !== 0 && !shownAtShowdown.has(p.seat)) expect(p.cards).toBeNull();
-      // No reasoning before the hand is over, and no table key before the game is.
-      expect(JSON.stringify(shown)).not.toContain(SECRET_REASONING);
-      expect(text).not.toMatch(/"seed"|c0ffee/);
-    }
+    // Secrecy: every reply until the human is out of the game (from then on they watch with every card up: the next test).
+    const checked = checkSecrecy(responses, game.finished);
     expect(checked).toBeGreaterThan(20);
 
     // The review: every hand face up, and once over, the recording with its table key, which verifies.
@@ -524,6 +540,69 @@ describe('the table: a whole game', () => {
     for (const s of chatSteps) expect(s.result.meta.reasoning).toContain(SECRET_REASONING);
     expect(new Set(up.calls.map((c) => c.headers['x-opper-project']))).toEqual(new Set(['proj-1']));
     expect(new Set(up.calls.map((c) => c.headers.authorization))).toEqual(new Set(['Bearer op-dev']));
+  });
+});
+
+describe('the table: six seats', () => {
+  const tokenSizes: string[] = [];
+  afterAll(() => console.info(`six-handed tokens at most: ${tokenSizes.join('; ')}`));
+  const SIX = [DECISION, CHAT, DECISION2, 'aws/claude-opus-5-5', 'openai/gpt-6-luna-decisions'];
+
+  it('plays you and five AIs to the end, blinds up every 12 hands, every hidden card hidden in every reply until public, the token small', async () => {
+    const { call, responses } = await setup({ signedIn: true });
+    const game = await playToEnd(call, PLAY(...SIX));
+    expect(game.snapshot.over).toBe(true);
+    expect(game.snapshot.view.players).toHaveLength(6);
+    expect(game.finished.map((h) => h.hand)).toEqual(Array.from({ length: game.snapshot.hand }, (_, i) => i + 1));
+    // Two orbits of six to a level: hand 12 still at 10/20, hand 13 at 15/30.
+    const first = (JSON.parse(responses[0]!.text) as SnapshotReply).snapshot;
+    expect(first.view.level).toMatchObject({ hand: 1, level: 1, sb: 10, bb: 20, handsUntilNextLevel: 12 });
+    const bb = new Map(game.finished.map((h) => [h.hand, (h.events[0] as { bb: number }).bb]));
+    expect([bb.get(1), bb.get(12), bb.get(13)]).toEqual([20, 20, 30]);
+    // Every reply scanned while the human plays: other seats' cards, the board to come, the reasoning, the table key.
+    expect(checkSecrecy(responses, game.finished)).toBeGreaterThan(40);
+    expect(responses.filter((r) => r.path !== 'review').every((r) => !r.text.includes(KEY))).toBe(true);
+    // The review: six players, places 1 to 6, and the recording verifies.
+    const review = (await call('review', { token: game.token })).body as unknown as Review;
+    expect(review.players).toEqual([{ kind: 'human', id: 'you' }, ...SIX.map((id) => ({ kind: 'model', id }))]);
+    const v = verifyRecording(review.recording);
+    expect(v.ok && [...v.result.places!].sort()).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(review.recording!.result.chips.reduce((a, b) => a + b, 0)).toBe(6 * 1500);
+    // The token, compact log and all: a long six-handed game stays well inside a request.
+    const actions = game.finished.reduce((a, h) => a + h.actions.length, 0);
+    tokenSizes.push(`${game.snapshot.hand} hands, ${actions} actions: ${Math.max(...game.tokens)} characters`);
+    expect(Math.max(...game.tokens)).toBeLessThan(6 * 1024);
+  });
+
+  it("keeps a long six-handed game's token small: a passive table that runs about 100 hands", async () => {
+    // The decision models check, or call up to 3 big blinds and fold to more, so hands are many and long.
+    const passive = (body: Record<string, unknown>) => {
+      const criteria = (body.questions as { action: { criteria: Record<string, string> } }).action.criteria;
+      const bb = Number(/\(([\d.]+) big blinds\)/.exec(criteria.call ?? '')?.[1] ?? 0);
+      const choice = 'check' in criteria ? 'check' : bb <= 3 ? 'call' : 'fold';
+      return { status: 200, body: { answers: { action: { type: 'choice', choice, probabilities: { [choice]: 0.9 } } }, usage: { input_tokens: 800, output_tokens: 1 } }, headers: { 'x-opper-cost': '0.00001' } };
+    };
+    const { call } = await setup({ up: { decide: passive } });
+    const game = await playToEnd(call, PLAY(DECISION, DECISION2, 'openai/gpt-6-luna-decisions', 'opper/kev-4b', 'cloudflare:global/clef-flash'));
+    expect(game.snapshot.over).toBe(true);
+    const actions = game.finished.reduce((a, h) => a + h.actions.length, 0);
+    tokenSizes.push(`${game.snapshot.hand} hands, ${actions} actions: ${Math.max(...game.tokens)} characters`);
+    // About 100 hands and 1,500 actions: about 5.4 KB, some 50 characters a hand (the body cap is 128 KB).
+    expect(game.snapshot.hand).toBeGreaterThanOrEqual(90);
+    expect(Math.max(...game.tokens)).toBeLessThan(8 * 1024);
+  });
+
+  it('watches six AIs to the end with every card face up, and the recording verifies', async () => {
+    const { call, up } = await setup({ devKey: true, pool: 'none' });
+    const models = [CHAT, DECISION, 'aws/claude-opus-5-5', DECISION2, 'azure:eu/gpt-6.1-sol', 'openai/gpt-6-luna-decisions'];
+    const game = await playToEnd(call, WATCH(...models));
+    expect(game.snapshot).toMatchObject({ viewer: null, over: true });
+    for (const s of game.steps) if (s.result.snapshot.view.street !== 'done') for (const p of s.result.snapshot.view.players) if (p.status !== 'empty') expect(p.cards).toHaveLength(2);
+    expect(game.steps.filter((s) => s.result.seat === 0 && s.result.meta.by === 'answer').every((s) => s.result.meta.reasoning?.includes(SECRET_REASONING))).toBe(true);
+    expect(new Set(up.calls.map((c) => c.body.model ?? 'systemone')).size).toBeGreaterThan(2);
+    const review = (await call('review', { token: game.token })).body as unknown as Review;
+    expect(verifyRecording(review.recording)).toMatchObject({ ok: true });
+    expect(review.recording!.players.map((p) => p.id)).toEqual(models);
   });
 });
 

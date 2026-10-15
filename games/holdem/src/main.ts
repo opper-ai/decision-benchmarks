@@ -7,10 +7,9 @@ import { appPath } from '../../../packages/kit/client/paths.ts';
 import { warmUp } from '../../../packages/kit/client/transport.ts';
 import { ModelWarming } from '../../../packages/kit/client/warming.ts';
 import { track, trackClicks } from '../../../packages/kit/client/track.ts';
-import type { HandEvent } from '../shared/engine.ts';
 import { audio } from './audio.ts';
 import { focusDialog, h, reducedMotion, wait } from './dom.ts';
-import type { StepResult, TableDriver, TableSnapshot } from './driver.ts';
+import type { ActionMeta, StepResult, TableDriver, TableSnapshot } from './driver.ts';
 import { LocalDriver } from './local-driver.ts';
 import { reconnectBanner } from './views/reconnect.ts';
 import { choiceOf, retryChoice } from './reconnect.ts';
@@ -23,7 +22,9 @@ import { endView } from './views/end.ts';
 import { lobbyView, seatsOf, type LobbyAccess, type LobbyChoice } from './views/lobby.ts';
 import { reviewView } from './views/review.ts';
 import { TableUI } from './views/table.ts';
-import { actionText, aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
+import { aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
+import { ChatBox } from './views/chat.ts';
+import { confirmDialog } from './views/confirm.ts';
 import { preloadFaces } from './views/parts.ts';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -46,7 +47,6 @@ const SPEAKER_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden
 /** The hand review (a list), and leaving the table (out through a door). */
 const REVIEW_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="6" r="1.4" fill="currentColor"/><circle cx="4" cy="12" r="1.4" fill="currentColor"/><circle cx="4" cy="18" r="1.4" fill="currentColor"/></svg>';
 const LEAVE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M14 4H6v16h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><path d="M11 12h10M17 8l4 4-4 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const THINK_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><path d="M8 10h8M8 13h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 /** An icon from its markup (ours, above). */
 function svg(markup: string): HTMLElement {
   const el = h('span.ic', { 'aria-hidden': 'true' });
@@ -252,7 +252,16 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   // ---------- the toolbar ----------
   const level = h('div.level', { 'aria-live': 'polite' });
   const tools = h('div.tools');
-  const log = h('div.log', { hidden: true, 'aria-label': 'What the models are thinking' });
+  // The table chat: the dealer's lines, the models' talk (and why, once the cards are up), and in play your own.
+  const chat = new ChatBox({
+    people: seats.map(personOf),
+    mode: watching ? 'watch' : 'play',
+    viewer: watching ? null : 0,
+    ...(watching ? {} : { onSay: (text: string) => driver.say?.(text) ?? null }),
+  });
+  // Your lines back from the table, as it placed them: the chat marks them said.
+  driver.onSaid = (lines) => chat.said(lines);
+  driver.onTalkRefused = (lines, why) => chat.unsaid(lines.length, why);
   if (watching) {
     const group = h('div.speed', { role: 'radiogroup', 'aria-label': 'Speed' });
     for (const s of [1, 2, 4, 8]) {
@@ -271,12 +280,8 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     }
     tools.append(group);
   }
-  // What the models think, as they act: watching, and in play once you are out (the snapshot says spectating).
-  const thinkingBtn = h('button.tbtn.word', { type: 'button', 'aria-pressed': 'false', 'aria-label': 'Show thinking', title: 'What the models are thinking', hidden: !watching, onclick: () => {
-    log.hidden = !log.hidden;
-    thinkingBtn.setAttribute('aria-pressed', String(!log.hidden));
-  } }, svg(THINK_ICON), h('span.lbl', null, 'Show thinking'));
-  tools.append(thinkingBtn);
+  // A phone opens the chat from here (a wide screen has it beside the table).
+  tools.append(chat.button);
   // Off until the table has started: before that there is nothing to review.
   // Review and Leave: words on a wide screen, icons on a phone, where the toolbar is one line (style.css).
   const reviewBtn = h('button.tbtn.word', { type: 'button', disabled: true, 'aria-label': 'Review', title: 'Review the hands', onclick: () => void openReview() }, svg(REVIEW_ICON), h('span.lbl', null, 'Review')) as HTMLButtonElement;
@@ -287,7 +292,23 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   };
   drawSound();
   signal.addEventListener('abort', audio.onChange(drawSound), { once: true });
-  tools.append(reviewBtn, soundBtn, h('button.tbtn.word', { type: 'button', 'aria-label': 'Leave', title: 'Leave the table', onclick: nav.lobby }, svg(LEAVE_ICON), h('span.lbl', null, 'Leave')));
+  /** A game is on (it has started and is not over): Leave asks first, as leaving ends it (the table is not kept). */
+  let live = false;
+  const askLeave = () => {
+    if (!live) return nav.lobby();
+    if (host.querySelector('.confirm-veil')) return;
+    const looking = watching || spectating;
+    host.append(
+      confirmDialog({
+        title: looking ? 'Stop watching this table?' : 'Leave this table?',
+        text: looking ? 'The game will end.' : 'Your game will end.',
+        yes: 'Leave',
+        no: looking ? 'Keep watching' : 'Keep playing',
+        onYes: nav.lobby,
+      }),
+    );
+  };
+  tools.append(reviewBtn, soundBtn, h('button.tbtn.word', { type: 'button', 'aria-label': 'Leave', title: 'Leave the table', onclick: askLeave }, svg(LEAVE_ICON), h('span.lbl', null, 'Leave')));
   if (PRACTICE) tools.prepend(h('span.practice', { title: 'Bots stand in for the models (?practice)' }, 'Practice'));
   const toolbar = h('div.toolbar', null, level, tools);
   const actions = h('div.actions', { hidden: true });
@@ -296,7 +317,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   if (signal.aborted) return;
   host.classList.toggle('watching', watching);
   host.classList.remove('all-up');
-  host.replaceChildren(toolbar, ui.el, actions, log, reconnect.el);
+  host.replaceChildren(toolbar, ui.el, actions, chat.el, reconnect.el);
 
   const drawLevel = (s: TableSnapshot) => {
     const t = levelText(s.view.level);
@@ -334,11 +355,10 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     restore = focusDialog(overlay);
   };
 
-  const logStep = (r: StepResult, events: readonly HandEvent[]) => {
-    const act = events.find((e): e is Extract<HandEvent, { type: 'action' }> => e.type === 'action' && e.seat === r.seat);
-    if (!act || (!r.meta.say && !r.meta.reasoning)) return;
-    log.prepend(h('p', null, h('b', null, ui.nameOf(r.seat)), ` ${actionText(act, r.seat === snap.viewer)}. `, r.meta.say ? h('span.said', null, `“${r.meta.say}” `) : null, r.meta.reasoning ?? ''));
-    while (log.childElementCount > 40) log.lastElementChild!.remove();
+  /** The answer's own move, its words and why: the chat puts them on its move (playNew). */
+  let said: { seat: number; meta: ActionMeta } | undefined;
+  const logStep = (r: StepResult) => {
+    said = { seat: r.seat, meta: r.meta };
   };
 
   // ---------- the game ----------
@@ -365,22 +385,29 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   }
   let snap = resume && driver instanceof RemoteDriver ? await driver.resume() : await driver.start({ seats });
   nav.started?.();
+  live = !snap.over;
   reviewBtn.disabled = false;
   track(resume ? 'play_resume' : 'play_start', { game: 'holdem', mode: choice.mode, set: choice.setId, opponents: choice.models.join(',') });
   let shown = 0;
   let knockedOut = 0;
   /** Play mode, out of the game: every card face up and the models' thinking from now on, as in watch mode. */
+  let seeingAll = false;
   const spectate = () => {
-    if (watching || !thinkingBtn.hidden) return;
+    if (watching || seeingAll) return;
+    seeingAll = true;
     ui.seeAll();
-    thinkingBtn.hidden = false;
     host.classList.add('all-up');
   };
+  /** The chat already has these events (a resume laid the hand in play out with what was said): playNew skips it once. */
+  let chatLaidOut = false;
   const playNew = async (s: TableSnapshot) => {
     const fresh = s.events.slice(shown);
     shown = s.events.length;
     snap = s;
     if (s.spectating) spectate();
+    if (chatLaidOut) chatLaidOut = false;
+    else chat.feed(fresh, s.hand, said);
+    said = undefined;
     await ui.play(fresh, s);
     drawLevel(s);
   };
@@ -388,6 +415,12 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     // Back at a kept table: the hand in play laid out again at once and silently (deal, bets, folds), without
     // announcing who went out before.
     knockedOut = snap.eliminations.length;
+    // The hand's chat as it went: the models' words (and reasoning only where it was shown) and your own lines.
+    const so = driver.handSoFar?.();
+    if (so) {
+      chat.history([{ hand: snap.hand, events: snap.events, actions: so.metas, talk: so.talk }]);
+      chatLaidOut = true;
+    }
     restoring = true;
     audio.hushed = true;
     try {
@@ -407,6 +440,8 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
       await endOfHand();
       if (signal.aborted) return;
       if (snap.over) {
+        live = false;
+        host.querySelector('.confirm-veil')?.remove();
         await wait(paced(1200, speed, reducedMotion()));
         if (signal.aborted) return;
         const review = await driver.review();
@@ -469,7 +504,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
       ui.showMeta(r.seat, r.meta);
     }
     if (signal.aborted) return;
-    logStep(r, r.snapshot.events.slice(shown));
+    logStep(r);
     await playNew(r.snapshot);
   }
 
@@ -537,7 +572,8 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
         resolve();
       };
       const onKey = (e: KeyboardEvent) => {
-        if (overlay || e.metaKey || e.ctrlKey || e.altKey) return;
+        const t = e.target as HTMLElement | null;
+        if (overlay || host.querySelector('.confirm-veil') || e.metaKey || e.ctrlKey || e.altKey || t?.tagName === 'INPUT') return;
         if (e.key === 'n' || e.key === 'N') go();
       };
       const deal = h('button.cta', { type: 'button', onclick: go }, 'Deal the next hand');

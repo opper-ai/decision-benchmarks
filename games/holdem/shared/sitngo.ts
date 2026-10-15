@@ -1,10 +1,11 @@
-// AI Hold'em's Sit & Go (the plan's "Rules"): 2 to 4 players with 1500 chips each play hands of the engine with rising
+// AI Hold'em's Sit & Go (the plan's "Rules"): 2 to 6 players (4 by default) with 1500 chips each play hands of the engine with rising
 // blinds until one player has every chip. Pure and deterministic like the engine: a Sit & Go is its key plus its
 // actions. Isomorphic.
 //
-// - Levels: 10/20, 15/30, 25/50, 50/100, 75/150, 100/200, 150/300, then doubling; 8 hands each, counted in hands so
-//   slow models don't change the structure. From 100/200 every player antes an eighth of the big blind, rounded to a
-//   whole chip (25, 38, 75, ...).
+// - Levels: 10/20, 15/30, 25/50, 50/100, 75/150, 100/200, 150/300, then doubling, counted in hands so slow models
+//   don't change the structure: two orbits of the table it started as, and never fewer than 8 hands (8 hands for 2 to
+//   4 players, 10 for 5, 12 for 6). From 100/200 every player antes an eighth of the big blind, rounded to a whole chip
+//   (25, 38, 75, ...).
 // - The deal: a Sit & Go has a secret 256-bit table key (64 hex digits). Hand h (from 0) is dealt from the deck
 //   keyedShuffle(DECK, key, h), Fisher-Yates driven by the ChaCha20 keystream under the key (rng.ts); the first
 //   button is drawn from the key's button stream. The cards a player sees say nothing about the cards to come.
@@ -17,7 +18,14 @@ import { DECK } from './cards.ts';
 import { keyBytes, keyedShuffle, Keystream, PURPOSE } from './rng.ts';
 
 export const STARTING_STACK = 1500;
+/** The seats a Sit & Go can have, and the table's usual size (you and three AIs: a model set fills it exactly). */
+export const MIN_SEATS = 2;
+export const MAX_SEATS = 6;
+export const DEFAULT_SEATS = 4;
+/** The fewest hands a level lasts (2 to 4 players). */
 export const HANDS_PER_LEVEL = 8;
+/** Hands per blind level for a Sit & Go that started with `seats` players: two orbits, at least HANDS_PER_LEVEL. */
+export const handsPerLevel = (seats: number): number => Math.max(HANDS_PER_LEVEL, 2 * seats);
 const LEVELS: readonly (readonly [number, number])[] = [[10, 20], [15, 30], [25, 50], [50, 100], [75, 150], [100, 200], [150, 300]];
 /** The level (from 0) of 100/200, where antes start. */
 const ANTE_LEVEL = 5;
@@ -29,10 +37,11 @@ export function blindsAt(level: number): { sb: number; bb: number; ante: number 
   return { sb, bb, ante: level >= ANTE_LEVEL ? Math.round(bb / 8) : 0 };
 }
 
-/** Where hand `handIndex` (from 0) sits in the structure: what the observation tells a player. */
-export function levelInfo(handIndex: number): LevelInfo {
-  const level = Math.floor(handIndex / HANDS_PER_LEVEL);
-  return { hand: handIndex + 1, level: level + 1, ...blindsAt(level), handsUntilNextLevel: HANDS_PER_LEVEL - (handIndex % HANDS_PER_LEVEL), next: blindsAt(level + 1) };
+/** Where hand `handIndex` (from 0) of a Sit & Go that started with `seats` players sits in the structure: what the observation tells a player. */
+export function levelInfo(handIndex: number, seats: number): LevelInfo {
+  const per = handsPerLevel(seats);
+  const level = Math.floor(handIndex / per);
+  return { hand: handIndex + 1, level: level + 1, ...blindsAt(level), handsUntilNextLevel: per - (handIndex % per), next: blindsAt(level + 1) };
 }
 
 export interface Elimination {
@@ -100,7 +109,7 @@ function afterHand(g: SitAndGo): SitAndGo {
 }
 
 function deal(g: Omit<SitAndGo, 'hand'>, stacks: readonly number[]): SitAndGo {
-  const level = levelInfo(g.handIndex);
+  const level = levelInfo(g.handIndex, g.places.length);
   // The whole deck, shuffled from the key's keystream for this hand (the engine's deck seed plays no part: 0).
   const deck = keyedShuffle(DECK, keyBytes(g.key), g.handIndex);
   const hand = newHand({ stacks, button: g.button, sb: level.sb, bb: level.bb, ante: level.ante, deckSeed: 0, deck, level });
@@ -110,7 +119,7 @@ function deal(g: Omit<SitAndGo, 'hand'>, stacks: readonly number[]): SitAndGo {
 
 export function newSitAndGo(o: { seats: number; key: string; startingStack?: number }): SitAndGo {
   const startingStack = o.startingStack ?? STARTING_STACK;
-  if (!Number.isInteger(o.seats) || o.seats < 2 || o.seats > 4) throw new Error('a Sit & Go seats 2 to 4 players');
+  if (!Number.isInteger(o.seats) || o.seats < MIN_SEATS || o.seats > MAX_SEATS) throw new Error(`a Sit & Go seats ${MIN_SEATS} to ${MAX_SEATS} players`);
   const key = keyBytes(o.key); // throws for anything that is not a table key
   if (!Number.isInteger(startingStack) || startingStack < 1) throw new Error('the starting stack must be a whole number of chips');
   const button = new Keystream(key, 0, PURPOSE.button).below(o.seats);

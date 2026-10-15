@@ -88,6 +88,32 @@ describe('LocalDriver', () => {
     expect(review.recording!.hands.flatMap((h) => h.actions).some((a) => a.by === 'human' && a.to !== undefined)).toBe(true);
   });
 
+  it('seats 2 to 6: practice at a table of 5 or 6, the stand-ins playing every AI seat, and the recording verifies', async () => {
+    await expect(instant().start({ seats: Array.from({ length: 7 }, () => ({ kind: 'bot' as const, id: 'rock' })) })).rejects.toThrow(/2 to 6/);
+    await expect(instant().start({ seats: [{ kind: 'human', id: 'you' }] })).rejects.toThrow(/2 to 6/);
+    const models = ['aws/claude-opus-5-5', 'sference/clef', 'azure:eu/gpt-6.1-sol', 'vertexai/gemini-4-argon-eu', 'openai/gpt-6-luna-decisions'];
+    for (const n of [5, 6]) {
+      const d = instant();
+      const coin = coinFrom(n);
+      const first = await d.start({ seed: 50 + n, seats: [{ kind: 'human', id: 'you' }, ...models.slice(0, n - 1).map((id) => ({ kind: 'model' as const, id }))] });
+      expect(first.view.players).toHaveLength(n);
+      expect(first.view.level).toMatchObject({ handsUntilNextLevel: 2 * n });
+      expect(d.standIns().slice(1).every((b) => b !== null)).toBe(true);
+      const { last } = await playOut(d, first, (s) => {
+        const t = s.turn!;
+        const passive = t.options.find((o) => o.key === 'check' || o.key === 'call')!;
+        return coin() < 0.8 ? { key: passive.key } : { key: t.options[Math.floor(coin() * t.options.length)]!.key };
+      });
+      expect(last.over).toBe(true);
+      expect([...last.places].sort()).toEqual(Array.from({ length: n }, (_, i) => i + 1));
+      expect(last.eliminations).toHaveLength(n - 1);
+      expect(last.view.players.reduce((a, p) => a + p.stack, 0)).toBe(n * 1500);
+      const review = await d.review();
+      expect(verifyRecording(review.recording).ok).toBe(true);
+      expect(review.hands).toHaveLength(review.recording!.hands.length);
+    }
+  });
+
   it('refuses a human action out of turn or against the rules, and an AI step on the human’s turn', async () => {
     const d = instant();
     let s = await d.start({ seed: 3, seats: [{ kind: 'human', id: 'you' }, { kind: 'bot', id: 'rock' }] });
@@ -139,6 +165,51 @@ describe('LocalDriver', () => {
     const s = await d.start({ seed: 11, seats: [{ kind: 'model', id: 'aws/claude-opus-5-5' }, { kind: 'model', id: 'sference/clef' }] });
     const seat = s.view.toAct!;
     expect(s.timeBankMs).toBe(seat === 0 ? 20_000 : 2_500);
+  });
+});
+
+describe('practice talk', () => {
+  it('settles every line you type: said with a move, or refused once the game is over, never left waiting', async () => {
+    const d = instant();
+    const said: string[] = [];
+    const refused: [string[], string][] = [];
+    d.onSaid = (lines) => said.push(...lines.map((l) => l.say));
+    d.onTalkRefused = (lines, why) => refused.push([lines, why]);
+    let s = await d.start({ seed: 7, seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: 'aws/claude-haiku-5-5-eu' }] });
+    const typed: string[] = [];
+    for (let i = 0; i < 5000 && !s.over; i++) {
+      if (s.view.street === 'done') {
+        s = await d.nextHand();
+        continue;
+      }
+      if (s.turn) {
+        s = (await d.act({ key: s.turn.options.some((o) => o.key === 'allin') ? 'allin' : 'call' })).snapshot;
+        continue;
+      }
+      // A line typed while the AI is still thinking: it goes with the next move, or is refused if this move ends the game.
+      const pending = d.step();
+      const line = `line ${i}`;
+      if (d.say(line)) typed.push(line);
+      s = (await pending).snapshot;
+    }
+    expect(s.over).toBe(true);
+    const settled = [...said, ...refused.flatMap(([lines]) => lines)];
+    expect(typed.every((l) => settled.includes(l))).toBe(true);
+    expect(refused.every(([, why]) => why === 'over')).toBe(true);
+    expect(d.say('after the end')).toBeNull();
+  });
+});
+
+describe('practice talk between hands', () => {
+  it('says a line typed between hands at the start of the next one', async () => {
+    const d = instant();
+    const said: { after: number; say: string }[] = [];
+    d.onSaid = (lines) => said.push(...lines);
+    let s = await d.start({ seed: 3, seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: 'aws/claude-haiku-5-5-eu' }] });
+    while (s.view.street !== 'done') s = s.turn ? (await d.act({ key: 'fold' })).snapshot : (await d.step()).snapshot;
+    expect(d.say('Next hand is mine.')).toBe('Next hand is mine.');
+    await d.nextHand();
+    expect(said).toEqual([expect.objectContaining({ after: 0, say: 'Next hand is mine.' })]);
   });
 });
 

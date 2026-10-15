@@ -271,3 +271,193 @@ describe('RemoteDriver: leaving the table', () => {
     expect(RemoteDriver.saved({ storage })).not.toBeNull();
   });
 });
+
+describe('RemoteDriver: the player talks at the table', () => {
+  it('queues a line, sends it with the next request, tells onSaid, and keeps it in the review and the recording', async () => {
+    const { driver, f } = await remote({ signedIn: true });
+    const said: unknown[] = [];
+    driver.onSaid = (lines) => said.push(...lines);
+    expect(driver.say('too early')).toBeNull(); // no table yet
+    let s = await driver.start({ seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: CHAT }, { kind: 'model', id: DECISION }] });
+    expect(driver.say('  Nice   try.\n')).toBe('Nice try.');
+    expect(driver.say(' ​ ')).toBeNull();
+    const step = s.turn ? await driver.act({ key: s.turn.options.find((o) => o.key === 'check' || o.key === 'call')!.key }) : await driver.step();
+    const body = JSON.parse(f.mock.calls.at(-1)![1]!.body as string) as { talk?: string[] };
+    expect(body.talk).toEqual(['Nice try.']);
+    expect(step.talk).toEqual([expect.objectContaining({ seat: 0, say: 'Nice try.' })]);
+    expect(said).toEqual(step.talk);
+    // Sent once: the next request carries no talk.
+    s = step.snapshot;
+    const last = await playOut(driver, s);
+    expect(JSON.parse(f.mock.calls.at(-1)![1]!.body as string)).not.toHaveProperty('talk');
+    const review = await driver.review();
+    expect(review.hands[0]!.talk).toEqual([expect.objectContaining({ say: 'Nice try.' })]);
+    expect(review.recording!.hands[0]!.talk).toEqual(review.hands[0]!.talk);
+    expect(verifyRecording(review.recording)).toMatchObject({ ok: true });
+    expect(last.over).toBe(true);
+  });
+
+  it('keeps a line for the next request when one could not get through, drops it with a refusal, and caps what waits', async () => {
+    let n = 0;
+    const bodies: Record<string, unknown>[] = [];
+    const answer = { token: 'T2', result: { seat: 1, key: 'call', meta: { by: 'answer', latencyMs: 1 }, snapshot: { over: false }, talk: [{ seat: 0, after: 0, say: 'Hi.' }] } };
+    const replies = [() => new Response('{}', { status: 502 }), () => new Response(JSON.stringify(answer), { status: 200 }), () => new Response(JSON.stringify({ error: 'It is your turn' }), { status: 409 })];
+    const f = vi.fn<typeof fetch>(async (_input, init) => {
+      bodies.push(JSON.parse(init!.body as string));
+      return replies[Math.min(n++, replies.length - 1)]!();
+    });
+    const refused: unknown[] = [];
+    // A retry budget so short that the 502 gives up at once (the connection never came back).
+    const d = new RemoteDriver({ fetch: f, url: (r) => r, storage: null, sleep: async () => {}, retryForMs: 0, onTalkRefused: (lines, why) => refused.push([lines, why]) });
+    Object.assign(d as unknown as Record<string, unknown>, { token: 'T1', mode: 'play' });
+    expect(d.say('Hi.')).toBe('Hi.');
+    await expect(d.step()).rejects.toMatchObject({ kind: 'failed' });
+    await d.step();
+    // Sent again from the same token after the failure: said once.
+    expect(bodies.map((b) => [b.token, b.talk])).toEqual([['T1', ['Hi.']], ['T1', ['Hi.']]]);
+    // A refusal takes its lines with it, and says so.
+    d.say('Too late.');
+    await expect(d.step()).rejects.toMatchObject({ kind: 'refused' });
+    expect(refused).toEqual([[['Too late.'], 'refused']]);
+    expect(bodies.at(-1)!.talk).toEqual(['Too late.']);
+    for (let i = 0; i < 6; i++) expect(d.say(`line ${i}`)).toBe(`line ${i}`);
+    expect(d.say('one too many')).toBeNull();
+    Object.assign(d as unknown as Record<string, unknown>, { mode: 'watch' });
+    expect(d.say('watching')).toBeNull();
+  });
+
+  it('keeps the lines of a step the page gave up on for the next request, and drops them only when the player leaves', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    let hang = true;
+    const answer = { token: 'T2', result: { seat: 1, key: 'call', meta: { by: 'answer', latencyMs: 1 }, snapshot: { over: false }, talk: [{ seat: 0, after: 0, say: 'Hi.' }] } };
+    const f = vi.fn<typeof fetch>((_input, init) => {
+      bodies.push(JSON.parse(init!.body as string));
+      if (!hang) return Promise.resolve(new Response(JSON.stringify(answer), { status: 200 }));
+      return new Promise((_, reject) => init!.signal!.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+    });
+    const refused: unknown[] = [];
+    const d = new RemoteDriver({ fetch: f, url: (r) => r, storage: null, sleep: async () => {}, onTalkRefused: (lines, why) => refused.push([lines, why]) });
+    Object.assign(d as unknown as Record<string, unknown>, { token: 'T1', mode: 'play' });
+    expect(d.say('Hi.')).toBe('Hi.');
+    const ac = new AbortController();
+    const cancelled = d.step(ac.signal);
+    setTimeout(() => ac.abort(), 10);
+    await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' });
+    hang = false;
+    const r = await d.step();
+    // The next request, from the same token, carries the line again: said once, nothing refused.
+    expect(bodies.map((b) => [b.token, b.talk])).toEqual([['T1', ['Hi.']], ['T1', ['Hi.']]]);
+    expect(r.talk).toEqual([expect.objectContaining({ say: 'Hi.' })]);
+    expect(refused).toEqual([]);
+  });
+
+  it("reports the lines the table did not say (over the allowance, or past a hand's room) and the ones left when the game ends", async () => {
+    const reply = { token: 'T2', result: { seat: 0, key: 'call', meta: { by: 'human', latencyMs: 1 }, snapshot: { over: false }, talk: [{ seat: 0, after: 1, say: 'a' }] }, talkRefused: { lines: ['b'], why: 'full' } };
+    let over = false;
+    const f = vi.fn<typeof fetch>(async () => new Response(JSON.stringify(over ? { ...reply, result: { ...reply.result, talk: undefined, snapshot: { over: true } }, talkRefused: undefined } : reply), { status: 200 }));
+    const events: unknown[] = [];
+    const d = new RemoteDriver({ fetch: f, url: (r) => r, storage: null, onSaid: (l) => events.push(['said', l.map((x) => x.say)]), onTalkRefused: (l, why) => events.push(['not said', l, why]) });
+    Object.assign(d as unknown as Record<string, unknown>, { token: 'T1', mode: 'play' });
+    d.say('a');
+    d.say('b');
+    await d.act({ key: 'call' });
+    expect(events).toEqual([['said', ['a']], ['not said', ['b'], 'full']]);
+    // The game ends with lines still waiting: they are not said, and no more can be.
+    over = true;
+    d.say('c');
+    d.say('d');
+    d.say('e');
+    d.say('f');
+    await d.step();
+    expect(events.at(-1)).toEqual(['not said', ['f'], 'over']);
+    expect(d.say('gg')).toBeNull();
+  });
+});
+
+describe('RemoteDriver: a reload in the middle of a hand', () => {
+  it('gives back the hand so far, what the models said and the player’s talk, so the chat can be laid out again (never the reasoning in play)', async () => {
+    const { playedHandLines } = await import('../src/chat-lines');
+    const s = await setup({ signedIn: true });
+    const storage = memoryStorage();
+    const make = () => new RemoteDriver({ fetch: (input, init) => fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), cookie: s.cookie } }), url: (route) => `${s.url}/api/table/${route}`, storage });
+    const first = make();
+    let snap = await first.start({ seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: CHAT }, { kind: 'model', id: DECISION }] });
+    let talked = false;
+    let spoke = false;
+    // Into a hand where the player has talked and the chat model has spoken, and stop there, mid-hand.
+    for (let i = 0; i < 60 && !(talked && spoke && snap.view.street !== 'done'); i++) {
+      if (snap.view.street === 'done') {
+        snap = await first.nextHand();
+        talked = spoke = false;
+      } else if (snap.turn) {
+        if (!talked) talked = first.say('Your move.') !== null;
+        snap = (await first.act({ key: snap.turn.options.some((o) => o.key === 'check') ? 'check' : 'call' })).snapshot;
+      } else {
+        const r = await first.step();
+        if (r.seat === 1 && r.meta.say) spoke = true;
+        snap = r.snapshot;
+      }
+    }
+    expect(talked && spoke && snap.view.street !== 'done').toBe(true);
+
+    // A reload: a new driver, the same browser.
+    const second = make();
+    const resumed = await second.resume();
+    const so = second.handSoFar();
+    expect(so.talk).toEqual([expect.objectContaining({ seat: 0, say: 'Your move.' })]);
+    expect(so.metas).toHaveLength(resumed.events.filter((e) => e.type === 'action').length);
+    expect(so.metas.some((m) => m.say?.startsWith('Talk'))).toBe(true);
+    // Play mode: the hand in play's reasoning stays hidden until it ends.
+    expect(JSON.stringify(so.metas)).not.toContain(SECRET_REASONING);
+
+    // The chat laid out again: the model's words and the player's line, in the order they came.
+    const lines = playedHandLines({ hand: resumed.hand, events: resumed.events, actions: so.metas, talk: so.talk });
+    const order = lines.flatMap((l) => ('talk' in l ? ['you'] : l.line.kind === 'move' && l.words?.say ? ['model'] : []));
+    expect(order).toContain('you');
+    expect(order).toContain('model');
+    expect(lines.every((l) => !('line' in l) || !l.words?.reasoning)).toBe(true);
+  });
+});
+
+describe('RemoteDriver: a reload after the answer that finished a hand was lost', () => {
+  it('takes the hand as it ended from the resume answer: the last move’s words and the talk sent with it', async () => {
+    const s = await setup({ signedIn: true });
+    const storage = memoryStorage();
+    let lose = false;
+    const send = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const res = await fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), cookie: s.cookie } });
+      if (!lose || !String(input).match(/\/(step|act)$/)) return res;
+      const body = (await res.clone().json()) as { finished?: unknown };
+      // The request reached the table and finished the hand; its answer never comes back.
+      if (body.finished) throw new TypeError('the connection dropped');
+      return res;
+    };
+    const first = new RemoteDriver({ fetch: send, url: (route) => `${s.url}/api/table/${route}`, storage, retryForMs: 0, sleep: async () => {} });
+    let snap = await first.start({ seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: CHAT }, { kind: 'model', id: DECISION }] });
+    lose = true;
+    let lost = false;
+    for (let i = 0; i < 40 && !lost; i++) {
+      try {
+        if (snap.turn) {
+          first.say(`Line ${i}.`);
+          snap = (await first.act({ key: snap.turn.options.some((o) => o.key === 'check') ? 'check' : 'call' })).snapshot;
+        } else snap = (await first.step()).snapshot;
+      } catch (e) {
+        expect(e).toMatchObject({ kind: 'failed' });
+        lost = true;
+      }
+    }
+    expect(lost).toBe(true);
+
+    // A reload: the table as the lost answer left it, the hand over.
+    const second = new RemoteDriver({ fetch: (input, init) => fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), cookie: s.cookie } }), url: (route) => `${s.url}/api/table/${route}`, storage });
+    const resumed = await second.resume();
+    expect(resumed.view.street).toBe('done');
+    const hand = (await second.review()).hands.find((h) => h.hand === resumed.hand)!;
+    const so = second.handSoFar();
+    expect(so.metas).toHaveLength(hand.actions.length);
+    expect(so.metas.at(-1)?.say).toBe(hand.actions.at(-1)!.say);
+    expect(so.talk).toEqual(hand.talk ?? []);
+    expect(so.talk.length).toBeGreaterThan(0);
+  });
+});

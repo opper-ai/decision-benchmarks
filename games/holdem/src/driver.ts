@@ -7,12 +7,15 @@
 // Everything is async because real models take seconds. One AI action per step(), so the page animates each action as
 // it arrives.
 import type { Action } from '../shared/engine.ts';
-import type { Review, SeatConfig, StepResult, TableSnapshot } from '../shared/table.ts';
+import type { ActionMeta, Review, SeatConfig, StepResult, TableSnapshot, TalkLine } from '../shared/table.ts';
 
-export type { ActionMeta, HumanTurn, Review, ReviewHand, SeatConfig, SeatKind, StepResult, TableSnapshot } from '../shared/table.ts';
+export type { ActionMeta, HumanTurn, Review, ReviewHand, SeatConfig, SeatKind, StepResult, TableSnapshot, TalkLine } from '../shared/table.ts';
 
 export interface TableConfig {
-  /** 2 to 4 seats, seat 0 first. Play mode has exactly one human seat; watch mode has none. */
+  /**
+   * 2 to 6 seats (shared/sitngo.ts MIN_SEATS to MAX_SEATS, 4 by default: DEFAULT_SEATS), seat 0 first. Play mode has
+   * exactly one human seat; watch mode has none.
+   */
   seats: SeatConfig[];
   /** The table key (rng.ts) that deals the Sit & Go; the driver picks a random one when left out (the service always does). */
   key?: string;
@@ -34,4 +37,18 @@ export interface TableDriver {
    * review. Never the hand in play, and never the seed (it deals the hands to come).
    */
   review(): Promise<Review>;
+  /**
+   * The player says something at the table (play mode; the models hear it, and practice stand-ins may answer): the
+   * line as it will be said, or null when it can't be (nothing left after cleaning, watch mode, too many waiting).
+   */
+  say?(text: string): string | null;
+  /** The hand in play so far (after a resume): each action's metadata in order, and the player's lines. */
+  handSoFar?(): { metas: ActionMeta[]; talk: TalkLine[] };
+  /** Told when the player's lines reached the table, as the table placed them (with say). */
+  onSaid?: ((lines: TalkLine[]) => void) | null;
+  /**
+   * Told when lines the player typed will never be said, oldest first: over their talk allowance ('busy'), past what a
+   * hand holds ('full'), sent with a request the table refused ('refused'), or still waiting when the game ended ('over').
+   */
+  onTalkRefused?: ((lines: string[], why: 'busy' | 'full' | 'refused' | 'over') => void) | null;
 }

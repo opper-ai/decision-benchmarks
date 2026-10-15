@@ -12,7 +12,11 @@ describe('view model', () => {
     expect(slotsFor(4, null)).toEqual(['bottom', 'left', 'top', 'right']);
     expect(slotsFor(3, 0)).toEqual(['bottom', 'top-left', 'top-right']);
     expect(slotsFor(2, 1)).toEqual(['top', 'bottom']);
-    expect(() => slotsFor(5, 0)).toThrow();
+    // Five and six: you at the bottom, two seats up each side (and one at the top for six).
+    expect(slotsFor(5, 0)).toEqual(['bottom', 'left', 'top-left', 'top-right', 'right']);
+    expect(slotsFor(6, 0)).toEqual(['bottom', 'left', 'top-left', 'top', 'top-right', 'right']);
+    expect(slotsFor(6, 3)).toEqual(['top', 'top-right', 'right', 'bottom', 'left', 'top-left']);
+    expect(() => slotsFor(7, 0)).toThrow();
   });
 
   it('writes actions, cards, levels and places as people read them', () => {

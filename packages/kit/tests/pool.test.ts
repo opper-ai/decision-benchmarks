@@ -156,6 +156,30 @@ describe('the hourly budget', () => {
 });
 
 describe('VisitorLimits', () => {
+  it('gives back what it took for a request that was not served, never past the burst', () => {
+    const limits = new VisitorLimits({ ratePerSec: 0.001, burst: 3 }, () => 0, { ratePerSec: 0.001, burst: 5 });
+    expect(limits.take('2001:db8::1', 3)).toBe('ok');
+    expect(limits.take('2001:db8::1')).toBe('rate');
+    limits.refund('2001:db8::1', 2);
+    expect(limits.take('2001:db8::1', 2)).toBe('ok');
+    limits.refund('2001:db8::1', 10);
+    expect(limits.take('2001:db8::1', 3)).toBe('ok');
+    expect(limits.take('2001:db8::1')).toBe('rate');
+  });
+
+  it('takes several at once, all or nothing: a batch over the allowance takes none of it', () => {
+    let now = 0;
+    const limits = new VisitorLimits({ ratePerSec: 1, burst: 3 }, () => now);
+    expect(limits.take('203.0.113.5', 2)).toBe('ok');
+    expect(limits.take('203.0.113.5', 2)).toBe('rate');
+    // Nothing was taken by the refusal: one is still there.
+    expect(limits.take('203.0.113.5')).toBe('ok');
+    expect(limits.take('203.0.113.5')).toBe('rate');
+    now = 2000;
+    expect(limits.take('203.0.113.5', 2)).toBe('ok');
+    expect(limits.take('203.0.113.5', 0)).toBe('ok');
+  });
+
   it('allows a burst, then the sustained rate', () => {
     let now = 0;
     const limits = new VisitorLimits({ ratePerSec: 2, burst: 3 }, () => now);

@@ -73,6 +73,30 @@ describe('a hand as a clip', () => {
     expect(clipFrameItems(first, info, hand).some((it) => it.kind === 'text' && it.text === 'You')).toBe(true);
   });
 
+  it('draws the talk over the seat that said it at tables of five and six too', async () => {
+    const d = new LocalDriver({ thinkScale: 0, sleep: async () => {} });
+    const ids = ['aws/claude-opus-5-5', 'azure:eu/gpt-6.1-sol', 'aws/claude-haiku-5-5-eu', 'azure:eu/gpt-6-luna', 'vertexai/claude-sonnet-5-5-eu', 'azure/gpt-5.6-terra'];
+    let s: TableSnapshot = await d.start({ seed: 8, seats: ids.map((id) => ({ kind: 'model' as const, id })) });
+    while (s.view.street !== 'done' || s.hand < 3) s = s.view.street === 'done' ? await d.nextHand() : (await d.step()).snapshot;
+    const review = await d.review();
+    let bubbles = 0;
+    for (const hand of review.hands) {
+      const tl = clipTimeline(hand);
+      const info = clipInfo(hand, review.players);
+      for (const b of tl.beats.filter((x) => x.say)) {
+        const items = clipFrameItems(frameAt(hand, tl, b.at + 0.1), info, hand);
+        const avatars = items.flatMap((it) => (it.kind === 'avatar' ? [it] : []));
+        for (const it of items) {
+          if (it.kind !== 'bubble') continue;
+          bubbles++;
+          // Over a face: the bubble sits above the avatar of the seat it belongs to.
+          expect(avatars.some((a) => a.cx === it.x && a.cy - 74 === it.y), `bubble at ${it.x},${it.y}`).toBe(true);
+        }
+      }
+    }
+    expect(bubbles).toBeGreaterThan(3);
+  });
+
   it('ends on the hand’s story, when it has one', async () => {
     const review = await game();
     const withStory = review.hands.map((h) => [h, clipInfo(h, review.players)] as const).find(([, i]) => i.caption);

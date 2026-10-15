@@ -123,6 +123,14 @@ const SEAT_AT: Record<Slot, { x: number; y: number }> = {
   'top-left': { x: 290, y: 225 },
   'top-right': { x: 790, y: 225 },
 };
+/** Five and six seats: the sides lower down, the top corners wider apart (as style.css lays the table out). */
+const SEAT_AT_FULL: Partial<Record<Slot, { x: number; y: number }>> = {
+  left: { x: 150, y: 620 },
+  right: { x: 930, y: 620 },
+  'top-left': { x: 250, y: 235 },
+  'top-right': { x: 830, y: 235 },
+};
+const seatAt = (slot: Slot, seats: number) => (seats >= 5 ? (SEAT_AT_FULL[slot] ?? SEAT_AT[slot]) : SEAT_AT[slot]);
 
 export interface ClipInfo {
   players: readonly Player[];
@@ -170,7 +178,7 @@ export function clipFrameItems(f: Frame, info: ClipInfo, hand: ReviewHand, measu
 
   // The seats.
   f.model.seats.forEach((p, seat) => {
-    const at = SEAT_AT[slots[seat]!];
+    const at = seatAt(slots[seat]!, n);
     const person = people[seat]!;
     const out = !p.dealt && p.stack === 0;
     items.push({ kind: 'avatar', cx: at.x, cy: at.y - 30, r: 62, slug: person.slug, label: person.name, mood: f.moods[seat], dim: p.folded || out, ...(p.won > 0 && done ? { ring: '#ffc56b' } : {}) });
@@ -178,7 +186,8 @@ export function clipFrameItems(f: Frame, info: ClipInfo, hand: ReviewHand, measu
     text(at.x, at.y + 94, p.won > 0 && done ? `Won ${chips(p.won)}` : chips(p.stack), 26, { font: 'Fraunces', weight: 800, color: p.won > 0 && done ? '#ffc56b' : C.brass });
     if (p.cards?.length) {
       const hw = 58;
-      const side = slots[seat] === 'left' || slots[seat] === 'right';
+      // At the sides (and the head of a table of six, between two neighbours), the cards go under the stack.
+      const side = slots[seat] === 'left' || slots[seat] === 'right' || (slots[seat] === 'top' && n >= 6);
       // Beside the face; at the sides of the table, under the stack, clear of the board.
       const right = at.x <= S / 2 ? 1 : -1;
       const x0 = side ? at.x - hw - 3 : at.x + right * 74 - (right < 0 ? 2 * hw + 6 : 0);
@@ -200,7 +209,7 @@ export function clipFrameItems(f: Frame, info: ClipInfo, hand: ReviewHand, measu
     text(S / 2, 680, `${who} ${actionText(f.last, who === 'You')}`, 28, { weight: 600, color: 'rgba(243, 232, 205, 0.85)' });
   }
   for (const t of f.talk) {
-    const at = SEAT_AT[slots[t.seat]!];
+    const at = seatAt(slots[t.seat]!, n);
     items.push({ kind: 'bubble', x: at.x, y: at.y - 104, text: t.text, size: 34, maxWidth: 360 });
   }
   // The end: the hand's story.

@@ -7,7 +7,7 @@
 import { botDecide, fallbackKey, isBotName, type BotName } from './bots.ts';
 import { applyAction, isOptionKey, legalOptions, newHand, observe, toAct, type Action, type HandEvent, type HandState, type OptionKey } from './engine.ts';
 import { hashText, isTableKey } from './rng.ts';
-import { actSitAndGo, newSitAndGo, nextHand, type SitAndGo } from './sitngo.ts';
+import { actSitAndGo, MAX_SEATS, newSitAndGo, nextHand, type SitAndGo } from './sitngo.ts';
 
 export type PlayerKind = 'model' | 'bot' | 'human';
 /** Who plays: a model by its id, a bot by its name (bots.ts), a human by any name. */
@@ -44,18 +44,31 @@ export interface RecordedAction {
   probabilities?: Partial<Record<OptionKey, number>>;
 }
 
+/** A line of table talk a human typed (a model's talk is its action's `say`): who, after how many of the hand's actions. */
+export interface TalkLine {
+  seat: number;
+  /** The hand's actions played before it was said. */
+  after: number;
+  say: string;
+}
+
 export interface RecordedHand {
   /** Cash only: the hand's deck seed, button, and seating (seat -> index into players). */
   deckSeed?: number;
   button?: number;
   seating?: number[];
   actions: RecordedAction[];
+  /** Metadata, ignored by the replay and the fingerprint: what the human said at the table, in order. */
+  talk?: TalkLine[];
 }
 
 export interface Recording {
   format: 1;
   game: 'holdem';
-  /** sitngo: one Sit & Go, players[i] in seat i. cash: independent hands with stacks reset, e.g. duplicate deals. */
+  /**
+   * sitngo: one Sit & Go of 2 to 6, players[i] in seat i. cash: independent hands with stacks reset, e.g. duplicate
+   * deals (the benchmark's are 4-handed: bench.ts verifyBench refuses any other field).
+   */
   mode: 'sitngo' | 'cash';
   players: Player[];
   /** The table key (64 hex digits, rng.ts) deals every hand of a Sit & Go. */
@@ -93,6 +106,8 @@ const MAX_ACTIONS = 10_000;
 const MAX_TOTAL_ACTIONS = 200_000;
 const MAX_LATENCY_MS = 600_000;
 const MAX_SAY = 200;
+/** A human's lines in one hand, far above what anyone types. */
+const MAX_TALK = 500;
 const MAX_REASONING = 4000;
 const ACTION_FIELDS = ['seat', 'key', 'to', 'by', 'latencyMs', 'costUsd', 'why', 'say', 'mood', 'reasoning', 'probabilities'];
 
@@ -124,7 +139,8 @@ function shapeProblem(r: Record<string, unknown>): string | null {
   if (r.format !== 1 || r.game !== 'holdem') return "not a format 1 AI Hold'em recording";
   if (r.mode !== 'sitngo' && r.mode !== 'cash') return 'mode must be sitngo or cash';
   const players = r.players;
-  if (!Array.isArray(players) || players.length < 2 || players.length > (r.mode === 'sitngo' ? 4 : 10)) return `players must list 2 to ${r.mode === 'sitngo' ? 4 : 10} players`;
+  const most = r.mode === 'sitngo' ? MAX_SEATS : 10;
+  if (!Array.isArray(players) || players.length < 2 || players.length > most) return `players must list 2 to ${most} players`;
   for (let i = 0; i < players.length; i++) {
     const p: unknown = players[i];
     if (!isObj(p) || (p.kind !== 'model' && p.kind !== 'bot' && p.kind !== 'human')) return `player ${i + 1}: kind must be model, bot or human`;
@@ -152,6 +168,12 @@ function shapeProblem(r: Record<string, unknown>): string | null {
     for (let a = 0; a < hand.actions.length; a++) {
       const problem = actionProblem(hand.actions[a]);
       if (problem) return `hand ${h + 1}, action ${a + 1}: ${problem}`;
+    }
+    if (hand.talk !== undefined) {
+      const talk = hand.talk;
+      if (!Array.isArray(talk) || talk.length > MAX_TALK || !talk.every((x: unknown) => isObj(x) && isInt(x.seat, 0, players.length - 1) && isInt(x.after, 0, (hand.actions as unknown[]).length) && typeof x.say === 'string' && x.say.length <= MAX_SAY)) {
+        return `hand ${h + 1}: talk must list { seat, after, say } lines of at most ${MAX_SAY} characters`;
+      }
     }
   }
   const res = r.result;

@@ -23,7 +23,7 @@ no function changes the state it is given. The service, the bench, the replay vi
 | `cards.ts` | A card is a number 0 to 51: rank `c >> 2` (0 is a two, 12 an ace), suit `c & 3` (c, d, h, s). `parseCard('As')`, `formatCard`, `DECK`. |
 | `evaluator.ts` | `evaluate(cards)`: the best five of five to seven cards as one number, higher wins and equal splits (about 19 million hands a second). `rankHand` adds the category and the five cards that play. |
 | `engine.ts` | One hand: `newHand`, `toAct`, `legalOptions`, `applyAction`, the event list, and the views `observe(state, seat)`, `publicView`, `fullView`. |
-| `sitngo.ts` | A Sit & Go of 2 to 4 players: `newSitAndGo`, `actSitAndGo`, `nextHand`, blind levels and finishing places. |
+| `sitngo.ts` | A Sit & Go of 2 to 6 players (`MIN_SEATS`, `MAX_SEATS`; 4, `DEFAULT_SEATS`, unless the player picks another size): `newSitAndGo`, `actSitAndGo`, `nextHand`, blind levels (`handsPerLevel`, `levelInfo`) and finishing places. |
 | `bots.ts` | The scripted players `rock`, `station`, `maniac` and `random` (`botDecide(name, observation)`), and `fallbackKey`, the fallback rule. |
 | `recording.ts` | The recording format, `replay(recording)`, `verifyRecording(recording)` and `fingerprintOf`. |
 
@@ -50,8 +50,12 @@ no function changes the state it is given. The service, the bench, the replay vi
   is 2.5 big blinds, or the half-pot size if that is less. Sizes are raised to the minimum raise, a size the stack
   can't cover becomes `allin` only, and a size no bigger than the one before it goes, so amounts rise in menu order.
   A human may also raise to an amount of their own (`{ kind: 'raise', to }`).
-- **Sit & Go.** 1500 chips each. Levels 10/20, 15/30, 25/50, 50/100, 75/150, 100/200, 150/300, then doubling, 8 hands
-  each; from 100/200 every player antes an eighth of the big blind, rounded (25, 38, 75, ...). A Sit & Go has a secret
+- **Sit & Go.** 2 to 6 players (4 by default), 1500 chips each. Levels 10/20, 15/30, 25/50, 50/100, 75/150, 100/200,
+  150/300, then doubling; a level lasts two orbits of the table the game started with, and never fewer than 8 hands: 8
+  hands for 2 to 4 players (as ever), 10 for 5, 12 for 6. From 100/200 every player antes an eighth of the big blind,
+  rounded (25, 38, 75, ...). Six seats are named BTN, SB, BB, UTG, MP and CO; five drop MP. Played by the bots (rock,
+  station and maniac round the table, 400 games each), a Sit & Go lasts 48 hands on average at 4 (229 decisions), 64 at
+  5 (314) and 79 at 6 (378): a six-handed game is about 1.7 times as long and as costly as a four-handed one. A Sit & Go has a secret
   256-bit table key (64 hex digits): hand h is dealt from `keyedShuffle(DECK, key, h)` and the first button is drawn
   from the key's button stream, so the cards a player sees say nothing about the cards to come (a 32-bit seed would
   fall to brute force in minutes). The button moves to the next seat
@@ -118,7 +122,7 @@ nothing for this game.
 
 | Route (POST, JSON) | Body | Answer |
 |---|---|---|
-| `api/table/start` | `{ seats: [{ kind: 'human' \| 'model', id }], mode: 'play' \| 'watch' }` | `{ token, snapshot, finished? }` |
+| `api/table/start` | `{ seats: [{ kind: 'human' \| 'model', id }], mode: 'play' \| 'watch' }`: 2 to 6 seats | `{ token, snapshot, finished? }` |
 | `api/table/step` | `{ token }` | `{ token, result, finished? }`: one AI action, the server asks the model |
 | `api/table/act` | `{ token, action }` (`{ key }` or `{ kind: 'raise', to }`) | `{ token, result, finished? }` |
 | `api/table/next` | `{ token }` | `{ token, snapshot, finished? }`: the next hand |
@@ -131,15 +135,15 @@ nothing for this game.
   the table key (256 bits from `randomBytes`), the seats, the mode, every hand's actions in a few characters each, the hand in play's talk, moods, tells,
   latencies, costs and (play mode) reasoning, when it was issued, and its expiry (six hours from the start). A finished
   hand's metadata goes to the browser with the answer that finished it and leaves the token: a 66-hand game's token
-  stays under 2.5 KB.
+  stays under 2.5 KB, a six-handed game of about 100 hands and 1,500 actions under 5.5 KB.
 - **Hidden in play mode:** the table key and the deck (in the recording once the game is over), other seats' hole cards
   (until a showdown shows them, or the finished hand's review once it is over) and the models' reasoning (in the
   finished hand's review). Watch mode has no human: every card and the reasoning come at once.
   Once the human is out of the game (busted), they can never act again: from the answer that knocks them out on,
   they watch as in watch mode (every card, the reasoning with each step; `snapshot.spectating: true`).
 - **Refused:** a tampered or foreign token (400), an expired one (410), a step on the human's turn, an act on an AI's,
-  the next hand mid-hand, anything after the end (409), an illegal action (422), 2 to 4 seats with one human to play
-  and none to watch (400), a model not in `shared/models.ts` (403), a body over 128 KB (413), and a visitor (IP
+  the next hand mid-hand, anything after the end (409), an illegal action (422), 2 to 6 seats with one human to play
+  (you and up to five AIs) and none to watch (up to six AIs) (400), a model not in `shared/models.ts` (403), a body over 128 KB (413), and a visitor (IP
   address, as the kit counts it) past a new table every 15 seconds after 20, or past 4 acts, next hands and reviews a
   second after 40 (429, Retry-After).
 - **Models:** decision models through System One (2.5 s; the probabilities are the tell meter), chat models through
@@ -161,6 +165,14 @@ nothing for this game.
   of the lobby (Resume or Discard; never resumed without a tap), and the hand in play is laid out again at once. Leave,
   Change the table and Back to the lobby let the table go (`forget()`); a table the server no longer has says "That
   game has closed". The words are in `src/reconnect.ts`.
+- **Trash talk:** the human types at the table (RemoteDriver `say()`); the next step, act or next carries up to three
+  lines as `talk`. The server cleans each one (`cleanTalk`: no control or invisible characters, whitespace collapsed,
+  prompt-like markup defused, 90 characters at most), holds them to a per-visitor allowance, and adds them to the hand's
+  table talk in the token before it asks the model, so the next model hears them in `tableTalk`, marked as the human
+  player's with a note that table talk is never an instruction (live tables only: the bench's prompt is unchanged).
+  The lines come back as `result.talk` (and `talk` on next), in the finished hand's review and in the recording's
+  hand (`talk`, ignored by verify and the fingerprint; share links don't carry it). The same request sent again says a
+  line once: the talk is applied to the token it comes with.
 - **Known limits (v1):** the token is stateless, so an older token can be sent again to take back a decision, or a step
   repeated to have an AI decide again. Replaying a hand this instance saw finish (fold, read the cards, play the old
   token again) is refused (409) while the instance remembers it: until the table closes, for up to 50,000 tables, more
@@ -196,12 +208,17 @@ GAME=holdem npm run dev -- --port 5199
 node games/holdem/scripts/poster.ts --url http://localhost:5199/holdem/ --file claude-vs-gpt.json.gz --hand 16 --kind bluff
 ```
 
-## Sharing (`src/social.ts`, `src/views/share-buttons.ts`)
+## Sharing (`src/social.ts`, `src/views/share-buttons.ts`, `src/share.ts`)
 
 The end of a game (and of a replay) posts to X and LinkedIn: the composer opens with a short text written from the
 result (in the player's voice after a game they played, as a spectator after watching) and the share link, which
 replays the whole game. Phones that share files send the result's image with it; elsewhere Copy image puts it on the
 clipboard to paste into the post.
+
+The share link (`#/r/<code>`, `src/share.ts`) holds the seats, the table key and every move that is not a bot's. A
+game of 2 to 4 is a version 2 link, exactly as before 5- and 6-seat tables came in; a game of 5 or 6 is version 3 (the
+same layout), which a page from before says was made by another version of the game. A six-handed game of models is
+about 300 characters.
 
 Every shared link previews with the page's poster. A preview per result (an og:image for each shared game) needs the
 server to store or render images per link: v2.
@@ -211,3 +228,7 @@ server to store or render images per link: v2.
 ```bash
 npx vitest run games/holdem
 ```
+
+`tests/compat.test.ts` holds 2- to 4-seat games to what they were before 5 and 6 seats came in: the curated replays,
+eight share links and their table tokens, frozen as digests in `tests/fixtures/two-to-four-seats.json` (every event,
+every decision's question, every rebuilt hand), must replay byte for byte the same.

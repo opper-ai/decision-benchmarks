@@ -61,7 +61,8 @@
  */
 @media (max-width: 759px) {
   .room { overflow: clip; --tb-h: 40px; --bar-h: 72px; }
-  .room.watching { --tb-h: 92px; --bar-h: 0px; } /* speeds and buttons on lines of their own */
+  .room.watching { --tb-h: 64px; --bar-h: 0px; } /* the hand on one line, the speeds and buttons on the next */
+  .room.watching:has(.replay-title) { --tb-h: 134px; } /* a replay: its title, the hand, and two lines of controls */
 }
 .room button { font-family: var(--j-body); }
 .room :focus-visible { outline: 2px solid var(--h-amber); outline-offset: 2px; }
@@ -83,6 +84,7 @@
 .tbtn[aria-pressed='true'] { background: rgba(215, 170, 82, 0.22); border-color: var(--h-brass); }
 .tbtn.icon { width: 32px; padding: 0; justify-content: center; }
 .tbtn[hidden] { display: none; }
+.room.watching .level { height: 18px; } /* its line is there before the first hand is drawn: the room keeps its height */
 .tbtn svg { flex: none; }
 /* Review and Leave: words; icons on a phone (below). */
 .tbtn .ic { display: none; }
@@ -97,6 +99,13 @@
   .room:not(.watching) .level .blinds .lbl { display: none; }
   .room:not(.watching) .tools { flex: none; flex-wrap: nowrap; gap: 4px; }
   .room:not(.watching) .practice { display: none; }
+  /* Watching: two lines that never change height, the hand and blinds (cut short if need be), then the speeds and buttons. */
+  .room.watching .toolbar:not(:has(.replay-title)) { flex-wrap: wrap; padding: 6px 8px 0 12px; gap: 6px 8px; }
+  .room.watching .level { display: block; flex: 1 0 100%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; line-height: 18px; }
+  .room.watching .level > span + span::before { content: ' · '; color: var(--h-dim); font-weight: 400; }
+  .room.watching .level .blinds .lbl { display: none; }
+  .room.watching .toolbar:not(:has(.replay-title)) .tools { flex: 1 0 100%; flex-wrap: nowrap; justify-content: space-between; gap: 4px; }
+  .room.watching .practice { display: none; }
 }
 .speed { display: inline-flex; border: 1px solid var(--h-line); border-radius: 999px; overflow: hidden; }
 .speed button { height: 30px; min-width: 38px; padding: 0 8px; border: 0; background: none; color: var(--h-dim); font: 700 12px var(--j-display); }
@@ -115,8 +124,25 @@
   .room:not(.watching) .middle { top: 56%; }
   .room:not(.watching) .seat[data-slot='bottom'] { --y: 90%; }
 }
-@media (min-width: 760px) { .felt-area { aspect-ratio: 16 / 9.4; --cw-board: 62px; --cw-seat: 42px; --cw-you: 70px; --av: 78px; } }
-@media (min-width: 1000px) { .felt-area { --cw-board: 68px; --cw-seat: 46px; --cw-you: 76px; --av: 86px; } }
+/*
+ * A wide screen: the faces and cards scale with the felt's width (--fw: the room's, less the chat column beside it from
+ * 1000 px), so a top seat, its talk under it, the board and the bottom seat always fit the felt's height.
+ */
+@media (min-width: 760px) {
+  .felt-area {
+    /*
+     * --fh, the felt's height: 0.625 of its width, as tall as the screen allows under the header, the toolbar and the
+     * action bar (taller rooms on a wide screen, so faces, cards and the bar never crowd; the page scrolls on a short one).
+     */
+    --fw: min(100vw - 48px, 1120px);
+    --fh: max(380px, min(calc(var(--fw) * 0.625), calc(100svh - 68px - 52px - var(--bar-h, 108px) - 16px)));
+    aspect-ratio: auto; height: var(--fh);
+    /* The felt's height less what doesn't scale (margins, plates, the talk and pots rows) holds two faces and a board card. */
+    --av: clamp(52px, calc((var(--fh) - 230px) / 3.2), 86px);
+    --cw-board: clamp(42px, calc(var(--av) * 0.8), 68px); --cw-seat: clamp(32px, calc(var(--av) * 0.55), 46px); --cw-you: clamp(56px, calc(var(--av) * 0.9), 76px);
+  }
+}
+@media (min-width: 1000px) { .felt-area { --fw: calc(min(100vw - 48px, 1120px) - 300px); } }
 .watching .felt-area, .all-up .felt-area { --cw-seat: 30px; }
 @media (min-width: 760px) { .watching .felt-area, .all-up .felt-area { --cw-seat: 50px; } }
 .rail {
@@ -146,8 +172,11 @@
 
 /* ---------- the middle: pots and the board ---------- */
 .middle { position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 8px; z-index: 2; }
-@media (min-width: 760px) { .middle { top: 47%; gap: 10px; } }
+/* A wide screen: the pots and board centred between a top seat's talk (under it) and the bottom seat. */
+@media (min-width: 760px) { .middle { top: calc((var(--top-edge) + 58px + 100% - var(--bottom-edge) - 10px) / 2); gap: 10px; } }
 .seat.you .shown-name { top: auto; bottom: calc(100% + 2px); }
+/* The bottom seat's shown hand under its cards, beside the face: under the plate is the felt's edge. */
+.seat[data-slot='bottom']:not(.you) .shown-name { top: calc(var(--cw-seat) * 1.4 + 10px); left: calc(50% + var(--av) * 0.5 + 4px); transform: none; }
 .pots { display: flex; gap: 8px; min-height: 26px; align-items: center; }
 .pot { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 999px; background: rgba(8, 20, 14, 0.55); font: 700 13px var(--j-display); font-variant-numeric: tabular-nums; }
 .pot .lbl { font: 500 11px var(--j-body); color: var(--h-dim); }
@@ -186,6 +215,35 @@
 .seat[data-slot='right'] { --x: 85%; --y: 37%; }
 .seat[data-slot='top-left'] { --x: 25%; --y: 13%; }
 .seat[data-slot='top-right'] { --x: 75%; --y: 13%; }
+/*
+ * The seats across the top hang from the felt's top edge, and the bottom seat stands on its bottom edge, whatever the
+ * table's height: every face, plate and card stays inside the room, clear of the toolbar (tests/fit/fit-check.ts).
+ */
+.seat:is([data-slot='top'], [data-slot='top-left'], [data-slot='top-right']) { top: 14px; transform: translate(-50%, 0); }
+.seat[data-slot='bottom'] { top: auto; bottom: 10px; transform: translate(-50%, 0); }
+/*
+ * Where those seats end, for what sits next to them: --top-edge is the foot of a top seat (its face, plate and, on a
+ * phone, the cards under the plate), --bottom-edge the head of the bottom seat, from the felt's foot (your big cards
+ * included). Bets go just inside them, the dealer button beside the face.
+ */
+.felt-area { --plate-h: 48px; --under: 0px; --top-edge: calc(14px + var(--av) + var(--plate-h) + var(--under)); --bottom-edge: calc(10px + max(var(--av) + var(--plate-h), var(--cw-you) * 1.4)); }
+@media (max-width: 759px) { .felt-area { --plate-h: 44px; --under: calc(var(--cw-seat) * 1.4); } }
+.felt-area .bet:is([data-slot='top'], [data-slot='top-left'], [data-slot='top-right']) { --y: calc(var(--top-edge) + 24px); }
+.felt-area .bet[data-slot='bottom'] { --y: calc(100% - var(--bottom-edge) - 24px); }
+.felt-area .dealer:is([data-slot='top'], [data-slot='top-left'], [data-slot='top-right']) { --y: calc(14px + var(--av) * 0.5); }
+.felt-area .dealer[data-slot='bottom'] { --x: calc(50% - max(var(--av) * 0.5 + 30px, var(--cw-you) + 90px)); --y: calc(100% - 10px - var(--av) * 0.5); }
+/* The side seats' bets just past their cards, toward the middle. */
+.felt-area .bet[data-slot='left'] { --x: calc(15% + 60px); --y: 37%; }
+.felt-area .bet[data-slot='right'] { --x: calc(85% - 60px); --y: 37%; }
+/* The top corners' button outside the face. */
+.felt-area .dealer[data-slot='top-left'] { --x: calc(25% - var(--av) * 0.5 - 20px); }
+.felt-area .dealer[data-slot='top-right'] { --x: calc(75% + var(--av) * 0.5 + 20px); }
+@media (min-width: 760px) {
+  .felt-area .bet[data-slot='left'] { --x: calc(8% + var(--av) * 0.5 + var(--cw-seat) * 2 + 32px); --y: 49%; }
+  .felt-area .bet[data-slot='right'] { --x: calc(92% - var(--av) * 0.5 - var(--cw-seat) * 2 - 32px); --y: 49%; }
+  .felt-area .dealer[data-slot='top-left'] { --x: calc(27% - var(--av) * 0.5 - 24px); }
+  .felt-area .dealer[data-slot='top-right'] { --x: calc(73% + var(--av) * 0.5 + 24px); }
+}
 @media (min-width: 760px) {
   .seat[data-slot='bottom'] { --y: 87%; }
   .seat[data-slot='top'] { --y: 12%; }
@@ -253,6 +311,65 @@
 .seat.you .who { display: grid; justify-items: center; }
 .shown-name { position: absolute; left: 50%; top: calc(100% + 4px); transform: translateX(-50%); white-space: nowrap; font: 700 11.5px var(--j-display); color: var(--h-amber); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
 
+/*
+ * Five and six round the table (data-seats on the felt): the side seats lower down the oval, two (or three) across its
+ * top, the board a little smaller. Bets sit between each seat and the middle, the dealer button beside its seat. Talk
+ * shows one bubble at a time at a table this full, over the middle (.bubble.center, below).
+ */
+.felt-area:is([data-seats='5'], [data-seats='6']) { --cw-board: 32px; --cw-seat: 24px; --av: 48px; }
+/* Phones: the board and pots lower, in the room under the side seats' bets. */
+@media (max-width: 759px) {
+  .room .felt-area:is([data-seats='5'], [data-seats='6']) .middle { top: 63%; }
+}
+.felt-area[data-seats='5'] .seat[data-slot='top-left'] { --x: 26%; --y: 11%; }
+.felt-area[data-seats='5'] .seat[data-slot='top-right'] { --x: 74%; --y: 11%; }
+.felt-area[data-seats='6'] .seat[data-slot='top-left'] { --x: 17%; --y: 13%; }
+.felt-area[data-seats='6'] .seat[data-slot='top'] { --x: 50%; --y: 14%; }
+.felt-area[data-seats='6'] .seat[data-slot='top-right'] { --x: 83%; --y: 13%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: 18%; --y: 51%; }
+/* Five or six round the table: every plate takes the short name and the family under it, as on a phone, so the side
+   seats stay on the felt ("Decision 1 / Microsoft" rather than "Microsoft Decision 1"). */
+.felt-area:is([data-seats='5'], [data-seats='6']) .plate { max-width: 108px; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .plate .full { display: none; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .plate .short { display: inline; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: 82%; --y: 51%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: 40%; --y: 44%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: 60%; --y: 44%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 30%; --y: calc(var(--top-edge) + 18px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 70%; --y: calc(var(--top-edge) + 18px); }
+.felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: calc(var(--top-edge) + 18px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 9%; --y: 75%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 91%; --y: 75%; }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 8%; --y: calc(var(--top-edge) + 16px); }
+.felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 92%; --y: calc(var(--top-edge) + 16px); }
+.felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 38%; --y: 25%; }
+@media (min-width: 760px) {
+  /* (Faces and cards: the wide screen's own sizes, from the felt's height.) */
+  .felt-area:is([data-seats='5'], [data-seats='6']) { --av: clamp(52px, calc((var(--fh) - 230px) / 3.2), 78px); --cw-board: clamp(42px, calc(var(--av) * 0.8), 62px); --cw-seat: clamp(32px, calc(var(--av) * 0.55), 42px); }
+  .felt-area[data-seats='5'] .seat[data-slot='top-left'] { --x: 30%; --y: 12%; }
+  .felt-area[data-seats='5'] .seat[data-slot='top-right'] { --x: 70%; --y: 12%; }
+  .felt-area[data-seats='6'] .seat[data-slot='top-left'] { --x: 22%; --y: 14%; }
+  .felt-area[data-seats='6'] .seat[data-slot='top'] { --x: 50%; --y: 13.5%; }
+  .felt-area[data-seats='6'] .seat[data-slot='top-right'] { --x: 78%; --y: 14%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='left'] { --x: max(8%, 60px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat[data-slot='right'] { --x: min(92%, 100% - 60px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='left'] { --x: calc(max(8%, 60px) + var(--av) * 0.5 + var(--cw-seat) * 2 + 32px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='right'] { --x: calc(min(92%, 100% - 60px) - var(--av) * 0.5 - var(--cw-seat) * 2 - 32px); --y: 60%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-left'] { --x: 28%; --y: calc(var(--top-edge) + 24px); }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .bet[data-slot='top-right'] { --x: 72%; --y: calc(var(--top-edge) + 24px); }
+  .felt-area[data-seats='6'] .bet[data-slot='top'] { --x: 50%; --y: calc(var(--top-edge) + 24px); }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='left'] { --x: 15%; --y: calc(60% + (var(--av) + var(--plate-h)) / 2 + 14px); }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='right'] { --x: 85%; --y: calc(60% + (var(--av) + var(--plate-h)) / 2 + 14px); }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-left'] { --x: 12%; --y: 30%; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .dealer[data-slot='top-right'] { --x: 88%; --y: 30%; }
+  .felt-area[data-seats='6'] .dealer[data-slot='top'] { --x: 40%; --y: 30%; }
+}
+/* Phones: the seats across the top hold their cards under the name plate, so neighbours don't meet. */
+@media (max-width: 759px) {
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='top-left'], [data-slot='top'], [data-slot='top-right']) .hole { position: static; justify-content: center; flex-direction: row; margin-top: -3px; }
+  .felt-area:is([data-seats='5'], [data-seats='6']) .seat:is([data-slot='top-left'], [data-slot='top'], [data-slot='top-right']) .hole .card:nth-child(2) { margin-right: 0; }
+}
+
 /* The tell meter: how sure a decision model was, folded into fold / call / raise. */
 .tell { position: absolute; top: -4px; left: -10px; z-index: 2; display: flex; align-items: flex-end; gap: 2px; height: calc(var(--av) * 0.42); padding: 3px; border-radius: 5px; background: var(--h-panel); border: 1px solid var(--h-line); }
 .seat[data-slot='right'] .tell, .seat[data-slot='top-right'] .tell { left: auto; right: -10px; }
@@ -265,12 +382,13 @@
 .seat.thinking .tell i:nth-child(3) { animation-delay: -0.5s; }
 @keyframes wobble { from { height: 20%; } to { height: 90%; } }
 
-/* Table talk: the models' own words, in their hand. */
+/* Table talk: the models' own words, quoted, in a face made to read small; two lines at most (the log has it all). */
 .bubble {
-  position: absolute; z-index: 6; width: max-content; max-width: 170px; padding: 5px 11px 6px; border-radius: 14px;
-  background: var(--h-paper); color: var(--h-ink); font: 700 19px/1.05 var(--h-hand); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
-  animation: pop calc(0.25s * var(--h-motion)) cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  position: absolute; z-index: 6; width: max-content; max-width: 220px; box-sizing: border-box; padding: 6px 11px 7px; border-radius: 14px;
+  background: #fffaf0; color: #1c120b; font: italic 500 14.5px/1.3 var(--j-body); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(155, 116, 50, 0.35);
+  animation: pop calc(0.25s * var(--h-motion)) cubic-bezier(0.2, 0.9, 0.3, 1.3) both; pointer-events: none;
 }
+.bubble-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-wrap: pretty; }
 .bubble::after { content: ''; position: absolute; width: 10px; height: 10px; background: inherit; transform: rotate(45deg); }
 .bubble.fade { opacity: 0; transition: opacity 0.4s; }
 .seat .bubble { top: calc(100% + 8px); left: 50%; translate: -50% 0; }
@@ -281,7 +399,28 @@
 .seat[data-slot='left'] .bubble::after { left: 22px; }
 .seat[data-slot='right'] .bubble { left: auto; right: 0; translate: none; }
 .seat[data-slot='right'] .bubble::after { left: auto; right: 22px; }
-@media (max-width: 759px) { .bubble { max-width: 130px; font-size: 17px; } }
+/* Wide screens: the top and bottom seats' talk beside the face, on the side away from their cards and clear of the bets. */
+@media (min-width: 760px) {
+  .seat:is([data-slot='left'], [data-slot='right']) .bubble { max-width: 196px; }
+  .seat:is([data-slot='top'], [data-slot='bottom']) .bubble { top: 6px; bottom: auto; left: auto; right: calc(100% + 10px); translate: none; }
+  .seat:is([data-slot='top'], [data-slot='bottom']) .bubble::after { top: 16px; bottom: auto; left: auto; right: -4px; }
+}
+/*
+ * Phones: narrower, and placed where the table has room: the side seats' talk above them reaching to the room's edge
+ * (clear of the top seat's cards), the top seat's beside its face (clear of the side seats' talk).
+ */
+@media (max-width: 759px) {
+  .bubble { max-width: 140px; padding: 5px 9px 6px; font-size: 13.5px; }
+  .seat:is([data-slot='left'], [data-slot='right']) .bubble { max-width: 118px; }
+  .seat[data-slot='left'] .bubble { left: -10px; }
+  .seat[data-slot='left'] .bubble::after { left: 38px; }
+  .seat[data-slot='right'] .bubble { right: -10px; }
+  .seat[data-slot='right'] .bubble::after { right: 38px; }
+  .seat[data-slot='top'] .bubble { max-width: 150px; }
+  /* Watching, the bottom seat's bet sits above it: its talk goes beside the face, on the side away from its cards. */
+  .seat[data-slot='bottom'] .bubble { top: 2px; bottom: auto; left: auto; right: calc(100% + 8px); translate: none; max-width: 128px; }
+  .seat[data-slot='bottom'] .bubble::after { top: 14px; bottom: auto; left: auto; right: -4px; }
+}
 @keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ---------- chips: bets in front of each seat, flights to the pot and back ---------- */
@@ -444,10 +583,10 @@
 .rp-tick.mark-only { width: 12px; height: 14px; }
 /* The menu's sizes as quick picks over the slider: phones only, where the bar leaves them out. */
 .rp-quick { display: none; }
+.rp-pick { height: 38px; border-radius: 999px; border: 1px solid var(--h-brass); background: rgba(215, 170, 82, 0.1); color: var(--h-ivory); font: 700 13px var(--j-display); white-space: nowrap; }
+.rp-pick[aria-pressed='true'] { background: var(--h-brass); color: var(--h-ink); }
 @media (max-width: 759px) {
   .rp-quick { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
-  .rp-pick { height: 38px; border-radius: 999px; border: 1px solid var(--h-brass); background: rgba(215, 170, 82, 0.1); color: var(--h-ivory); font: 700 13px var(--j-display); white-space: nowrap; }
-  .rp-pick[aria-pressed='true'] { background: var(--h-brass); color: var(--h-ink); }
 }
 .rp-ends { display: flex; justify-content: space-between; margin-top: -6px; font-size: 11px; color: var(--h-dim); }
 .rp-go {
@@ -605,21 +744,22 @@
 .tl img, .tl .mono { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; grid-row: 1 / span 6; }
 .tl > :not(img):not(.mono) { grid-column: 2; }
 .tl .mono { display: grid; place-items: center; font: 800 9px var(--h-poster); color: var(--h-ink); background: var(--h-brass); }
-.tl .line { font-size: 14px; }
+.tl .line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 14px; }
 .tl .line b { font-family: var(--j-display); }
+.tl > * { max-width: 72ch; }
 .tl .meta { font-size: 11.5px; color: var(--h-dim); }
-.tl .said { font: 700 19px/1.1 var(--h-hand); color: var(--h-ivory); }
-.tl .why { margin: 2px 0 0; padding: 6px 10px; border-radius: 10px; background: rgba(0, 0, 0, 0.3); font-size: 13px; line-height: 1.45; color: rgba(243, 232, 205, 0.86); border-left: 2px solid var(--h-brass-deep); }
+
+.tl .why { margin: 2px 0 0; padding: 6px 10px; border-radius: 10px; background: rgba(0, 0, 0, 0.25); font-size: 13px; line-height: 1.5; color: rgba(243, 232, 205, 0.72); border-left: 2px solid var(--h-brass-deep); }
 .tl .tellrow { display: flex; gap: 10px; font-size: 11.5px; color: var(--h-dim); }
 .tl .tellrow i { display: inline-block; height: 6px; border-radius: 3px; background: var(--h-amber); vertical-align: middle; margin-right: 4px; }
 .result-line { font-size: 14px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 197, 107, 0.1); }
 
-/* The thinking log in watch mode: what each model said and why, as it plays. */
-.log { margin: 0 12px 14px; padding: 10px 12px; border-radius: 14px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(215, 170, 82, 0.16); max-height: 260px; overflow: auto; display: grid; gap: 8px; }
-.log[hidden] { display: none; }
-.log p { margin: 0; font-size: 13px; line-height: 1.4; }
-.log p b { font-family: var(--j-display); color: var(--h-brass); }
-.log .said { font: 700 17px var(--h-hand); color: var(--h-ivory); }
+/* A move as a chip: fold grey, check and call quiet, bet and raise brass, all-in red. */
+.act-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font: 700 11.5px var(--j-display); white-space: nowrap; font-variant-numeric: tabular-nums; border: 1px solid transparent; }
+.act-chip.t-fold { background: rgba(255, 255, 255, 0.08); color: #b9ad9a; border-color: rgba(255, 255, 255, 0.12); }
+.act-chip.t-calm { background: rgba(243, 232, 205, 0.14); color: var(--h-ivory); border-color: rgba(243, 232, 205, 0.22); }
+.act-chip.t-push { background: rgba(215, 170, 82, 0.22); color: #ffd98a; border-color: rgba(215, 170, 82, 0.5); }
+.act-chip.t-allin { background: rgba(181, 52, 43, 0.4); color: #ffd1c8; border-color: rgba(224, 104, 93, 0.6); }
 
 @media (prefers-reduced-motion: reduce) {
   :root { --h-motion: 0.01; }
@@ -680,3 +820,144 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 @media (prefers-reduced-motion: reduce) { .reconnect .spin { animation-duration: 3s; } }
 /* Under the toolbar, over the felt's top edge: the toolbar's hand and buttons stay readable. */
 @media (max-width: 759px) { .reconnect { top: calc(var(--tb-h) + 6px); font-size: 12.5px; } }
+
+/* A small question over the table (views/confirm.ts): "Leave this table?", the safe answer first and focused. */
+.confirm-veil { align-items: start; padding-top: min(28%, 150px); background: rgba(18, 9, 4, 0.7); }
+.poster.confirm { width: min(100%, 360px); gap: 12px; padding: 22px 18px 18px; }
+.poster.confirm h2 { font-size: clamp(24px, 6.4vw, 30px); }
+.poster.confirm .sub { margin: -4px 0 4px; font-size: 14.5px; }
+.poster.confirm .row { display: grid; grid-template-columns: 1fr 1fr; }
+.poster.confirm .cta { min-height: 46px; padding: 0 12px; }
+
+/* ---------- the table chat (views/chat.ts): beside the table on a wide screen, a sheet on a phone ---------- */
+.chat { display: flex; flex-direction: column; min-height: 0; box-sizing: border-box; border-radius: 14px; overflow: hidden; background: rgba(12, 7, 4, 0.62); border: 1px solid rgba(215, 170, 82, 0.24); color: var(--h-text); }
+.chat-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px 7px 14px; border-bottom: 1px solid rgba(215, 170, 82, 0.16); }
+.chat-head h3 { margin: 0; font: 700 12.5px var(--j-display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--h-brass); }
+.chat-collapse { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--h-line); background: none; color: var(--h-text); }
+.chat-collapse .chev { display: inline-flex; transition: rotate 0.15s; }
+.chat:not(.open) .chev { rotate: 180deg; }
+.chat-body { position: relative; flex: 1; min-height: 0; display: flex; }
+.chat:not(.open) .chat-body, .chat:not(.open) .chat-say { display: none; }
+.chat-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.chat-scroll:focus-visible { outline-offset: -2px; }
+.chat-note { margin: 4px 0; font-size: 13px; line-height: 1.45; color: var(--h-dim); }
+.chat-note[hidden] { display: none; }
+.chat-newer { position: absolute; bottom: 8px; left: 50%; translate: -50% 0; padding: 4px 12px; border-radius: 999px; border: 0; background: var(--h-amber); color: var(--h-ink); font: 700 12px var(--j-display); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); }
+.chat-newer[hidden] { display: none; }
+.chat-hand { margin: 8px 0 0; padding-top: 7px; border-top: 1px dashed rgba(215, 170, 82, 0.22); font-size: 11.5px; color: var(--h-dim); text-align: center; }
+.chat-hand b { color: var(--h-brass); font: 700 11.5px var(--j-display); letter-spacing: 0.03em; }
+.chat-hand:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+.chat-dealer { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 3px 6px; font-size: 12.5px; line-height: 1.35; color: rgba(243, 232, 205, 0.72); }
+.chat-dealer b { font-weight: 600; color: var(--h-text); }
+.chat-dealer.win { color: var(--h-text); }
+.chat-dealer.win b { color: var(--h-amber); }
+.chat-cards { display: inline-flex; gap: 3px; }
+.chat-cards .cc { padding: 0 4px; border-radius: 4px; background: #fffaf0; color: #1c120b; font: 700 12.5px/1.45 var(--j-display); }
+.chat-cards .cc.red { color: #b5342b; }
+.chat-msg { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; padding: 7px 9px 8px; border-radius: 12px; background: rgba(255, 240, 210, 0.06); }
+.chat-msg.you { background: rgba(215, 170, 82, 0.14); }
+.chat-msg.you.pending { opacity: 0.6; }
+.chat-msg.you.unsent { opacity: 0.55; }
+.chat-msg.you.unsent .chat-said { text-decoration: line-through; }
+.chat-state { font-size: 11px; color: var(--h-dim); }
+.chat-hint { margin: 0; font-size: 12px; color: var(--h-amber); text-align: right; }
+.chat-face, .chat-msg .chat-face.mono { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1.5px var(--h-brass-deep); }
+.chat-msg .chat-face.mono { display: grid; place-items: center; font: 800 9px var(--h-poster); color: var(--h-ink); background: var(--h-brass); }
+.chat-main { display: grid; gap: 3px; min-width: 0; }
+.chat-who { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 7px; }
+.chat-who b { font: 700 13px var(--j-display); }
+.chat-said { font: italic 500 14px/1.4 var(--j-body); color: var(--h-ivory); overflow-wrap: anywhere; }
+.chat-why summary { width: max-content; cursor: pointer; list-style: none; padding: 2px 0; font: 700 12.5px var(--j-display); color: var(--h-brass); }
+.chat-why summary::-webkit-details-marker { display: none; }
+.chat-why summary::after { content: ' ▸'; }
+.chat-why[open] summary::after { content: ' ▾'; }
+.chat-why summary:hover { color: var(--h-amber); }
+.chat-why p { margin: 4px 0 2px; padding: 6px 10px; border-left: 2px solid var(--h-brass-deep); border-radius: 0 8px 8px 0; background: rgba(0, 0, 0, 0.22); font: 400 13px/1.55 var(--j-body); color: rgba(243, 232, 205, 0.78); }
+/* The header's Show thinking switch. */
+.chat-head { gap: 8px; }
+.chat-head h3 { flex: 1; }
+.chat-think { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 6px; border-radius: 999px; border: 1px solid var(--h-line); background: none; color: var(--h-dim); font: 600 12px var(--j-body); white-space: nowrap; }
+.chat-think .knob { position: relative; width: 26px; height: 15px; border-radius: 999px; background: rgba(255, 240, 210, 0.16); transition: background 0.15s; }
+.chat-think .knob::after { content: ''; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--h-dim); transition: translate 0.15s, background 0.15s; }
+.chat-think[aria-checked='true'] { color: var(--h-text); border-color: var(--h-brass); }
+.chat-think[aria-checked='true'] .knob { background: var(--h-brass-deep); }
+.chat-think[aria-checked='true'] .knob::after { translate: 11px 0; background: var(--h-ivory); }
+.chat-say { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px; border-top: 1px solid rgba(215, 170, 82, 0.16); }
+.chat-input { flex: 1; min-width: 0; height: 34px; box-sizing: border-box; padding: 0 12px; border-radius: 999px; border: 1px solid var(--h-line); background: rgba(0, 0, 0, 0.35); color: var(--h-text); font: 14px var(--j-body); }
+.chat-input::placeholder { color: rgba(243, 232, 205, 0.45); }
+.chat-input:focus { outline: none; border-color: var(--h-amber); }
+.chat-count { flex: none; font-size: 11px; color: var(--h-dim); font-variant-numeric: tabular-nums; }
+.chat-send { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--h-brass); color: var(--h-ink); font: 800 16px var(--j-display); }
+.chat-btn { position: relative; }
+.chat-unread { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--h-red); color: var(--h-ivory); font: 700 11px/18px var(--j-display); text-align: center; }
+.chat-unread[hidden] { display: none; }
+@keyframes chat-up { from { opacity: 0; transform: translateY(18px) scale(0.97); } }
+@keyframes chat-dock { from { opacity: 0; transform: translateY(10px); } }
+.chat-btn[data-unread]::after { content: attr(data-unread); position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; border-radius: 999px; background: var(--h-red); color: var(--h-ivory); font: 700 10px/16px var(--j-display); text-align: center; }
+
+/* A wide screen: the chat in a column beside the table, from its top to the room's foot (the action bar's row too). */
+@media (min-width: 1000px) {
+  .room:has(> .chat) { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto auto auto; }
+  .room:has(> .chat) > .toolbar { grid-column: 1 / -1; grid-row: 1; }
+  .room:has(> .chat) > :is(.felt-area, .replay-table) { grid-column: 1; grid-row: 2; }
+  .room:has(> .chat) > .actions { grid-column: 1; grid-row: 3; }
+  .room > .chat { grid-column: 2; grid-row: 2 / span 2; contain: size; margin: 10px 12px 14px 0; }
+  /* Folded: a bar docked at the room's foot on the right (over the felt's corner, above the action bar), and the
+     column's width goes back to the table; opened, it rises from there into the column. The felt keeps its height. */
+  .room:has(> .chat) { transition: grid-template-columns calc(0.22s * var(--h-motion)) ease; }
+  .room:has(> .chat:not(.open)) { grid-template-columns: minmax(0, 1fr) 0px; }
+  .room > .chat:not(.open) { position: absolute; right: 12px; bottom: calc(var(--bar-h, 0px) + 12px); width: 240px; margin: 0; z-index: 16; contain: none; cursor: pointer; box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.7); animation: chat-dock calc(0.2s * var(--h-motion)) ease-out both; }
+  .room.watching > .chat:not(.open) { bottom: 12px; }
+  .chat:not(.open) .chat-think { display: none; }
+  .room > .chat.open { animation: chat-up calc(0.22s * var(--h-motion)) ease-out both; transform-origin: bottom right; }
+
+  .chat-btn { display: none; }
+}
+/* A phone or a tablet: a sheet over the table's lower part, opened from the toolbar's chat button. */
+@media (max-width: 999px) {
+  .room > .chat { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 18; height: min(68%, 460px); background: #1d120b; box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6); }
+  .room > .chat:not(.open) { display: none; }
+  .chat-collapse .chev { rotate: 0deg; }
+}
+
+/* One height for the room through a game: the action bar's place is kept while it is away (the models' turns, the end). */
+.room:not(.watching) > .actions { height: var(--bar-h); box-sizing: border-box; align-content: center; }
+/* (!important: the kit's page.css hides every [hidden] with !important; this one keeps its place, unseen.) */
+.room:not(.watching) > .actions[hidden] { display: grid !important; visibility: hidden; }
+@media (min-width: 760px) { .room { --bar-h: 108px; } }
+
+/* A table of five or six: one bubble at a time, over the middle with the speaker's name (views/table.ts); on a wide
+   screen one line, under the seats across the top. */
+.felt-area > .bubble.center { left: 50%; top: calc(var(--top-edge) + 40px); translate: -50% 0; max-width: 136px; text-align: center; }
+.felt-area > .bubble.center::after { display: none; }
+.bubble.center b { display: block; font: 700 11.5px var(--j-display); font-style: normal; color: var(--h-brass-deep); }
+
+/* A wide screen's toolbar never re-wraps during a game (the room keeps its height): the hand and blinds clipped to
+   their space beside the buttons; a replay's title and hand on a line of their own, its controls on the next. */
+@media (min-width: 760px) {
+  .room .toolbar { flex-wrap: nowrap; }
+  .room .toolbar > .level { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+  .room .toolbar > .tools { flex: none; flex-wrap: nowrap; }
+  .room .toolbar:has(.replay-title) { flex-wrap: wrap; }
+  .room .toolbar:has(.replay-title) > .replay-title { flex: 1 0 100%; }
+  .room .toolbar:has(.replay-title) > .tools { flex: 1 0 100%; justify-content: flex-end; }
+}
+@media (min-width: 760px) {
+  .felt-area > .bubble.center { top: calc(var(--top-edge) + 4px); max-width: min(64%, 520px); display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+  .felt-area > .bubble.center b { display: inline; flex: none; }
+  .felt-area > .bubble.center .bubble-text { -webkit-line-clamp: 1; line-clamp: 1; min-width: 0; }
+}
+
+/*
+ * The action bar by its own width, not the window's: narrower than the full row of buttons (the table's column beside
+ * the chat, 1000 to 1300 px windows), it is the phone's row (Fold, Check or Call, Raise…, All-in) with the sizes as
+ * quick picks in Raise…'s panel, so it never wraps onto a second row.
+ */
+.room > .actions { container: bar / inline-size; }
+@container bar (max-width: 919px) {
+  .menu { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+  .menu .act { min-width: 0; }
+  .menu[data-custom] .act.raise { display: none; }
+  .menu .act .verb { display: none; }
+  .rp-quick { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+}

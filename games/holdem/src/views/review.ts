@@ -5,11 +5,11 @@ import type { HandEvent, Street } from '../../shared/engine.ts';
 import { h } from '../dom.ts';
 import type { Review, ReviewHand } from '../driver.ts';
 import { describeHighlight, factsOf, highlightsOf, titleOf } from '../highlights.ts';
-import { actionText, aHand, chips, handName, personOf, tellBars, type SeatPerson } from '../view-model.ts';
+import { aHand, chips, handName, personOf, STREET_NAMES, tellBars, type SeatPerson } from '../view-model.ts';
+import { chipEl } from './chat.ts';
 import { clipButton } from './end.ts';
 import { avatarEl, cardEl } from './parts.ts';
 
-const STREET_NAMES: Record<Street, string> = { preflop: 'Before the flop', flop: 'Flop', turn: 'Turn', river: 'River' };
 
 export interface ReviewOptions {
   review: Review;
@@ -62,6 +62,8 @@ export function reviewView(o: ReviewOptions): HTMLElement {
 }
 
 function handBody(hand: ReviewHand, people: SeatPerson[], name: (seat: number) => string, players: Review['players']): HTMLElement[] {
+  /** The player's own table talk, where it was said among the moves. */
+  const talkRow = (t: { seat: number; say: string }) => h('div.tl.talk', null, avatarEl(people[t.seat]!), h('div.line', null, h('b', null, people[t.seat]!.name), h('span.meta', null, 'said')), h('q.said', null, t.say));
   const f = factsOf(hand);
   const shown = new Map(hand.events.flatMap((e) => (e.type === 'showdown' ? e.hands.map((x) => [x.seat, x.category] as const) : [])));
   const held = h('div.who-held');
@@ -98,6 +100,7 @@ function handBody(hand: ReviewHand, people: SeatPerson[], name: (seat: number) =
       const cards = street === 'preflop' ? [] : (streetCards.get(street) ?? []);
       timeline.append(h('div.street-head', null, STREET_NAMES[street], h('span.cards', null, ...cards.map((c) => cardEl(c, true)))));
     }
+    for (const t of hand.talk ?? []) if (t.after === i) timeline.append(talkRow(t));
     const meta = hand.actions[i];
     const p = people[a.seat]!;
     const bars = tellBars(meta?.probabilities);
@@ -106,8 +109,8 @@ function handBody(hand: ReviewHand, people: SeatPerson[], name: (seat: number) =
         'div.tl',
         null,
         avatarEl(p, meta?.mood ?? 'relaxed'),
-        h('div.line', null, h('b', null, p.name), ` ${actionText(a, p.name === 'You')}`, meta?.by === 'fallback' ? h('span.meta', null, '  (out of time: the fallback played)') : null),
-        meta?.say ? h('div.said', null, `“${meta.say}”`) : null,
+        h('div.line', null, h('b', null, p.name), chipEl(a), meta?.by === 'fallback' ? h('span.meta', null, 'out of time: the fallback played') : null),
+        meta?.say ? h('q.said', null, meta.say) : null,
         h(
           'div.meta',
           null,
@@ -118,6 +121,7 @@ function handBody(hand: ReviewHand, people: SeatPerson[], name: (seat: number) =
       ),
     );
   });
+  for (const t of hand.talk ?? []) if (t.after >= f.actions.length) timeline.append(talkRow(t));
   const results = hand.events.flatMap((e) => (e.type === 'award' ? [e] : [])).map((e) => {
     const winners = e.winners.map(name).join(' and ');
     const cat = e.winners.length && shown.get(e.winners[0]!);

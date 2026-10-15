@@ -148,6 +148,8 @@ describe('verify', () => {
       [(r) => ((r.hands[0]!.actions[0] as { mood: string }).mood = 'furious'), /mood/],
       [(r) => (r.hands[0]!.actions[0]!.say = 'x'.repeat(1000)), /say/],
       [(r) => ((r.hands[0]!.actions[0] as unknown as Record<string, unknown>).extra = 1), /unknown fields/],
+      [(r) => (r.hands[0]!.talk = [{ seat: r.players.length, after: 0, say: 'from nowhere' }]), /talk/],
+      [(r) => (r.hands[0]!.talk = [{ seat: 0, after: 9999, say: 'later' }]), /talk/],
       [(r) => Object.assign(r.hands[0]!.actions[0]!, { to: 100 }), /key or a raise/],
       [(r) => ((r.players[1] as { id: string }).id = 'shark'), /bot/],
       [(r) => ((r.players[0] as { kind: string }).kind = 'alien'), /kind/],

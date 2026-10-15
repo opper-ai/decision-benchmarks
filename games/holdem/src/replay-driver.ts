@@ -89,7 +89,9 @@ export class ReplayDriver implements TableDriver {
 
   private archive(): void {
     if (this.g.hand.street !== 'done' || this.finished.some((h) => h.hand === this.hand + 1)) return;
-    this.finished.push(finishedHandOf(this.g, this.recording.hands[this.hand]!.actions));
+    // The hand's table talk too (the player's lines in a recording), so the review shows it where it was said.
+    const recorded = this.recording.hands[this.hand]!;
+    this.finished.push(finishedHandOf(this.g, recorded.actions, recorded.talk ?? []));
   }
 
   /** Every card face up, as a spectator sees a finished game; no time banks (the moves are already made). */

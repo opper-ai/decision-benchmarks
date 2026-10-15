@@ -13,12 +13,16 @@ const SLOTS: Record<number, Slot[]> = {
   2: ['bottom', 'top'],
   3: ['bottom', 'top-left', 'top-right'],
   4: ['bottom', 'left', 'top', 'right'],
+  // Five and six: the side seats lower down the oval, two across its top (and one at its head for six); style.css
+  // places them by the table's seat count (data-seats).
+  5: ['bottom', 'left', 'top-left', 'top-right', 'right'],
+  6: ['bottom', 'left', 'top-left', 'top', 'top-right', 'right'],
 };
 
 /** The slot of each seat: the viewer (or seat 0) at the bottom, the others clockwise from there, as seats go. */
 export function slotsFor(seats: number, viewer: number | null): Slot[] {
   const order = SLOTS[seats];
-  if (!order) throw new Error('a table seats 2 to 4 players');
+  if (!order) throw new Error('a table seats 2 to 6 players');
   const first = viewer ?? 0;
   return Array.from({ length: seats }, (_, seat) => order[(seat - first + seats) % seats]!);
 }
@@ -39,6 +43,35 @@ function thirdPerson(a: { kind: ActionKind; to: number; add: number; allIn: bool
   if (a.kind === 'allin') return `is all-in for ${chips(a.to)}`;
   if (a.kind === 'bet') return a.allIn ? `bets ${chips(a.to)}, all-in` : `bets ${chips(a.to)}`;
   return a.allIn ? `raises to ${chips(a.to)}, all-in` : `raises to ${chips(a.to)}`;
+}
+
+/** How an action reads at a glance in the thinking log and the review: its words, and a colour for what it does. */
+export type ChipTone = 'fold' | 'calm' | 'push' | 'allin';
+export function actionChip(a: { kind: ActionKind; to: number; add: number; allIn: boolean }): { label: string; tone: ChipTone } {
+  if (a.kind === 'fold') return { label: 'Fold', tone: 'fold' };
+  if (a.kind === 'check') return { label: 'Check', tone: 'calm' };
+  if (a.kind === 'call') return a.allIn ? { label: `Call ${chips(a.add)}, all-in`, tone: 'allin' } : { label: `Call ${chips(a.add)}`, tone: 'calm' };
+  if (a.allIn || a.kind === 'allin') return { label: `All-in ${chips(a.to)}`, tone: 'allin' };
+  return { label: a.kind === 'bet' ? `Bet ${chips(a.to)}` : `Raise to ${chips(a.to)}`, tone: 'push' };
+}
+
+/** The streets as the log's and the review's headers name them. */
+export const STREET_NAMES: Record<'preflop' | 'flop' | 'turn' | 'river', string> = { preflop: 'Before the flop', flop: 'Flop', turn: 'Turn', river: 'River' };
+
+/**
+ * How long a speech bubble stays up: time to read it (about 15 characters a second, after a moment to notice it),
+ * between 2.5 and 8 seconds, shorter when the table is sped up, but never less than 1.2 seconds.
+ */
+export function bubbleMs(text: string, speed: number): number {
+  const read = Math.min(8000, Math.max(2500, 1200 + 65 * [...text].length));
+  return Math.max(1200, Math.round(read / Math.sqrt(Math.max(1, speed))));
+}
+
+/** What an empty thinking log says, by the styles at the table (null for you or a bot): why it is empty. */
+export function logNote(styles: readonly ('decision' | 'chat' | null)[]): string {
+  return styles.includes('chat')
+    ? 'Nothing said yet. What the models say, and why they play as they do, shows here.'
+    : 'Decision models don’t explain their moves: their tell meters show how sure they were.';
 }
 
 /** A short word for the seat's last action, shown on its name plate. */
