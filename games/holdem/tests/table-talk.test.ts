@@ -169,6 +169,48 @@ describe('the table hears the human', () => {
     expect(r).not.toHaveProperty('talkRefused');
   });
 
+  it('charges a retried request (its answer was lost) once: the same body again still says its lines', async () => {
+    const { call } = await setup({ signedIn: true, limits: { ...LOOSE, talk: { ratePerSec: 0.001, burst: 4 } } });
+    let { token, snapshot } = (await call('start', PLAY(DECISION, DECISION2))).body as unknown as SnapshotReply;
+    ({ token, snapshot } = await toHumanTurn(call, token, snapshot));
+    const body = { token, action: { key: passive(snapshot) }, talk: ['a', 'b', 'c'] };
+    // The first answer is lost on the way back; the page sends the very same body again, twice.
+    for (let i = 0; i < 3; i++) {
+      const r = await call('act', body);
+      expect(r.status).toBe(200);
+      expect((r.body as unknown as StepReply).result.talk?.map((x) => x.say)).toEqual(['a', 'b', 'c']);
+      expect(r.body).not.toHaveProperty('talkRefused');
+    }
+    // Three lines were charged in all: one is left.
+    const other = { ...body, talk: ['d'] };
+    expect((await call('act', other)).body).not.toHaveProperty('talkRefused');
+    expect((await call('act', { ...body, talk: ['e'] })).body).toMatchObject({ talkRefused: { why: 'busy' } });
+  });
+
+  it("gives the talk back when Opper refuses the model call after the step was let in (the player's wallet is empty)", async () => {
+    let broke = true;
+    const chat = (body: Record<string, unknown>) => {
+      if (broke) return { status: 402, body: { error: 'empty' } };
+      const keys = (body.response_format as { json_schema: { schema: { properties: { action: { enum: string[] } } } } }).json_schema.schema.properties.action.enum;
+      const content = JSON.stringify({ action: keys.includes('check') ? 'check' : 'call', say: '', mood: 'calm', reasoning: 'x', turn_complete: true });
+      return { status: 200, body: { choices: [{ finish_reason: 'stop', message: { content } }] } };
+    };
+    const { call } = await setup({ signedIn: true, limits: { ...LOOSE, talk: { ratePerSec: 0.001, burst: 3 } }, up: { chat } });
+    let { token, snapshot } = (await call('start', PLAY(CHAT))).body as unknown as SnapshotReply;
+    while (snapshot.turn) {
+      const r = (await call('act', { token, action: { key: passive(snapshot) } })).body as unknown as StepReply;
+      ({ token } = r);
+      snapshot = r.result.snapshot;
+    }
+    expect(snapshot.view.street).not.toBe('done');
+    expect((await call('step', { token, talk: ['a', 'b', 'c'] })).status).toBe(402);
+    expect((await call('step', { token, talk: ['d', 'e', 'f'] })).status).toBe(402);
+    // Topped up: new lines are said, the refused steps having taken nothing.
+    broke = false;
+    const r = (await call('step', { token, talk: ['g', 'h', 'i'] })).body as unknown as StepReply;
+    expect(r.result.talk?.map((x) => x.say)).toEqual(['g', 'h', 'i']);
+  });
+
   it('never says a line twice when the same request is sent again (a retry), and the recording keeps the talk for the review', async () => {
     const { call, up } = await setup({ signedIn: true });
     let { token: t, snapshot: s } = (await call('start', PLAY(CHAT, DECISION, DECISION2))).body as unknown as SnapshotReply;

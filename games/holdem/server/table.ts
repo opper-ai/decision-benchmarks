@@ -262,6 +262,8 @@ export interface TableLimits {
  */
 export const DEFAULT_TABLE_LIMITS: TableLimits = { starts: { ratePerSec: 1 / 15, burst: 20 }, moves: { ratePerSec: 4, burst: 40 }, steps: { ratePerSec: 10, burst: 60 }, talk: { ratePerSec: 0.5, burst: 9 }, remember: 50_000 };
 
+/** Requests whose talk was charged, remembered so a retry is not charged again (see `charged`). */
+const MAX_CHARGED_TALK = 20_000;
 /** Tables whose answer to the request that finished their last hand is kept for a retry (see `answers`). */
 const REMEMBERED_ANSWERS = 2000;
 /** How long such an answer is kept: past the page's two minutes of retries (RemoteDriver RETRY_FOR_MS). */
@@ -281,7 +283,29 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
    * each route calls this last, once the request is let in (its turn, its payer and the free credits' allowance), so
    * a refused request takes no talk. Play mode only: watch mode has no human to speak (400).
    */
-  const talkFor = (call: GameApiCall, t: Table): { t: Table; said: TalkLine[]; refused?: TalkRefused } | GameApiResponse => {
+  /**
+   * Requests whose talk was charged (request key: route and body), for ANSWER_TTL_MS: the page sends the same body
+   * again when an answer is lost, and the same lines from the same token are the same talk, said and charged once.
+   * At most MAX_CHARGED_TALK, the oldest first to go.
+   */
+  const charged = new Map<string, number>();
+  const chargeOnce = (call: GameApiCall, request: string, n: number): boolean => {
+    const now = deps.now();
+    for (const [k, at] of charged) {
+      if (charged.size > MAX_CHARGED_TALK || now - at > ANSWER_TTL_MS) charged.delete(k);
+      else break;
+    }
+    if (charged.has(request)) return true;
+    if (talkLimits.take(call.visitor, n) !== 'ok') return false;
+    charged.set(request, now);
+    return true;
+  };
+  /** A request whose talk was charged was not served after all (Opper refused the model call): the talk is given back. */
+  const uncharge = (call: GameApiCall, request: string, n: number) => {
+    if (!n || !charged.delete(request)) return;
+    talkLimits.refund(call.visitor, n);
+  };
+  const talkFor = (call: GameApiCall, t: Table, request: string): { t: Table; said: TalkLine[]; refused?: TalkRefused } | GameApiResponse => {
     const raw = (call.body as Record<string, unknown>).talk;
     if (raw === undefined) return { t, said: [] };
     if (t.st.mode !== 'play') return fail(400, 'Only a player at the table can talk: watch mode has none');
@@ -289,7 +313,7 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     const lines: string[] = (raw as string[]).map(cleanTalk).filter(Boolean);
     if (!lines.length) return { t, said: [] };
     const fits = lines.slice(0, Math.max(0, MAX_HAND_TALK - t.talk.length));
-    if (fits.length && talkLimits.take(call.visitor, fits.length) !== 'ok') return { t, said: [], refused: { lines, why: 'busy' } };
+    if (fits.length && !chargeOnce(call, request, fits.length)) return { t, said: [], refused: { lines, why: 'busy' } };
     const human = t.st.seats.indexOf(null);
     const after = (t.hands[t.hands.length - 1] ?? []).length;
     const said = fits.map((say) => ({ seat: human, after, say }));
@@ -460,11 +484,15 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     }
     // The human's lines, once the step is let in (so a refused one costs no talk), before the model is asked: the
     // model hears them in this very step.
-    const talked = talkFor(call, t);
+    const talked = talkFor(call, t, request);
     if (!('said' in talked)) return talked;
     t = talked.t;
     const x = await ask(call, t, model, payer, deps);
-    if (!('seat' in x)) return x;
+    if (!('seat' in x)) {
+      // Not served (Opper refused the key, or the player left): the lines were not heard, so they cost nothing.
+      uncharge(call, request, talked.said.length);
+      return x;
+    }
     // Another request on this token (another instance's retry, a different body) ended the hand meanwhile.
     if (stale(t)) return answered(t, request) ?? STALE;
     call.log(`table ${t.st.id}: hand ${t.g.handIndex + 1}, seat ${seat} ${model.id} (${payer.mode}) ${x.key}${x.by === 'fallback' ? ` [fallback: ${x.why}]` : ''} in ${x.latencyMs} ms${x.costUsd !== undefined ? `, $${Number(x.costUsd.toPrecision(3))}` : ''}`);
@@ -493,7 +521,7 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     } catch (e) {
       return fail(422, `Not a legal action: ${(e as Error).message}`);
     }
-    const talked = talkFor(call, t);
+    const talked = talkFor(call, t, request);
     if (!('said' in talked)) return talked;
     t = talked.t;
     const latencyMs = Math.min(MAX_HUMAN_MS, Math.max(0, now - t.st.at));
@@ -513,7 +541,7 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     if (t.g.hand.street !== 'done') return fail(409, 'The hand in play is not over');
     const g = nextHand(t.g);
     // The lines that come with the deal are said at the start of the new hand.
-    const talked = talkFor(call, { ...t, g, hands: [...t.hands, []], talk: [] });
+    const talked = talkFor(call, { ...t, g, hands: [...t.hands, []], talk: [] }, requestKey('next', call.body));
     if (!('said' in talked)) return talked;
     const { t: dealt, said } = talked;
     const reply: SnapshotReply = { token: seal(call, dealt, now), snapshot: snapshotOf(g, viewerOf(t.st), timeBankOf(t.st)), ...finishedOf(dealt), ...(said.length ? { talk: said } : {}), ...(talked.refused ? { talkRefused: talked.refused } : {}) };

@@ -260,6 +260,20 @@ export class VisitorLimits {
     this.global.tokens -= cost;
     return 'ok';
   }
+
+  /** Gives back what take() took for a request that was not served after all (never past the burst). */
+  refund(visitor: string, cost = 1): void {
+    const now = this.now();
+    const own = this.bucket(visitorKey(visitor), this.settings, now);
+    own.tokens = Math.min(this.settings.burst, own.tokens + cost);
+    const net = networkKey(visitor);
+    if (net !== null) {
+      const shared = this.bucket(net, this.network, now);
+      shared.tokens = Math.min(this.network.burst, shared.tokens + cost);
+    }
+    refill(this.global, this.globalSettings, now);
+    this.global.tokens = Math.min(this.globalSettings.burst, this.global.tokens + cost);
+  }
 }
 
 function refill(b: Bucket, settings: LimitSettings, now: number): void {

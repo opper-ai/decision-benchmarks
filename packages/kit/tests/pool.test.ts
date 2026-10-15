@@ -156,6 +156,17 @@ describe('the hourly budget', () => {
 });
 
 describe('VisitorLimits', () => {
+  it('gives back what it took for a request that was not served, never past the burst', () => {
+    const limits = new VisitorLimits({ ratePerSec: 0.001, burst: 3 }, () => 0, { ratePerSec: 0.001, burst: 5 });
+    expect(limits.take('2001:db8::1', 3)).toBe('ok');
+    expect(limits.take('2001:db8::1')).toBe('rate');
+    limits.refund('2001:db8::1', 2);
+    expect(limits.take('2001:db8::1', 2)).toBe('ok');
+    limits.refund('2001:db8::1', 10);
+    expect(limits.take('2001:db8::1', 3)).toBe('ok');
+    expect(limits.take('2001:db8::1')).toBe('rate');
+  });
+
   it('takes several at once, all or nothing: a batch over the allowance takes none of it', () => {
     let now = 0;
     const limits = new VisitorLimits({ ratePerSec: 1, burst: 3 }, () => now);
