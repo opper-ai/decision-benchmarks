@@ -145,14 +145,20 @@ export class ChatBox {
     this.newer.hidden = true;
   }
 
-  /** Finished hands' chat, as they went (a replay that jumps ahead shows the hands it skipped). */
+  /**
+   * Hands' chat as they went: finished hands a replay jumped past, or the hand in play after a resume (its events so
+   * far with the driver's handSoFar()).
+   */
   history(hands: readonly Parameters<typeof playedHandLines>[0][]): void {
     for (const hand of hands)
       for (const p of playedHandLines(hand) as PlayedLine[]) {
         if ('talk' in p) this.heard(p.talk.seat, p.talk.say);
-        else this.add(this.lineEl(p.line, p.words));
+        else {
+          // The street carries on into what is fed next (a hand in play laid out after a resume).
+          if (p.line.kind === 'hand' || p.line.kind === 'board') this.street = p.line.kind === 'hand' ? 'preflop' : p.line.street;
+          this.add(this.lineEl(p.line, p.words));
+        }
       }
-    this.street = 'preflop';
   }
 
   /** Your lines sent and not yet back from the table: shown dimmed until said() or unsaid() settles them, in order. */

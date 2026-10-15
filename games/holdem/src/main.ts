@@ -398,12 +398,15 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     ui.seeAll();
     host.classList.add('all-up');
   };
+  /** The chat already has these events (a resume laid the hand in play out with what was said): playNew skips it once. */
+  let chatLaidOut = false;
   const playNew = async (s: TableSnapshot) => {
     const fresh = s.events.slice(shown);
     shown = s.events.length;
     snap = s;
     if (s.spectating) spectate();
-    chat.feed(fresh, s.hand, said);
+    if (chatLaidOut) chatLaidOut = false;
+    else chat.feed(fresh, s.hand, said);
     said = undefined;
     await ui.play(fresh, s);
     drawLevel(s);
@@ -412,6 +415,12 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     // Back at a kept table: the hand in play laid out again at once and silently (deal, bets, folds), without
     // announcing who went out before.
     knockedOut = snap.eliminations.length;
+    // The hand's chat as it went: the models' words (and reasoning only where it was shown) and your own lines.
+    const so = driver.handSoFar?.();
+    if (so) {
+      chat.history([{ hand: snap.hand, events: snap.events, actions: so.metas, talk: so.talk }]);
+      chatLaidOut = true;
+    }
     restoring = true;
     audio.hushed = true;
     try {

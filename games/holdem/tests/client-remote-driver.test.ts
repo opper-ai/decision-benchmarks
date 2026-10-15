@@ -373,3 +373,48 @@ describe('RemoteDriver: the player talks at the table', () => {
     expect(d.say('gg')).toBeNull();
   });
 });
+
+describe('RemoteDriver: a reload in the middle of a hand', () => {
+  it('gives back the hand so far, what the models said and the player’s talk, so the chat can be laid out again (never the reasoning in play)', async () => {
+    const { playedHandLines } = await import('../src/chat-lines');
+    const s = await setup({ signedIn: true });
+    const storage = memoryStorage();
+    const make = () => new RemoteDriver({ fetch: (input, init) => fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), cookie: s.cookie } }), url: (route) => `${s.url}/api/table/${route}`, storage });
+    const first = make();
+    let snap = await first.start({ seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: CHAT }, { kind: 'model', id: DECISION }] });
+    let talked = false;
+    let spoke = false;
+    // Into a hand where the player has talked and the chat model has spoken, and stop there, mid-hand.
+    for (let i = 0; i < 60 && !(talked && spoke && snap.view.street !== 'done'); i++) {
+      if (snap.view.street === 'done') {
+        snap = await first.nextHand();
+        talked = spoke = false;
+      } else if (snap.turn) {
+        if (!talked) talked = first.say('Your move.') !== null;
+        snap = (await first.act({ key: snap.turn.options.some((o) => o.key === 'check') ? 'check' : 'call' })).snapshot;
+      } else {
+        const r = await first.step();
+        if (r.seat === 1 && r.meta.say) spoke = true;
+        snap = r.snapshot;
+      }
+    }
+    expect(talked && spoke && snap.view.street !== 'done').toBe(true);
+
+    // A reload: a new driver, the same browser.
+    const second = make();
+    const resumed = await second.resume();
+    const so = second.handSoFar();
+    expect(so.talk).toEqual([expect.objectContaining({ seat: 0, say: 'Your move.' })]);
+    expect(so.metas).toHaveLength(resumed.events.filter((e) => e.type === 'action').length);
+    expect(so.metas.some((m) => m.say?.startsWith('Talk'))).toBe(true);
+    // Play mode: the hand in play's reasoning stays hidden until it ends.
+    expect(JSON.stringify(so.metas)).not.toContain(SECRET_REASONING);
+
+    // The chat laid out again: the model's words and the player's line, in the order they came.
+    const lines = playedHandLines({ hand: resumed.hand, events: resumed.events, actions: so.metas, talk: so.talk });
+    const order = lines.flatMap((l) => ('talk' in l ? ['you'] : l.line.kind === 'move' && l.words?.say ? ['model'] : []));
+    expect(order).toContain('you');
+    expect(order).toContain('model');
+    expect(lines.every((l) => !('line' in l) || !l.words?.reasoning)).toBe(true);
+  });
+});

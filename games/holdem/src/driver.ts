@@ -7,7 +7,7 @@
 // Everything is async because real models take seconds. One AI action per step(), so the page animates each action as
 // it arrives.
 import type { Action } from '../shared/engine.ts';
-import type { Review, SeatConfig, StepResult, TableSnapshot, TalkLine } from '../shared/table.ts';
+import type { ActionMeta, Review, SeatConfig, StepResult, TableSnapshot, TalkLine } from '../shared/table.ts';
 
 export type { ActionMeta, HumanTurn, Review, ReviewHand, SeatConfig, SeatKind, StepResult, TableSnapshot, TalkLine } from '../shared/table.ts';
 
@@ -42,6 +42,8 @@ export interface TableDriver {
    * line as it will be said, or null when it can't be (nothing left after cleaning, watch mode, too many waiting).
    */
   say?(text: string): string | null;
+  /** The hand in play so far (after a resume): each action's metadata in order, and the player's lines. */
+  handSoFar?(): { metas: ActionMeta[]; talk: TalkLine[] };
   /** Told when the player's lines reached the table, as the table placed them (with say). */
   onSaid?: ((lines: TalkLine[]) => void) | null;
   /**

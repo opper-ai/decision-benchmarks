@@ -130,6 +130,8 @@ export interface SavedTable {
   finished: ReviewHand[];
   /** The hand in play's actions as they came. */
   metas: ActionMeta[];
+  /** The player's lines of talk in the hand in play, as the table placed them (absent in a table kept before talk). */
+  talk?: TalkLine[];
   savedAt: number;
 }
 
@@ -223,6 +225,8 @@ export class RemoteDriver implements TableDriver {
   private finished = new Map<number, ReviewHand>();
   /** The hand in play's actions as they came (watch mode: with their reasoning). */
   private metas: ActionMeta[] = [];
+  /** The player's lines said in the hand in play (the resume answer has the table, not the talk: it is kept here). */
+  private handTalk: TalkLine[] = [];
   /** Aborts every request in flight when the player leaves (forget). */
   private leaving = new AbortController();
 
@@ -329,7 +333,7 @@ export class RemoteDriver implements TableDriver {
     const finished = [...this.finished.values()].sort((a, b) => a.hand - b.hand);
     try {
       for (;;) {
-        const saved: SavedTable = { v: 1, token: this.token, mode: this.mode, seats: this.seats, hand: snapshot.hand, finished, metas: this.metas, savedAt: this.now() };
+        const saved: SavedTable = { v: 1, token: this.token, mode: this.mode, seats: this.seats, hand: snapshot.hand, finished, metas: this.metas, talk: this.handTalk, savedAt: this.now() };
         const text = JSON.stringify(saved);
         if (text.length <= MAX_SAVED_CHARS || !finished.length) return this.storage.setItem(STORAGE_KEY, text);
         // Too big: the oldest finished hands go (the server's review still has their cards and moves).
@@ -367,6 +371,7 @@ export class RemoteDriver implements TableDriver {
     this.seats = seats;
     this.finished.clear();
     this.metas = [];
+    this.handTalk = [];
     this.keep(r.finished);
     this.save(r.snapshot);
     return r.snapshot;
@@ -376,6 +381,15 @@ export class RemoteDriver implements TableDriver {
    * Sits back down at the table kept in this browser (RemoteDriver.saved()): the table as its token has it. Throws
    * TableError 'refused' when there is none; when the server refuses it (expired, stale, unreadable) it is cleared.
    */
+  /**
+   * The hand in play so far, as this browser saw it: each action's metadata in order (what was said, the face, and the
+   * reasoning only where the answers carried it: watching, or once the player is out) and the player's lines. After a
+   * resume, so the page can lay the hand's chat out again.
+   */
+  handSoFar(): { metas: ActionMeta[]; talk: TalkLine[] } {
+    return { metas: structuredClone(this.metas), talk: structuredClone(this.handTalk) };
+  }
+
   async resume(): Promise<TableSnapshot> {
     const saved = readSaved(this.storage);
     if (!saved) throw new TableError('refused', 0, 'There is no table to go back to');
@@ -393,6 +407,7 @@ export class RemoteDriver implements TableDriver {
     this.finished = new Map(saved.finished.map((h) => [h.hand, h]));
     // The hand in play's actions as they came, unless the table moved on (the answer that ended the hand was lost).
     this.metas = r.snapshot.hand === saved.hand ? saved.metas : [];
+    this.handTalk = r.snapshot.hand === saved.hand && Array.isArray(saved.talk) ? saved.talk : [];
     this.ended = r.snapshot.over;
     this.keep(r.finished);
     this.save(r.snapshot);
@@ -458,6 +473,7 @@ export class RemoteDriver implements TableDriver {
   private played(r: StepReply): StepResult {
     this.token = r.token;
     this.metas.push(r.result.meta);
+    if (r.result.talk?.length) this.handTalk.push(...r.result.talk);
     this.keep(r.finished);
     this.save(r.result.snapshot);
     return r.result;
@@ -475,6 +491,8 @@ export class RemoteDriver implements TableDriver {
     const r = await this.withTalk<SnapshotReply>('next', { token: this.tokenOrThrow() });
     this.token = r.token;
     this.metas = [];
+    // The lines that came with it were said as the new hand was dealt: they are the new hand's.
+    this.handTalk = [...(r.talk ?? [])];
     this.keep(r.finished);
     this.save(r.snapshot);
     return r.snapshot;
