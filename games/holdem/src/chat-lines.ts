@@ -4,6 +4,7 @@
 import { formatCard } from '../shared/cards.ts';
 import type { HandEvent, Street } from '../shared/engine.ts';
 import type { Category } from '../shared/evaluator.ts';
+import type { Mood } from '../shared/recording.ts';
 
 export type ActionEvent = Extract<HandEvent, { type: 'action' }>;
 
@@ -76,3 +77,29 @@ export const thinkingKey = (mode: 'play' | 'watch'): string => `holdem:show-thin
 
 /** Whether the chat opens every "what it was thinking": as last set for this kind of table, else on when watching. */
 export const showThinking = (mode: 'play' | 'watch', stored: string | null): boolean => (stored === 'on' ? true : stored === 'off' ? false : mode === 'watch');
+
+/** A finished hand's chat, as it went: each line with the words that came with its move, and the player's own talk. */
+export type PlayedLine = { line: ChatLine; words?: { say?: string; mood?: Mood; reasoning?: string } } | { talk: { seat: number; say: string } };
+
+/**
+ * The chat of a finished hand (a review's hand): what a replay that jumps ahead shows for the hands it skipped. The
+ * moves take their words and reasoning from the hand's actions, in order; the player's lines go in before the move
+ * they came with (talk[].after), the last after the hand's last move.
+ */
+export function playedHandLines(hand: { hand: number; events: readonly HandEvent[]; actions: readonly { say?: string; mood?: Mood; reasoning?: string }[]; talk?: readonly { seat: number; after: number; say: string }[] }): PlayedLine[] {
+  const out: PlayedLine[] = [];
+  const talk = hand.talk ?? [];
+  let move = 0;
+  const said = (upTo: number) => {
+    for (const t of talk) if (t.after === upTo) out.push({ talk: { seat: t.seat, say: t.say } });
+  };
+  for (const line of chatLinesOf(hand.events, hand.hand)) {
+    if (line.kind === 'move') {
+      said(move);
+      const a = hand.actions[move++];
+      out.push(a && (a.say || a.reasoning || a.mood) ? { line, words: { ...(a.say ? { say: a.say } : {}), ...(a.mood ? { mood: a.mood } : {}), ...(a.reasoning ? { reasoning: a.reasoning } : {}) } } : { line });
+    } else out.push({ line });
+  }
+  for (const t of talk) if (t.after >= move) out.push({ talk: { seat: t.seat, say: t.say } });
+  return out;
+}

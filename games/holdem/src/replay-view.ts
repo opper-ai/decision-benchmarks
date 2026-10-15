@@ -148,6 +148,10 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion });
     tableHost.replaceChildren(ui.el);
     shown = 0;
+    // The chat starts again too: from the first hand empty ("Watch it again"), or after a jump with the hands before
+    // it laid out as they went, so it reads as if the replay had played up to here.
+    chat.clear();
+    if (s.hand > 1) chat.history((await driver.review()).hands.filter((h) => h.hand < s.hand));
     knockedOut = s.eliminations.length;
     await playNew(s);
   };

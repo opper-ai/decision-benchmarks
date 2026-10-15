@@ -7,7 +7,7 @@
 import type { HandEvent, Street } from '../../shared/engine.ts';
 import type { ActionMeta } from '../../shared/table.ts';
 import { cleanTalk } from '../../shared/questions.ts';
-import { chatLinesOf, NOT_SAID, PendingTalk, SAY_MAX, sayCount, showThinking, thinkingKey, type ActionEvent, type ChatLine } from '../chat-lines.ts';
+import { chatLinesOf, NOT_SAID, PendingTalk, playedHandLines, type PlayedLine, SAY_MAX, sayCount, showThinking, thinkingKey, type ActionEvent, type ChatLine } from '../chat-lines.ts';
 import { h } from '../dom.ts';
 import { actionChip, aHand, cardFace, chips, logNote, STREET_NAMES, type SeatPerson } from '../view-model.ts';
 import { avatarEl } from './parts.ts';
@@ -137,6 +137,24 @@ export class ChatBox {
     }
   }
 
+  /** Empties the chat (a replay starting again, or jumping to another hand). */
+  clear(): void {
+    while (this.scroller.childElementCount > 1) this.scroller.lastElementChild!.remove();
+    this.street = 'preflop';
+    this.note.hidden = false;
+    this.newer.hidden = true;
+  }
+
+  /** Finished hands' chat, as they went (a replay that jumps ahead shows the hands it skipped). */
+  history(hands: readonly Parameters<typeof playedHandLines>[0][]): void {
+    for (const hand of hands)
+      for (const p of playedHandLines(hand) as PlayedLine[]) {
+        if ('talk' in p) this.heard(p.talk.seat, p.talk.say);
+        else this.add(this.lineEl(p.line, p.words));
+      }
+    this.street = 'preflop';
+  }
+
   /** Your lines sent and not yet back from the table: shown dimmed until said() or unsaid() settles them, in order. */
   private pending = new PendingTalk<HTMLElement>();
 
@@ -185,7 +203,7 @@ export class ChatBox {
     this.add(h('p.chat-hint', { role: 'status' }, text), true);
   }
 
-  private lineEl(l: ChatLine, meta: ActionMeta | undefined): HTMLElement {
+  private lineEl(l: ChatLine, meta: Pick<ActionMeta, 'say' | 'mood' | 'reasoning'> | undefined): HTMLElement {
     const name = (seat: number) => (seat === this.o.viewer ? 'You' : this.o.people[seat]!.name);
     if (l.kind === 'hand') return h('div.chat-hand', null, h('b', null, `Hand ${l.hand}`), ` · blinds ${chips(l.sb)}/${chips(l.bb)}${l.ante ? `, ante ${chips(l.ante)}` : ''}`);
     if (l.kind === 'board') return h('p.chat-dealer.board', null, h('b', null, STREET_NAMES[l.street]), cardsText(l.cards));

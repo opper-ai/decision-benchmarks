@@ -76,3 +76,31 @@ describe('the chat’s Show thinking switch', () => {
     expect(thinkingKey('play')).not.toBe(thinkingKey('watch'));
   });
 });
+
+describe('a replay jumped to a later hand', () => {
+  it('lays out the hands before it as they were played: every move with its words, your talk where it was said', async () => {
+    const { playedHandLines } = await import('../src/chat-lines');
+    const d = new LocalDriver({ thinkScale: 0, sleep: async () => {} });
+    let s = await d.start({ seed: 5, seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: 'aws/claude-opus-5-5' }] });
+    let first = true;
+    while (s.view.street !== 'done') {
+      if (s.turn) {
+        if (first) (d.say('Nice try.'), (first = false));
+        s = (await d.act({ key: s.turn.options.find((o) => o.key === 'check' || o.key === 'call')!.key })).snapshot;
+      } else s = (await d.step()).snapshot;
+    }
+    s = await d.nextHand();
+    const hand = (await d.review()).hands[0]!;
+    const lines = playedHandLines(hand);
+    const moves = lines.filter((l) => 'line' in l && l.line.kind === 'move');
+    expect(moves.length).toBe(hand.actions.length);
+    // Each move carries its own action's words.
+    moves.forEach((m, i) => 'line' in m && expect(m.words?.say).toBe(hand.actions[i]!.say));
+    // Your line, just before the move it came with.
+    const talk = lines.findIndex((l) => 'talk' in l);
+    expect(hand.talk?.length).toBe(1);
+    expect(lines[talk]).toEqual({ talk: { seat: 0, say: 'Nice try.' } });
+    const after = hand.talk![0]!.after;
+    expect(lines.slice(0, talk).filter((l) => 'line' in l && l.line.kind === 'move').length).toBe(after);
+  });
+});
