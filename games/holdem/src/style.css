@@ -282,6 +282,11 @@
 .seat[data-slot='left'] .bubble::after { left: 22px; }
 .seat[data-slot='right'] .bubble { left: auto; right: 0; translate: none; }
 .seat[data-slot='right'] .bubble::after { left: auto; right: 22px; }
+/* Wide screens: the top and bottom seats' talk beside the face, on the side away from their cards and clear of the bets. */
+@media (min-width: 760px) {
+  .seat:is([data-slot='top'], [data-slot='bottom']) .bubble { top: 6px; bottom: auto; left: auto; right: calc(100% + 10px); translate: none; }
+  .seat:is([data-slot='top'], [data-slot='bottom']) .bubble::after { top: 16px; bottom: auto; left: auto; right: -4px; }
+}
 /*
  * Phones: narrower, and placed where the table has room: the side seats' talk above them reaching to the room's edge
  * (clear of the top seat's cards), the top seat's beside its face (clear of the side seats' talk).
