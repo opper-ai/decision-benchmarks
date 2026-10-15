@@ -121,7 +121,7 @@ describe('the action menu', () => {
     expect(menuButtons(legalOptions(s)).map((b) => b.what)).toEqual(['Check', 'Bet ⅓ pot', 'Bet ½ pot', 'Bet ¾ pot', 'Bet Pot', 'All-in']);
   });
 
-  it('offers the sizes as one-tap chips with keys 1 to 4', () => {
+  it('offers the sizes for keys 1 to 4 and the raise panel', () => {
     let s = deal({ stacks: [1000, 1000, 1000], button: 0 });
     expect(quickBets(legalOptions(s)).map((q) => [q.key, q.size, q.word, q.amount, q.to, q.shortcut])).toEqual([
       ['small', '½', ' pot', '45', 45, '1'],

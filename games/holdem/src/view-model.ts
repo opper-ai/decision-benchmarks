@@ -244,7 +244,7 @@ export function menuButtons(options: readonly { key: OptionKey; kind: ActionKind
 
 export interface QuickBet {
   key: OptionKey;
-  /** The chip's words: the size ("½", "2.5 BB", "Pot") and, where there is room, " pot" after a fraction. */
+  /** The size in words: "½", "2.5 BB", "Pot", and " pot" after a fraction. */
   size: string;
   word: string;
   /** Raise (or bet) to this many chips. */
@@ -257,7 +257,7 @@ export interface QuickBet {
 }
 
 /**
- * The menu's sizes as one-tap chips over a narrow bar (and keys 1 to 4 on any bar): menu order, without a size that
+ * The menu's sizes as keys 1 to 4 (instant raises) and the raise panel's quick picks: menu order, without a size that
  * is the all-in (the bar has its own button) or one that repeats a smaller size's amount.
  */
 export function quickBets(options: readonly { key: OptionKey; kind: ActionKind; to: number; add: number; label: string }[]): QuickBet[] {

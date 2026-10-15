@@ -7,8 +7,8 @@
 //
 // Every seat (face, name plate, tag, tell, hole cards), bet, the dealer button and every speech bubble must sit inside
 // the room with MARGIN px to spare, below the toolbar, and above the action bar's row; nothing at the table may
-// overlap another seat's face, plate or cards (a bubble may cover a bet or the button), and the action bar and the
-// sizes' chips over it (a narrow bar) keep to one row each, clear of every seat and the board. The room's height is recorded
+// overlap another seat's face, plate or cards (a bubble may cover a bet or the button), and the action bar keeps to one
+// row clear of every seat and the board. The room's height is recorded
 // so a caller can check it does not change during a game.
 
 export const MARGIN = 8;
@@ -64,23 +64,12 @@ export function measure(room: Element = document.querySelector('#room')!): strin
     for (const p of parts) if (p.boxes.some((b) => meet(M, b))) out.push(`the action bar meets seat ${p.slot}`);
     for (const c of room.querySelectorAll('.board .card, .board .slot')) if (meet(M, box(c))) out.push('the action bar meets the board');
   }
-  // The sizes' chips over a narrow bar: one row, inside the room and above the buttons, clear of every seat and the board.
-  const chips = [...room.querySelectorAll('.actions:not([hidden]) .quick .qb')].filter(seen);
-  if (chips.length) {
-    if (new Set(chips.map((b) => Math.round(b.getBoundingClientRect().top))).size > 1) out.push('the chips wrap onto a second row');
-    const Q = union(chips.map(box));
-    if (Q.l < R.l || Q.r > R.r || Q.b > R.b) out.push('the chips leave the room');
-    if (menu && seen(menu) && meet(Q, box(menu))) out.push('the chips meet the action bar');
-    for (const c of chips) if ((c as HTMLElement).scrollWidth > (c as HTMLElement).clientWidth + 1) out.push('a chip’s words are cut off');
-    for (const p of parts) if (p.boxes.some((b) => meet(Q, b))) out.push(`the chips meet seat ${p.slot}`);
-    for (const c of room.querySelectorAll('.board .card, .board .slot')) if (meet(Q, box(c))) out.push('the chips meet the board');
-  }
   // The folded chat, docked at the room's foot: clear of the seats, the board and the action bar.
   const dock = room.querySelector('.chat:not(.open)');
   if (dock && seen(dock) && getComputedStyle(dock).position === 'absolute') {
     const D = box(dock);
     for (const p of parts) if (p.boxes.some((b) => meet(D, b))) out.push(`the folded chat meets seat ${p.slot}`);
-    for (const c of room.querySelectorAll('.board .card, .board .slot, .actions:not([hidden]) .act, .actions:not([hidden]) .qb, .bet:not(.empty)')) if (seen(c) && meet(D, box(c))) out.push(`the folded chat meets ${c.closest('.board') ? 'the board' : c.classList.contains('act') ? 'the action bar' : c.classList.contains('qb') ? 'the chips' : 'a bet'}`);
+    for (const c of room.querySelectorAll('.board .card, .board .slot, .actions:not([hidden]) .act, .bet:not(.empty)')) if (seen(c) && meet(D, box(c))) out.push(`the folded chat meets ${c.closest('.board') ? 'the board' : c.classList.contains('act') ? 'the action bar' : 'a bet'}`);
   }
   // Bets, the button and the board against the seats (a bet or the button on a face, plate or card).
   const things = [...room.querySelectorAll('.bet:not(.empty), .dealer, .board .card, .board .slot, .pots .pot')].filter(seen);

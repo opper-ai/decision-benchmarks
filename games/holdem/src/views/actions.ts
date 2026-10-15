@@ -1,11 +1,10 @@
 // Your turn: one row of buttons (fold, check or call, the menu's sizes with their chips, Raise…, all-in) and, from
 // Raise…, a small panel over the bar with a raise of your own: a brass slider with a chip for a thumb, ticks at the
 // menu's sizes that it snaps to, the amount in big blinds and as a share of the pot, −/+ by the minimum raise, and a
-// confirm button. On a narrow bar (a phone, or the table's column beside the chat) the row keeps only fold, check or
-// call, Raise… and all-in, and the menu's sizes ride over it as a slim row of chips, one tap each (style.css shows the
-// chips or the size buttons, by the bar's width; the chips' row keeps its place on a narrow bar even when it is empty).
-// Keys: F fold, C check or call, 1 to 4 the sizes, A all-in, R opens the raise panel (arrows adjust, Enter confirms,
-// Esc closes). The keys do nothing while a dialog (the hand review, the end, Leave?) covers the table.
+// confirm button. On a phone the row keeps only fold, check or call, Raise… and all-in, and the menu's sizes become
+// quick picks in the panel, over the slider (style.css shows one or the other). Keys: F fold, C check or call, 1 to 4
+// raise to the menu's sizes at once, A all-in, R opens the raise panel (arrows adjust, Enter confirms, Esc closes). The
+// keys do nothing while a dialog (the hand review, the end, Leave?) covers the table, or while you type.
 import type { Action } from '../../shared/engine.ts';
 import { h } from '../dom.ts';
 import type { HumanTurn } from '../driver.ts';
@@ -25,7 +24,7 @@ export function raisePlan(turn: HumanTurn, ctx: TableContext) {
   const step = Math.max(1, Math.min(r.max - r.min, r.min - currentBet || ctx.bb));
   const base = ctx.pot + turn.toCall;
   const share = (to: number) => (base > 0 ? Math.round((100 * (to - currentBet)) / base) : 0);
-  // The menu's sizes as the buttons name them ("2.5 BB", "½ pot", "Pot"), short as the slider's ticks.
+  // The menu's sizes as the buttons name them ("2.5 BB", "½ pot", "Pot"): in full for the quick picks, short as ticks.
   const quick = menuButtons(turn.options).flatMap((b) => {
     const o = turn.options.find((x) => x.key === b.key)!;
     return b.look === 'raise' && o.to >= r.min && o.to <= r.max ? [{ to: o.to, label: b.size ?? '' }] : [];
@@ -56,12 +55,13 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
       resolve(a);
     };
     const buttons = menuButtons(turn.options);
-    const quick = quickBets(turn.options);
+    // The menu's sizes (none the all-in, none twice): keys 1 to 4, and the raise panel's quick picks.
+    const sizes = quickBets(turn.options);
     const canRaise = !!turn.raise && turn.raise.max > turn.raise.min;
-    // data-custom: Raise… is there, so a narrow bar can leave the sizes to the chips over it.
+    // data-custom: Raise… is there, so a phone can leave the sizes to its panel.
     const menu = h('div.menu', { role: 'group', 'aria-label': 'Your options', 'data-custom': canRaise });
     const button = (b: (typeof buttons)[number]) => {
-      const key = b.shortcut ?? quick.find((q) => q.key === b.key)?.shortcut;
+      const key = b.shortcut ?? sizes.find((q) => q.key === b.key)?.shortcut;
       return h(
         `button.act.${b.look}`,
         { type: 'button', 'aria-label': b.label + (key ? ` (${key})` : ''), onclick: () => done({ key: b.key }) },
@@ -70,14 +70,6 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
         key ? h('kbd', null, key) : null,
       );
     };
-    // The sizes as chips over a narrow bar: "½ pot · 96", one tap raises. The row is there, empty, when there are none.
-    const chipRow = h(
-      'div.quick',
-      quick.length ? { role: 'group', 'aria-label': 'Sizes' } : { 'aria-hidden': 'true' },
-      ...quick.map((q) =>
-        h('button.qb', { type: 'button', 'aria-label': `${q.label} (${q.shortcut})`, onclick: () => done({ key: q.key }) }, h('span.qs', null, q.size, q.word ? h('span.qw', null, q.word) : null), h('b.qa', null, q.amount), h('kbd', null, q.shortcut)),
-      ),
-    );
     const allin = buttons.find((b) => b.look === 'allin');
     for (const b of buttons) if (b !== allin) menu.append(button(b));
 
@@ -103,8 +95,12 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
       const facts = h('span.rp-facts');
       const range = h('input.rp-range', { type: 'range', min: 0, max: 1000, step: 1, value: Math.round(positionOf(value, plan) * 1000), 'aria-label': `${verb}, from ${chips(plan.min)} to ${chips(plan.max)} chips` }) as HTMLInputElement;
       const confirm = h('button.rp-go', { type: 'button' }) as HTMLButtonElement;
+      // The menu's sizes as chips to tap (phones; the bar has them as buttons on a wide screen): each sets the amount.
+      const quick = sizes.filter((q) => q.to >= plan.min && q.to <= plan.max);
+      const picks = quick.map((q) => h('button.rp-pick', { type: 'button', 'aria-pressed': 'false', 'aria-label': `${q.size}${q.word}, ${chips(q.to)}`, onclick: () => set(q.to) }, q.size + q.word) as HTMLButtonElement);
       const set = (v: number) => {
         value = Math.max(plan.min, Math.min(plan.max, v));
+        picks.forEach((p, i) => p.setAttribute('aria-pressed', String(quick[i]!.to === value)));
         range.value = String(Math.round(positionOf(value, plan) * 1000));
         range.setAttribute('aria-valuenow', String(value));
         const all = value >= plan.max;
@@ -140,6 +136,7 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
         'div.raise-panel',
         { role: 'dialog', 'aria-label': `${verb}: choose an amount` },
         h('div.rp-head', null, h('span.rp-verb', null, verb), amount, facts, h('button.rp-close', { type: 'button', 'aria-label': 'Close (Esc)', onclick: () => closePanel() }, '×')),
+        picks.length ? h('div.rp-quick', { role: 'group', 'aria-label': 'Sizes' }, ...picks) : null,
         h('div.rp-track', null, stepBtn(-1), h('div.rp-rail', null, range, ticks), stepBtn(1)),
         h('div.rp-ends', { 'aria-hidden': 'true' }, h('span', null, chips(plan.min)), h('span', null, `All-in ${chips(plan.max)}`)),
         confirm,
@@ -169,7 +166,7 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
       menu.append(opener);
     }
     if (allin) menu.append(button(allin));
-    host.replaceChildren(chipRow, menu, h('p.hint', null, `Keys: F fold, C check or call, ${quick.length ? `${quick.length > 1 ? `1–${quick.length}` : '1'} sizes, ` : ''}R raise, A all-in`));
+    host.replaceChildren(menu, h('p.hint', null, `Keys: F fold, C check or call, ${sizes.length ? `${sizes.length > 1 ? `1–${sizes.length}` : '1'} sizes, ` : ''}R raise, A all-in`));
     host.hidden = false;
     (menu.querySelector('button.call') as HTMLElement | null)?.focus({ preventScroll: true });
 
@@ -194,7 +191,7 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
       else if (k === 'a' && has('allin')) done({ key: 'allin' });
       else if (k === 'r' && canRaise) openPanel();
       else {
-        const size = quick.find((q) => q.shortcut === e.key);
+        const size = sizes.find((q) => q.shortcut === e.key);
         if (!size) return;
         done({ key: size.key });
       }
