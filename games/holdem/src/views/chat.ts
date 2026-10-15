@@ -67,8 +67,14 @@ export class ChatBox {
     if (o.onSay) this.el.append(this.sayForm(o.onSay));
     this.button = h('button.tbtn.icon.chat-btn', { type: 'button', 'aria-label': 'Table talk', 'aria-expanded': 'false', title: 'Table talk', onclick: () => this.toggle() }) as HTMLButtonElement;
     this.button.innerHTML = CHAT_ICON;
-    // Open beside the table on a wide screen; shut (the toolbar's button opens it) on a phone.
-    this.toggle(typeof matchMedia === 'function' && matchMedia('(min-width: 1000px)').matches);
+    // Open beside the table on a wide screen; shut (the toolbar's button opens it) on a phone; and again so when the
+    // window crosses from one to the other.
+    if (typeof matchMedia === 'function') {
+      const wide = matchMedia('(min-width: 1000px)');
+      this.toggle(wide.matches);
+      const follow = (e: MediaQueryListEvent) => (this.el.isConnected ? this.toggle(e.matches) : wide.removeEventListener('change', follow));
+      wide.addEventListener('change', follow);
+    } else this.toggle(false);
   }
 
   /** The chat as a sheet (a phone) or a panel (wide): open or shut. */
@@ -168,7 +174,8 @@ export class ChatBox {
   /** A line at the bottom: followed if the reader is at the bottom (or it is their own), else "New messages". */
   private add(el: HTMLElement, mine = false): void {
     const follow = mine || this.atBottom();
-    this.note.hidden = true;
+    // The note says why there are no words (decision models): until someone says something.
+    if (el.matches('.chat-msg')) this.note.hidden = true;
     this.scroller.append(el);
     while (this.scroller.childElementCount > KEEP + 1) this.scroller.children[1]!.remove();
     if (follow) this.toBottom();

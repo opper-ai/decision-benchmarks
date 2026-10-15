@@ -61,7 +61,8 @@
  */
 @media (max-width: 759px) {
   .room { overflow: clip; --tb-h: 40px; --bar-h: 72px; }
-  .room.watching { --tb-h: 92px; --bar-h: 0px; } /* speeds and buttons on lines of their own */
+  .room.watching { --tb-h: 64px; --bar-h: 0px; } /* the hand on one line, the speeds and buttons on the next */
+  .room.watching:has(.replay-title) { --tb-h: 134px; } /* a replay: its title, the hand, and two lines of controls */
 }
 .room button { font-family: var(--j-body); }
 .room :focus-visible { outline: 2px solid var(--h-amber); outline-offset: 2px; }
@@ -97,6 +98,13 @@
   .room:not(.watching) .level .blinds .lbl { display: none; }
   .room:not(.watching) .tools { flex: none; flex-wrap: nowrap; gap: 4px; }
   .room:not(.watching) .practice { display: none; }
+  /* Watching: two lines that never change height, the hand and blinds (cut short if need be), then the speeds and buttons. */
+  .room.watching .toolbar:not(:has(.replay-title)) { flex-wrap: wrap; padding: 6px 8px 0 12px; gap: 6px 8px; }
+  .room.watching .level { display: block; flex: 1 0 100%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; line-height: 18px; }
+  .room.watching .level > span + span::before { content: ' · '; color: var(--h-dim); font-weight: 400; }
+  .room.watching .level .blinds .lbl { display: none; }
+  .room.watching .toolbar:not(:has(.replay-title)) .tools { flex: 1 0 100%; flex-wrap: nowrap; justify-content: space-between; gap: 4px; }
+  .room.watching .practice { display: none; }
 }
 .speed { display: inline-flex; border: 1px solid var(--h-line); border-radius: 999px; overflow: hidden; }
 .speed button { height: 30px; min-width: 38px; padding: 0 8px; border: 0; background: none; color: var(--h-dim); font: 700 12px var(--j-display); }

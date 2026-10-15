@@ -130,7 +130,7 @@ export function lobbyView(o: LobbyOptions): HTMLElement {
     const kids: (HTMLElement | null)[] = [
       o.resume ? resumeCard(o.resume) : null,
       h('h2', null, choice.mode === 'play' ? 'Take a seat' : 'Pull up a chair'),
-      h('p.lede', null, choice.mode === 'play' ? 'You and up to three AI models, 1500 chips each. Blinds go up every 8 hands until one player has every chip.' : 'The models play each other with every card face up. You see what they say, and why.'),
+      h('p.lede', null, choice.mode === 'play' ? 'You and up to five AI models, 1500 chips each. Blinds go up every 8 hands (longer at a bigger table) until one player has every chip.' : 'The models play each other with every card face up. You see what they say, and why.'),
       modes,
       sets,
       h('div.lineup', null, h('h3', null, 'At the table'), lineup, add),
