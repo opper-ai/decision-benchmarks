@@ -171,7 +171,7 @@ function shapeProblem(r: Record<string, unknown>): string | null {
     }
     if (hand.talk !== undefined) {
       const talk = hand.talk;
-      if (!Array.isArray(talk) || talk.length > MAX_TALK || !talk.every((x: unknown) => isObj(x) && isInt(x.seat, 0, 9) && isInt(x.after, 0, (hand.actions as unknown[]).length) && typeof x.say === 'string' && x.say.length <= MAX_SAY)) {
+      if (!Array.isArray(talk) || talk.length > MAX_TALK || !talk.every((x: unknown) => isObj(x) && isInt(x.seat, 0, players.length - 1) && isInt(x.after, 0, (hand.actions as unknown[]).length) && typeof x.say === 'string' && x.say.length <= MAX_SAY)) {
         return `hand ${h + 1}: talk must list { seat, after, say } lines of at most ${MAX_SAY} characters`;
       }
     }
