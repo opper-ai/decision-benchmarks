@@ -31,7 +31,7 @@ import { appPath } from '../../../packages/kit/client/paths.ts';
 import type { Action } from '../shared/engine.ts';
 import { cleanTalk, MAX_TALK_LINES } from '../shared/questions.ts';
 import type { RecordedAction, TalkLine } from '../shared/recording.ts';
-import type { ActionMeta, Review, ReviewHand, SeatConfig, SnapshotReply, StepReply, StepResult, TableErrorBody, TableSnapshot } from '../shared/table.ts';
+import type { ActionMeta, Review, ReviewHand, SeatConfig, SnapshotReply, StepReply, StepResult, TableErrorBody, TableSnapshot, TalkRefused } from '../shared/table.ts';
 import type { TableConfig, TableDriver } from './driver.ts';
 
 /**
@@ -87,6 +87,8 @@ export interface RemoteDriverOptions {
   onConnection?: (e: ConnectionEvent) => void;
   /** Told when the player's queued lines of table talk reached the table (also settable as driver.onSaid). */
   onSaid?: (lines: TalkLine[]) => void;
+  /** Told when queued lines will never be said (also settable as driver.onTalkRefused): see TalkNotSaid. */
+  onTalkRefused?: (lines: string[], why: TalkNotSaid) => void;
   /** How long one call keeps retrying before it gives up (default two minutes). */
   retryForMs?: number;
   /** One attempt's own timeout: past a chat model's 20 s and the server's own work (default 45 s). */
@@ -97,6 +99,12 @@ export interface RemoteDriverOptions {
   /** Where the table is kept for a resume: the page's localStorage by default; null keeps nothing. */
   storage?: TableStorage | null;
 }
+
+/**
+ * Why lines of the player's talk were not said: over the visitor's talk allowance ('busy'), past what a hand holds
+ * ('full'), the request they went with was refused ('refused'), or the game is over ('over').
+ */
+export type TalkNotSaid = 'busy' | 'full' | 'refused' | 'over';
 
 /** The pauses between attempts, the last repeated. */
 export const RETRY_DELAYS_MS: readonly number[] = [500, 1000, 2000, 4000, 8000];
@@ -195,6 +203,10 @@ export class RemoteDriver implements TableDriver {
   onConnection: ((e: ConnectionEvent) => void) | null;
   /** Told when the player's queued lines of table talk reached the table, as the server placed them. */
   onSaid: ((lines: TalkLine[]) => void) | null;
+  /** Told when queued lines will never be said, in the order they were queued, and why. */
+  onTalkRefused: ((lines: string[], why: TalkNotSaid) => void) | null;
+  /** The game is over: no more talk. */
+  private ended = false;
   /** Lines the player typed, waiting for the next request (cleanTalk'd). */
   private talkQueue: string[] = [];
   private readonly fetch: typeof fetch;
@@ -219,6 +231,7 @@ export class RemoteDriver implements TableDriver {
     this.url = o.url ?? ((route) => appPath(`/api/table/${route}`));
     this.onConnection = o.onConnection ?? null;
     this.onSaid = o.onSaid ?? null;
+    this.onTalkRefused = o.onTalkRefused ?? null;
     this.retryForMs = o.retryForMs ?? RETRY_FOR_MS;
     this.attemptTimeoutMs = o.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS;
     this.sleep = o.sleep ?? defaultSleep;
@@ -339,6 +352,8 @@ export class RemoteDriver implements TableDriver {
   /** A new table (start, resume): the driver keeps it again. */
   private reopen(): void {
     if (this.leaving.signal.aborted) this.leaving = new AbortController();
+    this.ended = false;
+    this.talkQueue = [];
   }
 
   async start(config: TableConfig): Promise<TableSnapshot> {
@@ -378,6 +393,7 @@ export class RemoteDriver implements TableDriver {
     this.finished = new Map(saved.finished.map((h) => [h.hand, h]));
     // The hand in play's actions as they came, unless the table moved on (the answer that ended the hand was lost).
     this.metas = r.snapshot.hand === saved.hand ? saved.metas : [];
+    this.ended = r.snapshot.over;
     this.keep(r.finished);
     this.save(r.snapshot);
     return r.snapshot;
@@ -386,34 +402,53 @@ export class RemoteDriver implements TableDriver {
   /**
    * The player says something at the table: the line, cleaned and capped as the server will (cleanTalk), queued for the
    * next request. Returns the line as it will be said, or null when there is nothing to say, no table to play at (watch
-   * mode has no human), or MAX_QUEUED_TALK lines are already waiting.
+   * mode has no human, the game is over), or MAX_QUEUED_TALK lines are already waiting.
    */
   say(text: string): string | null {
     const line = cleanTalk(text);
-    if (!line || !this.token || this.mode !== 'play' || this.talkQueue.length >= MAX_QUEUED_TALK) return null;
+    if (!line || !this.token || this.ended || this.mode !== 'play' || this.talkQueue.length >= MAX_QUEUED_TALK) return null;
     this.talkQueue.push(line);
     return line;
   }
 
-  /** Sends a request with the queued talk; on success tells onSaid, on failure puts the lines back in front. */
-  private async withTalk<T extends { talk?: TalkLine[]; result?: { talk?: TalkLine[] } }>(route: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+  private tell<A extends unknown[]>(f: ((...a: A) => void) | null, ...a: A): void {
+    try {
+      f?.(...a);
+    } catch {
+      // the page's listener must not break the table
+    }
+  }
+
+  /**
+   * Sends a request with the queued talk. The answer says which lines were said (onSaid) and which not (onTalkRefused,
+   * after the said ones: the server places a batch's lines in order). A request that could not get through (no
+   * connection, too fast) keeps its lines in front of the queue for the next one, which goes from the same token; one
+   * the table refused takes its lines with it (onTalkRefused 'refused'). Once the game is over, what still waits is not
+   * said ('over').
+   */
+  private async withTalk<T extends { talk?: TalkLine[]; talkRefused?: TalkRefused; result?: { talk?: TalkLine[]; snapshot: TableSnapshot }; snapshot?: TableSnapshot }>(route: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
     const talk = this.talkQueue.splice(0, MAX_TALK_LINES);
     let r: T;
     try {
       r = await this.post<T>(route, talk.length ? { ...body, talk } : body, signal);
     } catch (e) {
-      this.talkQueue.unshift(...talk);
+      if (e instanceof TableError && e.kind !== 'failed' && e.kind !== 'rate') {
+        if (talk.length) this.tell(this.onTalkRefused, talk, 'refused');
+      } else if ((e as Error)?.name !== 'AbortError') this.talkQueue.unshift(...talk);
       throw e;
     }
     const said = r.result?.talk ?? r.talk;
-    if (said?.length) {
-      try {
-        this.onSaid?.(said);
-      } catch {
-        // the page's listener must not break the table
-      }
-    }
+    if (said?.length) this.tell(this.onSaid, said);
+    if (r.talkRefused?.lines.length) this.tell(this.onTalkRefused, r.talkRefused.lines, r.talkRefused.why);
+    if ((r.result?.snapshot ?? r.snapshot)?.over) this.end();
     return r;
+  }
+
+  /** The game is over: nothing more is said, and what still waits never will be. */
+  private end(): void {
+    this.ended = true;
+    const left = this.talkQueue.splice(0);
+    if (left.length) this.tell(this.onTalkRefused, left, 'over');
   }
 
   private played(r: StepReply): StepResult {

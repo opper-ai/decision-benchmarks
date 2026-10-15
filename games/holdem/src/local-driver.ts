@@ -282,11 +282,11 @@ export class LocalDriver implements TableDriver {
 
   /**
    * Your table talk, as the real table takes it (cleaned, at most 6 waiting): it goes with the next move, and the next
-   * chat stand-in to act may answer it. Null in watch mode, or with nothing left after cleaning.
+   * chat stand-in to act may answer it. Null in watch mode, once the game is over, or with nothing left after cleaning.
    */
   say(text: string): string | null {
     const line = cleanTalk(text);
-    if (this.human === null || !line || this.talkQueue.length >= 6) return null;
+    if (this.human === null || !line || this.g?.over || this.talkQueue.length >= 6) return null;
     this.talkQueue.push(line);
     return line;
   }

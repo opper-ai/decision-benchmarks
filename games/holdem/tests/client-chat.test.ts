@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatCard } from '../shared/cards';
 import type { HandEvent } from '../shared/engine';
-import { chatLinesOf, sayCount, SAY_MAX } from '../src/chat-lines';
+import { chatLinesOf, PendingTalk, sayCount, SAY_MAX } from '../src/chat-lines';
 import { LocalDriver } from '../src/local-driver';
 
 describe('the table chat: what the dealer says', () => {
@@ -50,5 +50,17 @@ describe('your talk in practice', () => {
     for (let i = 0; i < 6; i++) expect(d.say(`line ${i}`)).not.toBeNull();
     expect(d.say('one too many')).toBeNull();
     expect(s.hand).toBe(1);
+  });
+});
+
+describe('your lines on their way', () => {
+  it('are settled oldest first, by order, whatever the table made of their words', () => {
+    const p = new PendingTalk<string>();
+    for (const x of ['Oh really…', 'two', 'three']) p.add(x);
+    // The server said the first as 'Oh really...' (cleaned again): it is still the first line's answer.
+    expect(p.take(1)).toEqual(['Oh really…']);
+    expect(p.take(2)).toEqual(['two', 'three']);
+    expect(p.take(1)).toEqual([]);
+    expect(p.size).toBe(0);
   });
 });

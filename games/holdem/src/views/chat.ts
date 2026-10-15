@@ -7,7 +7,7 @@
 import type { HandEvent, Street } from '../../shared/engine.ts';
 import type { ActionMeta } from '../../shared/table.ts';
 import { cleanTalk } from '../../shared/questions.ts';
-import { chatLinesOf, SAY_MAX, sayCount, type ActionEvent, type ChatLine } from '../chat-lines.ts';
+import { chatLinesOf, NOT_SAID, PendingTalk, SAY_MAX, sayCount, type ActionEvent, type ChatLine } from '../chat-lines.ts';
 import { h } from '../dom.ts';
 import { actionChip, aHand, cardFace, chips, logNote, STREET_NAMES, type SeatPerson } from '../view-model.ts';
 import { avatarEl } from './parts.ts';
@@ -101,27 +101,40 @@ export class ChatBox {
     }
   }
 
-  /** Your lines sent and not yet back from the table: shown dimmed until said() confirms them. */
-  private pending: { text: string; el: HTMLElement }[] = [];
+  /** Your lines sent and not yet back from the table: shown dimmed until said() or unsaid() settles them, in order. */
+  private pending = new PendingTalk<HTMLElement>();
 
   /** Your own talk, as it is sent: dimmed ("sending") until the table has it. */
   you(text: string): void {
     const p = this.o.viewer !== null ? this.o.people[this.o.viewer] : undefined;
     const el = h('article.chat-msg.you.pending', { 'aria-busy': 'true' }, p ? avatarEl(p, 'relaxed', 'chat-face') : null, h('div.chat-main', null, h('div.chat-who', null, h('b', null, 'You'), h('span.chat-state', null, 'sending…')), h('q.chat-said', null, text)));
-    this.pending.push({ text, el });
+    this.pending.add(el);
     this.add(el, true);
   }
 
-  /** The table has your lines (the driver's onSaid): each one's message is said, not sending. */
+  /**
+   * The table has your lines (the driver's onSaid): the oldest waiting messages are said, not sending, with the words
+   * as the table heard them. Matched by order, as the table answers them.
+   */
   said(lines: readonly { seat: number; say: string }[]): void {
-    for (const l of lines) {
-      if (l.seat !== this.o.viewer) continue;
-      const i = this.pending.findIndex((p) => p.text === l.say);
-      const p = i >= 0 ? this.pending.splice(i, 1)[0]! : null;
-      if (!p) continue;
-      p.el.classList.remove('pending');
-      p.el.removeAttribute('aria-busy');
-      p.el.querySelector('.chat-state')?.remove();
+    const mine = lines.filter((l) => l.seat === this.o.viewer);
+    this.pending.take(mine.length).forEach((el, i) => {
+      el.classList.remove('pending');
+      el.removeAttribute('aria-busy');
+      el.querySelector('.chat-state')?.remove();
+      const q = el.querySelector('.chat-said');
+      if (q) q.textContent = mine[i]!.say;
+    });
+  }
+
+  /** Your lines the table will not say (the driver's onTalkRefused), oldest first: marked "not sent" and why. */
+  unsaid(count: number, why: keyof typeof NOT_SAID): void {
+    for (const el of this.pending.take(count)) {
+      el.classList.remove('pending');
+      el.classList.add('unsent');
+      el.removeAttribute('aria-busy');
+      const state = el.querySelector('.chat-state');
+      if (state) state.textContent = NOT_SAID[why];
     }
   }
 

@@ -44,4 +44,9 @@ export interface TableDriver {
   say?(text: string): string | null;
   /** Told when the player's lines reached the table, as the table placed them (with say). */
   onSaid?: ((lines: TalkLine[]) => void) | null;
+  /**
+   * Told when lines the player typed will never be said, oldest first: over their talk allowance ('busy'), past what a
+   * hand holds ('full'), sent with a request the table refused ('refused'), or still waiting when the game ended ('over').
+   */
+  onTalkRefused?: ((lines: string[], why: 'busy' | 'full' | 'refused' | 'over') => void) | null;
 }

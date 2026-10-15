@@ -260,6 +260,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   });
   // Your lines back from the table, as it placed them: the chat marks them said.
   driver.onSaid = (lines) => chat.said(lines);
+  driver.onTalkRefused = (lines, why) => chat.unsaid(lines.length, why);
   if (watching) {
     const group = h('div.speed', { role: 'radiogroup', 'aria-label': 'Speed' });
     for (const s of [1, 2, 4, 8]) {

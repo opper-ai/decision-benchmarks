@@ -814,6 +814,8 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .chat-msg { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; padding: 7px 9px 8px; border-radius: 12px; background: rgba(255, 240, 210, 0.06); }
 .chat-msg.you { background: rgba(215, 170, 82, 0.14); }
 .chat-msg.you.pending { opacity: 0.6; }
+.chat-msg.you.unsent { opacity: 0.55; }
+.chat-msg.you.unsent .chat-said { text-decoration: line-through; }
 .chat-state { font-size: 11px; color: var(--h-dim); }
 .chat-hint { margin: 0; font-size: 12px; color: var(--h-amber); text-align: right; }
 .chat-face, .chat-msg .chat-face.mono { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1.5px var(--h-brass-deep); }

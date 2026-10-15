@@ -40,3 +40,33 @@ export const SAY_MAX = 90;
 
 /** The counter under the chat's input: "12/90". */
 export const sayCount = (text: string): string => `${[...text].length}/${SAY_MAX}`;
+
+/**
+ * Your lines sent and not yet answered, oldest first. The table answers them in the order they were sent (said, or
+ * not said and why), so each answer settles the oldest ones: matched by order, never by text (the server cleans a line
+ * again, and a line may come back other than it was typed).
+ */
+export class PendingTalk<T> {
+  private q: T[] = [];
+
+  get size(): number {
+    return this.q.length;
+  }
+
+  add(x: T): void {
+    this.q.push(x);
+  }
+
+  /** The `n` oldest, settled. */
+  take(n: number): T[] {
+    return this.q.splice(0, n);
+  }
+}
+
+/** Why a line of yours was not said, as the chat shows it under the line. */
+export const NOT_SAID: Record<'busy' | 'full' | 'refused' | 'over', string> = {
+  busy: 'not sent: too much talk for now',
+  full: 'not sent: enough talk this hand',
+  refused: 'not sent',
+  over: 'not sent: the game is over',
+};

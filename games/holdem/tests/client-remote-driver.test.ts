@@ -297,25 +297,54 @@ describe('RemoteDriver: the player talks at the table', () => {
     expect(last.over).toBe(true);
   });
 
-  it('keeps a line for the next request when one fails, so it is said once, and caps what waits', async () => {
+  it('keeps a line for the next request when one could not get through, drops it with a refusal, and caps what waits', async () => {
     let n = 0;
     const bodies: Record<string, unknown>[] = [];
-    const answer = { token: 'T2', result: { seat: 1, key: 'call', meta: { by: 'answer', latencyMs: 1 }, snapshot: {}, talk: [{ seat: 0, after: 0, say: 'Hi.' }] } };
+    const answer = { token: 'T2', result: { seat: 1, key: 'call', meta: { by: 'answer', latencyMs: 1 }, snapshot: { over: false }, talk: [{ seat: 0, after: 0, say: 'Hi.' }] } };
+    const replies = [() => new Response('{}', { status: 502 }), () => new Response(JSON.stringify(answer), { status: 200 }), () => new Response(JSON.stringify({ error: 'It is your turn' }), { status: 409 })];
     const f = vi.fn<typeof fetch>(async (_input, init) => {
       bodies.push(JSON.parse(init!.body as string));
-      n++;
-      return n === 1 ? new Response(JSON.stringify({ error: 'It is your turn' }), { status: 409 }) : new Response(JSON.stringify(answer), { status: 200 });
+      return replies[Math.min(n++, replies.length - 1)]!();
     });
-    const d = new RemoteDriver({ fetch: f, url: (r) => r, storage: null, sleep: async () => {} });
+    const refused: unknown[] = [];
+    // A retry budget so short that the 502 gives up at once (the connection never came back).
+    const d = new RemoteDriver({ fetch: f, url: (r) => r, storage: null, sleep: async () => {}, retryForMs: 0, onTalkRefused: (lines, why) => refused.push([lines, why]) });
     Object.assign(d as unknown as Record<string, unknown>, { token: 'T1', mode: 'play' });
     expect(d.say('Hi.')).toBe('Hi.');
-    await expect(d.step()).rejects.toBeInstanceOf(TableError);
+    await expect(d.step()).rejects.toMatchObject({ kind: 'failed' });
     await d.step();
-    expect(bodies.map((b) => b.talk)).toEqual([['Hi.'], ['Hi.']]);
-    expect(bodies.map((b) => b.token)).toEqual(['T1', 'T1']);
+    // Sent again from the same token after the failure: said once.
+    expect(bodies.map((b) => [b.token, b.talk])).toEqual([['T1', ['Hi.']], ['T1', ['Hi.']]]);
+    // A refusal takes its lines with it, and says so.
+    d.say('Too late.');
+    await expect(d.step()).rejects.toMatchObject({ kind: 'refused' });
+    expect(refused).toEqual([[['Too late.'], 'refused']]);
+    expect(bodies.at(-1)!.talk).toEqual(['Too late.']);
     for (let i = 0; i < 6; i++) expect(d.say(`line ${i}`)).toBe(`line ${i}`);
     expect(d.say('one too many')).toBeNull();
     Object.assign(d as unknown as Record<string, unknown>, { mode: 'watch' });
     expect(d.say('watching')).toBeNull();
+  });
+
+  it("reports the lines the table did not say (over the allowance, or past a hand's room) and the ones left when the game ends", async () => {
+    const reply = { token: 'T2', result: { seat: 0, key: 'call', meta: { by: 'human', latencyMs: 1 }, snapshot: { over: false }, talk: [{ seat: 0, after: 1, say: 'a' }] }, talkRefused: { lines: ['b'], why: 'full' } };
+    let over = false;
+    const f = vi.fn<typeof fetch>(async () => new Response(JSON.stringify(over ? { ...reply, result: { ...reply.result, talk: undefined, snapshot: { over: true } }, talkRefused: undefined } : reply), { status: 200 }));
+    const events: unknown[] = [];
+    const d = new RemoteDriver({ fetch: f, url: (r) => r, storage: null, onSaid: (l) => events.push(['said', l.map((x) => x.say)]), onTalkRefused: (l, why) => events.push(['not said', l, why]) });
+    Object.assign(d as unknown as Record<string, unknown>, { token: 'T1', mode: 'play' });
+    d.say('a');
+    d.say('b');
+    await d.act({ key: 'call' });
+    expect(events).toEqual([['said', ['a']], ['not said', ['b'], 'full']]);
+    // The game ends with lines still waiting: they are not said, and no more can be.
+    over = true;
+    d.say('c');
+    d.say('d');
+    d.say('e');
+    d.say('f');
+    await d.step();
+    expect(events.at(-1)).toEqual(['not said', ['f'], 'over']);
+    expect(d.say('gg')).toBeNull();
   });
 });
