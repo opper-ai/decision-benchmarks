@@ -408,6 +408,15 @@ export class RemoteDriver implements TableDriver {
     // The hand in play's actions as they came, unless the table moved on (the answer that ended the hand was lost).
     this.metas = r.snapshot.hand === saved.hand ? saved.metas : [];
     this.handTalk = r.snapshot.hand === saved.hand && Array.isArray(saved.talk) ? saved.talk : [];
+    // The answer that finished the kept hand was lost: the resume answer has the hand as it ended, every action with
+    // what was said (and, the hand being over, why) and the talk that came with the last request. Take the hand so far
+    // from it rather than from what was kept before that request.
+    if (r.finished && r.finished.hand === saved.hand) {
+      this.keep(r.finished);
+      const ended = this.finished.get(saved.hand)!;
+      this.metas = ended.actions.map((a) => ({ by: a.by, latencyMs: a.latencyMs ?? 0, ...recordedMeta(a as ActionMeta), ...(a.why ? { why: a.why } : {}) }));
+      this.handTalk = [...(ended.talk ?? [])];
+    }
     this.ended = r.snapshot.over;
     this.keep(r.finished);
     this.save(r.snapshot);

@@ -418,3 +418,46 @@ describe('RemoteDriver: a reload in the middle of a hand', () => {
     expect(lines.every((l) => !('line' in l) || !l.words?.reasoning)).toBe(true);
   });
 });
+
+describe('RemoteDriver: a reload after the answer that finished a hand was lost', () => {
+  it('takes the hand as it ended from the resume answer: the last move’s words and the talk sent with it', async () => {
+    const s = await setup({ signedIn: true });
+    const storage = memoryStorage();
+    let lose = false;
+    const send = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const res = await fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), cookie: s.cookie } });
+      if (!lose || !String(input).match(/\/(step|act)$/)) return res;
+      const body = (await res.clone().json()) as { finished?: unknown };
+      // The request reached the table and finished the hand; its answer never comes back.
+      if (body.finished) throw new TypeError('the connection dropped');
+      return res;
+    };
+    const first = new RemoteDriver({ fetch: send, url: (route) => `${s.url}/api/table/${route}`, storage, retryForMs: 0, sleep: async () => {} });
+    let snap = await first.start({ seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: CHAT }, { kind: 'model', id: DECISION }] });
+    lose = true;
+    let lost = false;
+    for (let i = 0; i < 40 && !lost; i++) {
+      try {
+        if (snap.turn) {
+          first.say(`Line ${i}.`);
+          snap = (await first.act({ key: snap.turn.options.some((o) => o.key === 'check') ? 'check' : 'call' })).snapshot;
+        } else snap = (await first.step()).snapshot;
+      } catch (e) {
+        expect(e).toMatchObject({ kind: 'failed' });
+        lost = true;
+      }
+    }
+    expect(lost).toBe(true);
+
+    // A reload: the table as the lost answer left it, the hand over.
+    const second = new RemoteDriver({ fetch: (input, init) => fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), cookie: s.cookie } }), url: (route) => `${s.url}/api/table/${route}`, storage });
+    const resumed = await second.resume();
+    expect(resumed.view.street).toBe('done');
+    const hand = (await second.review()).hands.find((h) => h.hand === resumed.hand)!;
+    const so = second.handSoFar();
+    expect(so.metas).toHaveLength(hand.actions.length);
+    expect(so.metas.at(-1)?.say).toBe(hand.actions.at(-1)!.say);
+    expect(so.talk).toEqual(hand.talk ?? []);
+    expect(so.talk.length).toBeGreaterThan(0);
+  });
+});
