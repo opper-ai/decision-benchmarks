@@ -36,11 +36,8 @@ export function chatLinesOf(events: readonly HandEvent[], hand: number, street: 
   return out;
 }
 
-/** The longest line a player may say to the table. */
+/** The longest line a player may say to the table (the chat input's maxlength; the table cleans it to MAX_SAY too). */
 export const SAY_MAX = 90;
-
-/** The counter under the chat's input: "12/90". */
-export const sayCount = (text: string): string => `${[...text].length}/${SAY_MAX}`;
 
 /**
  * Your lines sent and not yet answered, oldest first. The table answers them in the order they were sent (said, or

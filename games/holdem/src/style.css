@@ -908,7 +908,6 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .chat-input { flex: 1; min-width: 0; height: 34px; box-sizing: border-box; padding: 0 12px; border-radius: 999px; border: 1px solid var(--h-line); background: rgba(0, 0, 0, 0.35); color: var(--h-text); font: 14px var(--j-body); }
 .chat-input::placeholder { color: rgba(243, 232, 205, 0.45); }
 .chat-input:focus { outline: none; border-color: var(--h-amber); }
-.chat-count { flex: none; font-size: 11px; color: var(--h-dim); font-variant-numeric: tabular-nums; }
 .chat-send { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--h-brass); color: var(--h-ink); font: 800 16px var(--j-display); }
 .chat-btn { position: relative; }
 .chat-unread { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--h-red); color: var(--h-ivory); font: 700 11px/18px var(--j-display); text-align: center; }

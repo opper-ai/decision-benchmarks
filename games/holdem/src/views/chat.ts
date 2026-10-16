@@ -7,7 +7,7 @@
 import type { HandEvent, Street } from '../../shared/engine.ts';
 import type { ActionMeta } from '../../shared/table.ts';
 import { cleanTalk } from '../../shared/questions.ts';
-import { chatLinesOf, NOT_SAID, PendingTalk, playedHandLines, type PlayedLine, SAY_MAX, sayCount, showThinking, thinkingKey, type ActionEvent, type ChatLine } from '../chat-lines.ts';
+import { chatLinesOf, NOT_SAID, PendingTalk, playedHandLines, type PlayedLine, SAY_MAX, showThinking, thinkingKey, type ActionEvent, type ChatLine } from '../chat-lines.ts';
 import { h } from '../dom.ts';
 import { actionChip, aHand, cardFace, chips, logNote, STREET_NAMES, type SeatPerson } from '../view-model.ts';
 import { avatarEl } from './parts.ts';
@@ -289,21 +289,18 @@ export class ChatBox {
   }
 
   private sayForm(onSay: (text: string) => string | null): HTMLElement {
-    const count = h('span.chat-count', { 'aria-hidden': 'true' }, sayCount(''));
-    // The counter counts what the table will say (cleanTalk: spaces folded, odd characters gone).
-    const counted = (text: string) => sayCount(cleanTalk(text));
+    // Nothing runs as you type: the input's maxlength caps the line, and it is cleaned once, when it is sent (the table
+    // cleans it again, and cleaning may shorten it).
     const input = h('input.chat-input', { type: 'text', maxlength: String(SAY_MAX), placeholder: 'Say something to the table…', 'aria-label': 'Say something to the table', autocomplete: 'off', enterkeyhint: 'send' }) as HTMLInputElement;
     this.input = input;
-    input.addEventListener('input', () => (count.textContent = counted(input.value)));
     // The action bar's keys (F, C, R, A) must not fire while typing here: actions.ts skips text inputs.
-    const form = h('form.chat-say', null, input, count, h('button.chat-send', { type: 'submit', 'aria-label': 'Send' }, '↑'));
+    const form = h('form.chat-say', null, input, h('button.chat-send', { type: 'submit', 'aria-label': 'Send' }, '↑'));
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (!cleanTalk(input.value)) return;
       const line = onSay(input.value);
       if (line === null) return this.hint('Slow down a little: your last lines are still on their way.');
       input.value = '';
-      count.textContent = counted('');
       this.you(line);
     });
     return form;
