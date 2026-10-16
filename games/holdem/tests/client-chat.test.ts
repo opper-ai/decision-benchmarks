@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { formatCard } from '../shared/cards';
 import type { HandEvent } from '../shared/engine';
-import { chatLinesOf, PendingTalk, sayCount, SAY_MAX } from '../src/chat-lines';
+import { MAX_SAY } from '../shared/questions';
+import { chatLinesOf, PendingTalk, SAY_MAX } from '../src/chat-lines';
 import { LocalDriver } from '../src/local-driver';
 
 describe('the table chat: what the dealer says', () => {
@@ -25,10 +26,9 @@ describe('the table chat: what the dealer says', () => {
     expect(chatLinesOf(events, 4)).toEqual([{ kind: 'board', street: 'flop', cards: [0, 13, 26].map(formatCard) }]);
   });
 
-  it('keeps your own line short: 90 characters, counted as you type', () => {
+  it('keeps your own line short: the input takes 90 characters, the table’s own cap', () => {
     expect(SAY_MAX).toBe(90);
-    expect(sayCount('Nice hand.')).toBe('10/90');
-    expect(sayCount('x'.repeat(95))).toBe('95/90');
+    expect(SAY_MAX).toBe(MAX_SAY);
   });
 });
 

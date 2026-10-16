@@ -13,7 +13,6 @@
    600 to 900: the casino-poster face for titles, banners, card ranks and the big numbers. */
 @font-face { font-family: 'Fraunces'; src: url('/fonts/fraunces-latin.woff2') format('woff2'); font-weight: 600 900; font-display: swap; }
 @font-face { font-family: 'Caveat'; src: url('/fonts/caveat-latin.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
-@property --bank-left { syntax: '<number>'; inherits: false; initial-value: 1; }
 
 :root {
   --h-room: #1c100a;
@@ -256,20 +255,32 @@
 .avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; background: var(--h-felt-deep); box-shadow: 0 0 0 2.5px var(--h-brass), 0 6px 14px rgba(0, 0, 0, 0.55); transition: box-shadow 0.2s; }
 .avatar.mono { display: grid; place-items: center; font: 800 calc(var(--av) * 0.4) var(--h-poster); color: var(--h-ink); background: radial-gradient(circle at 35% 30%, #f3d78f, var(--h-brass) 60%, var(--h-brass-deep)); }
 .seat.to-act .avatar { box-shadow: 0 0 0 3px var(--h-amber), 0 0 26px rgba(255, 197, 107, 0.65); }
-/* The time bank: a ring that runs down while the seat thinks. */
-.avatar-wrap::before {
-  content: ''; position: absolute; inset: -7px; border-radius: 50%; opacity: 0; transition: opacity 0.2s;
-  background: conic-gradient(var(--h-amber) calc(var(--bank-left) * 1turn), rgba(255, 255, 255, 0.1) 0);
+/*
+ * The time bank: a ring that runs down while the seat thinks. Its amber is two half discs turned on the compositor
+ * (transform only), each seen through one half of the ring: the left half's turns away in the first half of the time,
+ * the right half's in the second. A seat thinking (a model's turn: most of a game) then costs no style or paint work.
+ */
+.bank {
+  position: absolute; inset: -7px; border-radius: 50%; opacity: 0; transition: opacity 0.2s; pointer-events: none; background: rgba(255, 255, 255, 0.1);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
 }
-.seat.thinking .avatar-wrap::before { opacity: 1; animation: bank var(--bank, 30s) linear forwards; }
-@keyframes bank { from { --bank-left: 1; } to { --bank-left: 0; } }
+.bank i { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
+.bank i:first-child { left: 50%; }
+.bank i:last-child { left: 0; }
+.bank i::before { content: ''; position: absolute; top: 0; bottom: 0; width: 200%; transform: rotate(180deg); }
+.bank i:first-child::before { left: -100%; background: linear-gradient(90deg, var(--h-amber) 50%, transparent 0); }
+.bank i:last-child::before { left: 0; background: linear-gradient(90deg, transparent 50%, var(--h-amber) 0); }
+.seat.thinking .bank { opacity: 1; }
+.seat.thinking .bank i:first-child::before { animation: bank-right var(--bank, 30s) linear forwards; }
+.seat.thinking .bank i:last-child::before { animation: bank-left var(--bank, 30s) linear forwards; }
+@keyframes bank-right { 0%, 50% { transform: rotate(180deg); } 100% { transform: rotate(0deg); } }
+@keyframes bank-left { 0% { transform: rotate(180deg); } 50%, 100% { transform: rotate(0deg); } }
 .seat.folded .avatar-wrap, .seat.folded .hole { opacity: 0.45; filter: saturate(0.4); }
 .seat.out { opacity: 0.4; filter: grayscale(0.8); }
 .plate {
   display: grid; justify-items: center; min-width: 76px; max-width: 132px; padding: 4px 9px 4px; border-radius: 10px; margin-top: -6px; position: relative; z-index: 1;
-  background: var(--h-panel); border: 1px solid var(--h-line); backdrop-filter: blur(2px);
+  background: var(--h-panel); border: 1px solid var(--h-line);
 }
 .plate .name { font: 700 12.5px/1.25 var(--j-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .plate .stack { font: 700 13px/1.2 var(--j-display); color: var(--h-brass); font-variant-numeric: tabular-nums; }
@@ -382,10 +393,11 @@
 .tell i:nth-child(1) { background: #a35b4b; }
 .tell i:nth-child(2) { background: var(--h-ivory); }
 .tell i:nth-child(3) { background: var(--h-amber); }
-.seat.thinking .tell i { animation: wobble 0.7s ease-in-out infinite alternate; }
+.seat.thinking .tell i { height: 90%; transform-origin: bottom; transition: none; animation: wobble 0.7s ease-in-out infinite alternate; }
 .seat.thinking .tell i:nth-child(2) { animation-delay: -0.25s; }
 .seat.thinking .tell i:nth-child(3) { animation-delay: -0.5s; }
-@keyframes wobble { from { height: 20%; } to { height: 90%; } }
+/* The bars bob between a fifth and nine tenths of the meter: scaled (the compositor's work), not resized (a layout a frame). */
+@keyframes wobble { from { transform: scaleY(0.222); } to { transform: none; } }
 
 /*
  * Table talk: the models' own words, quoted, in a face made to read small. The whole line always shows: talk is at most
@@ -675,7 +687,8 @@
 .lineup .add { justify-self: start; border: 1px dashed var(--h-line); background: none; color: var(--h-text); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; }
 
 /* ---------- overlays: the end of the game, the hand review ---------- */
-.overlay { position: absolute; inset: 0; z-index: 20; overflow: auto; overscroll-behavior: contain; background: rgba(18, 9, 4, 0.94); backdrop-filter: blur(3px); display: grid; align-items: start; justify-items: center; padding: 14px 10px 24px; }
+/* No backdrop blur under a 94% opaque veil: it would show nowhere, yet blur the live table under it on every frame. */
+.overlay { position: absolute; inset: 0; z-index: 20; overflow: auto; overscroll-behavior: contain; background: rgba(18, 9, 4, 0.94); display: grid; align-items: start; justify-items: center; padding: 14px 10px 24px; }
 @media (min-width: 760px) { .overlay { padding: 28px 28px 36px; } }
 /* The end of the game: an ivory poster on the felt. */
 .poster {
@@ -778,15 +791,20 @@
   box-shadow: 0 0 0 2px var(--h-amber), 0 0 16px 4px rgba(255, 197, 107, 0.55); animation: spoke 0.6s ease-out both;
 }
 @keyframes spoke { 0% { opacity: 0; transform: scale(0.94); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.1); } }
-/* ... and its new line in the chat lights up. */
-.chat-msg.fresh { animation: fresh 1.6s ease-out; }
-@keyframes fresh { from { background: rgba(215, 170, 82, 0.34); box-shadow: inset 0 0 0 1px rgba(255, 197, 107, 0.6); } }
+/* ... and its new line in the chat lights up: a glow over the message that fades (opacity, the compositor's work). */
+.chat-msg.fresh { position: relative; isolation: isolate; }
+.chat-msg.fresh::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: rgba(215, 170, 82, 0.34); box-shadow: inset 0 0 0 1px rgba(255, 197, 107, 0.6); animation: fresh 1.6s ease-out;
+}
+@keyframes fresh { from { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   :root { --h-motion: 0.01; }
   /* Still: a ring that stays while the class does (views/table.ts takes it off after 700 ms). */
   .seat.spoke .avatar-wrap::after { animation: none; opacity: 1; }
   .bubble, .banner, .card.arrive { animation: none; }
-  .seat.thinking .tell i { animation: none; }
+  .seat.thinking .tell i { animation: none; height: calc(var(--p, 0.1) * 100%); }
+  .chat-msg.fresh::after { animation: none; }
 }
 
 /* ---------- chips you can follow: slides, sweeps, pay-outs, counting numbers ---------- */
@@ -844,7 +862,7 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 @media (max-width: 759px) { .reconnect { top: calc(var(--tb-h) + 6px); font-size: 12.5px; } }
 
 /* A small question over the table (views/confirm.ts): "Leave this table?", the safe answer first and focused. */
-.confirm-veil { align-items: start; padding-top: min(28%, 150px); background: rgba(18, 9, 4, 0.7); }
+.confirm-veil { align-items: start; padding-top: min(28%, 150px); background: rgba(18, 9, 4, 0.7); backdrop-filter: blur(3px); }
 .poster.confirm { width: min(100%, 360px); gap: 12px; padding: 22px 18px 18px; }
 .poster.confirm h2 { font-size: clamp(24px, 6.4vw, 30px); }
 .poster.confirm .sub { margin: -4px 0 4px; font-size: 14.5px; }
@@ -908,7 +926,6 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .chat-input { flex: 1; min-width: 0; height: 34px; box-sizing: border-box; padding: 0 12px; border-radius: 999px; border: 1px solid var(--h-line); background: rgba(0, 0, 0, 0.35); color: var(--h-text); font: 14px var(--j-body); }
 .chat-input::placeholder { color: rgba(243, 232, 205, 0.45); }
 .chat-input:focus { outline: none; border-color: var(--h-amber); }
-.chat-count { flex: none; font-size: 11px; color: var(--h-dim); font-variant-numeric: tabular-nums; }
 .chat-send { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--h-brass); color: var(--h-ink); font: 800 16px var(--j-display); }
 .chat-btn { position: relative; }
 .chat-unread { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--h-red); color: var(--h-ivory); font: 700 11px/18px var(--j-display); text-align: center; }

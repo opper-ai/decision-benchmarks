@@ -7,7 +7,7 @@
 import type { HandEvent, Street } from '../../shared/engine.ts';
 import type { ActionMeta } from '../../shared/table.ts';
 import { cleanTalk } from '../../shared/questions.ts';
-import { chatLinesOf, NOT_SAID, PendingTalk, playedHandLines, type PlayedLine, SAY_MAX, sayCount, showThinking, thinkingKey, type ActionEvent, type ChatLine } from '../chat-lines.ts';
+import { chatLinesOf, NOT_SAID, PendingTalk, playedHandLines, type PlayedLine, SAY_MAX, showThinking, thinkingKey, type ActionEvent, type ChatLine } from '../chat-lines.ts';
 import { h } from '../dom.ts';
 import { actionChip, aHand, cardFace, chips, logNote, STREET_NAMES, type SeatPerson } from '../view-model.ts';
 import { avatarEl } from './parts.ts';
@@ -40,6 +40,8 @@ export interface ChatOptions {
    * when it can't take it now (too many waiting: "Slow down a little").
    */
   onSay?: (text: string) => string | null;
+  /** The table's life: once it aborts (the player left), the chat stops following the window's width and can go. */
+  signal?: AbortSignal;
 }
 
 export class ChatBox {
@@ -94,7 +96,8 @@ export class ChatBox {
       const open = (isWide: boolean) => isWide && readStored(CHAT_OPEN_KEY) === 'on';
       this.toggle(open(wide.matches));
       const follow = (e: MediaQueryListEvent) => (this.el.isConnected ? this.toggle(open(e.matches)) : wide.removeEventListener('change', follow));
-      wide.addEventListener('change', follow);
+      // Removed when the table goes (else the window's media query would keep every old table's chat alive).
+      wide.addEventListener('change', follow, o.signal ? { signal: o.signal } : undefined);
     } else this.toggle(false);
   }
 
@@ -274,7 +277,10 @@ export class ChatBox {
     // A new line someone said lights up for a moment (with the chat open beside the table it stands in for the bubble).
     if (!this.quiet && !mine && el.querySelector('.chat-said')) {
       el.classList.add('fresh');
-      el.addEventListener('animationend', () => el.classList.remove('fresh'), { once: true });
+      // Off when the glow ends, or after its 1.6 s anyway: with reduced motion there is no animation to end.
+      const done = () => el.classList.remove('fresh');
+      el.addEventListener('animationend', done, { once: true });
+      setTimeout(done, 1700);
     }
     this.scroller.append(el);
     while (this.scroller.childElementCount > KEEP + 1) this.scroller.children[1]!.remove();
@@ -289,21 +295,18 @@ export class ChatBox {
   }
 
   private sayForm(onSay: (text: string) => string | null): HTMLElement {
-    const count = h('span.chat-count', { 'aria-hidden': 'true' }, sayCount(''));
-    // The counter counts what the table will say (cleanTalk: spaces folded, odd characters gone).
-    const counted = (text: string) => sayCount(cleanTalk(text));
+    // Nothing runs as you type: the input's maxlength caps the line, and it is cleaned once, when it is sent (the table
+    // cleans it again, and cleaning may shorten it).
     const input = h('input.chat-input', { type: 'text', maxlength: String(SAY_MAX), placeholder: 'Say something to the table…', 'aria-label': 'Say something to the table', autocomplete: 'off', enterkeyhint: 'send' }) as HTMLInputElement;
     this.input = input;
-    input.addEventListener('input', () => (count.textContent = counted(input.value)));
     // The action bar's keys (F, C, R, A) must not fire while typing here: actions.ts skips text inputs.
-    const form = h('form.chat-say', null, input, count, h('button.chat-send', { type: 'submit', 'aria-label': 'Send' }, '↑'));
+    const form = h('form.chat-say', null, input, h('button.chat-send', { type: 'submit', 'aria-label': 'Send' }, '↑'));
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (!cleanTalk(input.value)) return;
       const line = onSay(input.value);
       if (line === null) return this.hint('Slow down a little: your last lines are still on their way.');
       input.value = '';
-      count.textContent = counted('');
       this.you(line);
     });
     return form;
