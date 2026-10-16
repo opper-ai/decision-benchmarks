@@ -310,7 +310,9 @@ export async function matrix(o: { modes?: ('play' | 'watch' | 'spectate')[]; sea
           (deal ?? allin)?.click();
           await sleep(300);
         }
-        if (await until(() => !!room.querySelector('.overlay .poster'), 3000)) {
+        // Winning the table instead brings up the game-over poster too: that run never went out.
+        const won = () => room.querySelector('.overlay .poster h2')?.textContent?.trim() === 'You won the table';
+        if ((await until(() => !!room.querySelector('.overlay .poster'), 3000)) && !won()) {
           await sleep(500);
           hs.add(Math.round(room.getBoundingClientRect().height));
           const poster = room.querySelector('.overlay .poster')?.getAttribute('aria-label') ?? 'the poster';
@@ -323,7 +325,7 @@ export async function matrix(o: { modes?: ('play' | 'watch' | 'spectate')[]; sea
             hs.add(Math.round(room.getBoundingClientRect().height));
             [...measure(room), ...measureBar(room)].forEach((p) => problems.add(`watching the rest: ${p}`));
           }
-        } else problems.add('never went out');
+        } else problems.add(won() ? 'never went out: won the table' : 'never went out');
         result.bustHeights = [...hs];
         for (const x of hs) if (!heights.has(x)) problems.add(`out of the game: the room is ${x} px high, ${[...heights].join('/')} px in the hand`);
       }
