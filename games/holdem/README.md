@@ -9,8 +9,9 @@ No-limit Texas Hold'em against AI models, built (v1) from the plan in
 - the page (`src/`): play a Sit & Go or watch models play live, the hand review with every AI's cards and reasoning,
   the end screen with a share image and link, the curated replays, and the leaderboard;
 - the curated replays and the poster (`scripts/`);
-- the models: the decision models, the Claude, GPT, Gemini, Open models (DeepSeek V4 Pro, Kimi K3, GLM-5.3) and Titans
-  sets, and more chat models any seat can pick (Grok, more DeepSeek, Qwen, GLM, MiniMax).
+- the models: the decision models (the Decision set is Jev 1.14, Eevo 1 and GPT-6 Luna Decisions; any seat can pick
+  the others), the Claude, GPT, Gemini, Open models (DeepSeek V4 Pro, Kimi K3, GLM-5.3) and Titans sets, and more chat
+  models any seat can pick (Grok, more DeepSeek, Qwen, GLM, MiniMax).
 
 ## The engine (`shared/`)
 

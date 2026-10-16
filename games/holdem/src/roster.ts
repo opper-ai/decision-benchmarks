@@ -33,6 +33,9 @@ export interface RosterModel {
 /** Avatar folders by model id, as avatars/index.json has them (folders keep the names they were drawn under). */
 const AVATARS: Record<string, string> = {
   'typesafe/jev-1.13.0': 'typesafe-jev-1-13-0',
+  // A new version of a model keeps its character.
+  'typesafe/jev-1.14.0': 'typesafe-jev-1-13-0',
+  'eevo:eu/eevo-1': 'upright-eevo-1',
   'sference/clef': 'sference-clef',
   'cloudflare:global/clef-flash': 'cloudflare-global-clef-flash',
   'opper/kev-4b': 'opper-kev-4b',
@@ -67,6 +70,8 @@ const AVATARS: Record<string, string> = {
 
 /** Practice stand-ins: a mix of styles at every preset table, so each set plays differently. */
 const STAND_INS: Record<string, BotName> = {
+  'typesafe/jev-1.14.0': 'maniac',
+  'eevo:eu/eevo-1': 'rock',
   'typesafe/jev-1.13.0': 'maniac',
   'sference/clef': 'rock',
   'openai/gpt-6-luna-decisions': 'station',
@@ -102,6 +107,8 @@ const STAND_INS: Record<string, BotName> = {
 /** Names for a phone's name plate: the character's own name, and the family or version beside it. */
 const SHORT: Record<string, [string, string]> = {
   'typesafe/jev-1.13.0': ['Jev', 'Jev 1.13'],
+  'typesafe/jev-1.14.0': ['Jev', 'Jev 1.14'],
+  'eevo:eu/eevo-1': ['Eevo', 'Eevo 1'],
   'sference/clef': ['Clef', 'Decision'],
   'openai/gpt-6-luna-decisions': ['Luna', 'GPT-6 Decisions'],
   'cloudflare:global/clef-flash': ['Flash', 'Clef Flash'],

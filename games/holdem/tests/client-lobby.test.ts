@@ -35,6 +35,14 @@ describe('the seat picker', () => {
     expect(SETS.filter((s) => s.free).map((s) => s.id)).toEqual(['decision']);
     expect(SETS.find((s) => s.id === 'titans')!.blurb).toBe('Fable, Astra and Argon. Big, expensive, very good.');
   });
+
+  it('seats the three strongest decision models in the Decision set, one Jev only, and offers every decision model for any seat', () => {
+    expect(set('decision')).toEqual(['typesafe/jev-1.14.0', 'eevo:eu/eevo-1', 'openai/gpt-6-luna-decisions']);
+    const decision = MODELS.filter((m) => m.group === 'decision').map((m) => m.id);
+    for (const id of ['typesafe/jev-1.13.0', 'sference/clef', 'cloudflare:global/clef-flash', 'azure:global/microsoft-decision-1', 'empiriolabs/aplomb-1', 'opper/kev-4b']) expect(decision, id).toContain(id);
+    // Practice stand-ins: a mix of styles at the Decision table too.
+    expect(new Set(set('decision').map((id) => MODELS.find((m) => m.id === id)!.standIn)).size).toBe(3);
+  });
 });
 
 describe('how many seats', () => {

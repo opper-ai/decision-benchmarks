@@ -128,6 +128,8 @@ describe('share links', () => {
     expect(LINK_MODELS.slice(0, 2)).toEqual(['typesafe/jev-1.13.0', 'sference/clef']);
     expect(LINK_MODELS.indexOf('azure/gpt-6-astra-global')).toBe(16);
     expect(LINK_MODELS.indexOf('nebius/MiniMaxAI/MiniMax-M3')).toBe(26);
+    expect(LINK_MODELS.indexOf('vertexai/gemini-3.5-flash-lite-eu')).toBe(29);
+    expect(LINK_MODELS.slice(30)).toEqual(['typesafe/jev-1.14.0', 'eevo:eu/eevo-1']);
     // A game with models added later goes through a link and back.
     const rec = await finishedGame({ seed: 9, seats: [{ kind: 'human', id: 'you' }, { kind: 'model', id: 'vertexai/gemini-4-argon-eu' }, { kind: 'model', id: 'vertexai/gemini-3.5-flash-lite-eu' }] });
     const back = decodeGame(encodeGame(rec));

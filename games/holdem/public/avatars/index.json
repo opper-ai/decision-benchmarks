@@ -10,6 +10,17 @@
       "smug"
     ]
   },
+  "typesafe/jev-1.14.0": {
+    "slug": "typesafe-jev-1-13-0",
+    "name": "Jev 1.14",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
   "sference/clef": {
     "slug": "sference-clef",
     "name": "Clef",
@@ -90,6 +101,17 @@
   "greenpt/metis": {
     "slug": "greenpt-metis",
     "name": "Metis",
+    "moods": [
+      "relaxed",
+      "confident",
+      "nervous",
+      "annoyed",
+      "smug"
+    ]
+  },
+  "eevo:eu/eevo-1": {
+    "slug": "upright-eevo-1",
+    "name": "Eevo 1",
     "moods": [
       "relaxed",
       "confident",

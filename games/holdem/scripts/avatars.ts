@@ -41,10 +41,15 @@ export const MOOD_PROMPTS: Record<Mood, string> = {
 
 const TITAN = 'A titan: larger than life, seen slightly from below, immense broad shoulders spanning the full width of the frame, a faint majestic glow behind the head; the head sits a little lower in the frame so the whole head and crown fit with clear space above.';
 
+/** Jev's character, for every version of the model. */
+const JEV = 'A wiry, quick-witted young card sharp in his twenties: a tall glossy jet-black pompadour quiff, a thin pencil moustache, sharp cheekbones, small round amber-tinted spectacles, a single silver ear stud; an electric-teal satin bomber jacket over a black turtleneck.';
+
 /** One character per model, inspired by the model's name only. Each has its own colour and silhouette. */
 export const CHARACTERS: { id: string; name: string; character: string; slug?: string }[] = [
   // Decision models (packages/kit/shared/models.ts)
-  { id: 'typesafe/jev-1.13.0', name: 'Jev 1.13', character: 'A wiry, quick-witted young card sharp in his twenties: a tall glossy jet-black pompadour quiff, a thin pencil moustache, sharp cheekbones, small round amber-tinted spectacles, a single silver ear stud; an electric-teal satin bomber jacket over a black turtleneck.' },
+  { id: 'typesafe/jev-1.13.0', name: 'Jev 1.13', character: JEV },
+  // A new version of a model keeps its character: Jev 1.14 sits in Jev 1.13's folder.
+  { id: 'typesafe/jev-1.14.0', slug: 'typesafe-jev-1-13-0', name: 'Jev 1.14', character: JEV },
   { id: 'sference/clef', name: 'Clef', character: 'A poised jazz pianist woman in her forties with deep brown skin: her black hair swept up into one tall, elegant spiral curl; long gold drop earrings; a deep violet velvet gown and a black-and-white piano-key patterned silk scarf around her shoulders.' },
   { id: 'cloudflare:global/clef-flash', name: 'Clef Flash', character: 'A hyperactive young DJ in her early twenties: a short spiky platinum-blonde pixie cut with one hot-magenta streak, big chunky white headphones around her neck, freckles; a glossy hot-magenta track jacket with a high zipped collar.' },
   { id: 'opper/kev-4b', name: 'Kev 4B', character: 'A short, stocky, round-faced friendly bloke in his thirties: a bushy ginger beard, rosy cheeks, a brown tweed flat cap, a stubby pencil tucked behind one ear; a chunky bright-orange knitted cardigan over a white t-shirt.' },
@@ -53,6 +58,7 @@ export const CHARACTERS: { id: string; name: string; character: string; slug?: s
   { id: 'azure:global/microsoft-decision-1', name: 'Microsoft Decision 1', character: 'A meticulous corporate strategist in his fifties: neatly side-parted steel-grey hair, a tidy clipped grey beard, rectangular black-rimmed glasses; a crisp navy-blue pinstripe three-piece suit, a pale sky-blue shirt and a silver tie, no badges or emblems.' },
   { id: 'empiriolabs/aplomb-1', name: 'Aplomb 1', character: 'A supremely self-possessed old-school gentleman gambler in his seventies: a bald crown with tufts of white hair at the sides, a magnificent waxed white handlebar moustache, a gold-rimmed monocle; a burgundy velvet smoking jacket with black satin lapels and a cream silk cravat.' },
   { id: 'greenpt/metis', name: 'Metis', character: 'A wise and cunning woman inspired by the ancient Greek titaness of counsel: curly auburn hair pinned up beneath a gold olive-leaf wreath, keen grey eyes; an ivory draped chiton with gold trim and a round gold shoulder brooch.' },
+  { id: 'eevo:eu/eevo-1', slug: 'upright-eevo-1', name: 'Eevo 1', character: 'A sharp-eyed, unhurried field naturalist woman in her forties, a student of evolution, with fair, lightly freckled skin: a sleek chin-length ash-blonde bob, keen pale-green eyes, a small brass magnifying loupe hanging on a fine chain at her neck; a wide-brimmed sand-coloured canvas field hat with a single iridescent electric-blue morpho butterfly perched on the brim; a mustard-yellow corduroy field jacket with a dark chocolate-brown collar over a high-necked cream blouse.' },
   // Claude family
   // EU routes (games/holdem/shared/models.ts); the folders keep the names they were first generated under.
   { id: 'aws/claude-haiku-5-5-eu', slug: 'anthropic-claude-haiku-5-5', name: 'Haiku 5.5', character: 'A minimalist poet of very few words: a slender, calm young person with a clean-shaven head and a long neck; a plain high-collared charcoal-black linen tunic; a single vermilion-red ink brush tucked behind one ear. A spare, almost monochrome design with one red accent.' },
@@ -122,8 +128,13 @@ async function main() {
   const moods = values.mood.flatMap((s) => s.split(',')) as Mood[];
   for (const m of moods) if (!MOODS.includes(m)) die(`unknown mood: ${m} (one of ${MOODS.join(', ')})`);
   const wanted: readonly Mood[] = moods.length ? moods : MOODS;
-  const slugs = new Set(CHARACTERS.map(slugOf));
-  if (slugs.size !== CHARACTERS.length) die('two models share a slug');
+  // Models may share a folder only when they are one character (a new version of a model keeps its faces).
+  const bySlug = new Map<string, string>();
+  for (const c of CHARACTERS) {
+    const drawn = bySlug.get(slugOf(c));
+    if (drawn !== undefined && drawn !== c.character) die(`two characters share the slug ${slugOf(c)}`);
+    bySlug.set(slugOf(c), c.character);
+  }
 
   const encoder = which('cwebp') ? 'cwebp' : which('magick') ? 'magick' : die('needs cwebp or ImageMagick (magick) on PATH');
   mkdirSync(values.out, { recursive: true });
@@ -190,7 +201,7 @@ async function main() {
     }
   }
 
-  const queue = [...chars];
+  const queue = chars.filter((c, i) => chars.findIndex((d) => slugOf(d) === slugOf(c)) === i);
   const failures: string[] = [];
   await Promise.all(
     Array.from({ length: Math.max(1, Number(values.concurrency)) }, async () => {
