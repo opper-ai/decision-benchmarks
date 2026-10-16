@@ -95,7 +95,7 @@ export const HOLDEM_MODELS: readonly HoldemModel[] = [
 ];
 
 /** The preset tables: you and the set's models (three each, so a preset table is four-handed). */
-export const SETS: readonly { id: SetId; name: string; models: readonly string[] }[] = (['gemini', 'claude', 'gpt', 'decision', 'open', 'titans'] as const).map((id) => ({
+export const SETS: readonly { id: SetId; name: string; models: readonly string[] }[] = (['decision', 'open', 'titans', 'gemini', 'claude', 'gpt'] as const).map((id) => ({
   id,
   name: { decision: 'Decision models', claude: 'Claude', gpt: 'GPT', gemini: 'Gemini', open: 'Open models', titans: 'Titans' }[id],
   models: HOLDEM_MODELS.filter((m) => m.sets.includes(id)).map((m) => m.id),

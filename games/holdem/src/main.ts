@@ -150,7 +150,11 @@ function keepInView(el: HTMLElement): void {
 
 function room(): void {
   const host = $('#room');
-  let choice: LobbyChoice = { mode: 'play', setId: 'decision', models: [...SETS.find((s) => s.id === 'decision')!.models] };
+  // The open models are the table to start with; a visitor who can't play chat models (signed out) gets the free
+  // decision models instead, once the server says so (below), unless they already started a table.
+  const presetChoice = (id: 'open' | 'decision'): LobbyChoice => ({ mode: 'play', setId: id, models: [...SETS.find((s) => s.id === id)!.models] });
+  const firstChoice = presetChoice('open');
+  let choice: LobbyChoice = firstChoice;
   let leave: AbortController | null = null;
 
   let access: LobbyAccess | undefined;
@@ -203,6 +207,7 @@ function room(): void {
   // Once the server says who is signed in, the lobby says what they can start.
   void ME.then((me) => {
     access = accessOf(me);
+    if (choice === firstChoice && access && !access.chat) choice = presetChoice('decision');
     if (inLobby) lobby();
   });
 
