@@ -507,6 +507,13 @@ export class TableUI {
     setFaceMood(this.seatEls[seat]!.avatar, this.people[seat]!, mood);
   }
 
+  /** Takes every speech bubble off the table (the chat opened beside it: the words are there now). */
+  clearBubbles(): void {
+    this.area.querySelectorAll('.bubble').forEach((b) => b.remove());
+    for (const t of this.bubbles.values()) clearTimeout(t);
+    this.bubbles.clear();
+  }
+
   /** A speech bubble with table talk, gone after a few seconds; or, with the chat open beside the table, a pulse. */
   say(seat: number, text: string): void {
     const root = this.seatEls[seat]!.root;

@@ -75,6 +75,10 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
   });
   // The table chat: the dealer's lines, and what the models said and why (every card is up in a replay).
   const chat = new ChatBox({ people: seats.map(personOf), mode: 'watch', viewer: null });
+  // Opening the chat beside the table takes the bubbles away (ui is the table in play at the time).
+  chat.onOpen = () => {
+    if (chatBesideTable(chat.el)) ui.clearBubbles();
+  };
   let said: { seat: number; meta: ActionMeta } | undefined;
   const reviewBtn = h('button.tbtn', { type: 'button', onclick: () => void openReview() }, 'Review');
   const toolbar = h(

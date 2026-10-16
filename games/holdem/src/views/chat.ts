@@ -105,6 +105,9 @@ export class ChatBox {
    * The chat as a sheet (a phone) or a panel (wide): open or shut. `remember`: the player's own choice, kept for a wide
    * screen's next table.
    */
+  /** Told when the chat opens (the table takes its bubbles away when the chat sits beside it). */
+  onOpen: (() => void) | null = null;
+
   toggle(open = !this.el.classList.contains('open'), remember = false): void {
     this.el.classList.toggle('open', open);
     this.el.classList.toggle('collapsed', !open);
@@ -114,6 +117,7 @@ export class ChatBox {
     if (open) {
       this.resetUnread();
       this.toBottom();
+      this.onOpen?.();
     }
     if (remember && typeof matchMedia === 'function' && matchMedia('(min-width: 1000px)').matches) {
       try {

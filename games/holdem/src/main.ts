@@ -150,11 +150,7 @@ function keepInView(el: HTMLElement): void {
 
 function room(): void {
   const host = $('#room');
-  // The open models are the table to start with; a visitor who can't play chat models (signed out) gets the free
-  // decision models instead, once the server says so (below), unless they already started a table.
-  const presetChoice = (id: 'open' | 'decision'): LobbyChoice => ({ mode: 'play', setId: id, models: [...SETS.find((s) => s.id === id)!.models] });
-  const firstChoice = presetChoice('open');
-  let choice: LobbyChoice = firstChoice;
+  let choice: LobbyChoice = { mode: 'play', setId: 'decision', models: [...SETS.find((s) => s.id === 'decision')!.models] };
   let leave: AbortController | null = null;
 
   let access: LobbyAccess | undefined;
@@ -207,7 +203,6 @@ function room(): void {
   // Once the server says who is signed in, the lobby says what they can start.
   void ME.then((me) => {
     access = accessOf(me);
-    if (choice === firstChoice && access && !access.chat) choice = presetChoice('decision');
     if (inLobby) lobby();
   });
 
@@ -264,6 +259,10 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     viewer: watching ? null : 0,
     ...(watching ? {} : { onSay: (text: string) => driver.say?.(text) ?? null }),
   });
+  // Opening the chat beside the table takes the bubbles away: its words are in the chat now.
+  chat.onOpen = () => {
+    if (chatBesideTable(chat.el)) ui.clearBubbles();
+  };
   // Your lines back from the table, as it placed them: the chat marks them said.
   driver.onSaid = (lines) => chat.said(lines);
   driver.onTalkRefused = (lines, why) => chat.unsaid(lines.length, why);
