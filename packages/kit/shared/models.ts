@@ -6,7 +6,7 @@
  *
  * Opper also serves some of these from a second route, left out here: Microsoft Decision 1 from azure:eu/, Clef from
  * cloudflare:global/clef, Clef Flash from berget/Cloudflare/clef-flash, and Eevo 1 from eevo/eevo-1. Eevo 1 plays
- * through Upright's EU route (eevo:eu/eevo-1), as on JevMan, which answered faster there; it costs about 60 times
+ * through Upright's EU route (eevo:eu/eevo-1), as on JevMan, which answered faster there; it costs about 65 times
  * Jev's price per input token ($2.75 a million against $0.042).
  */
 export const DECISION_MODELS = [
