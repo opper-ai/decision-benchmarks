@@ -23,7 +23,7 @@ import { lobbyView, seatsOf, type LobbyAccess, type LobbyChoice } from './views/
 import { reviewView } from './views/review.ts';
 import { TableUI } from './views/table.ts';
 import { aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
-import { ChatBox } from './views/chat.ts';
+import { ChatBox, chatBesideTable } from './views/chat.ts';
 import { confirmDialog } from './views/confirm.ts';
 import { preloadFaces } from './views/parts.ts';
 
@@ -245,7 +245,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   const driver: TableDriver = local ?? (liveRemote = new RemoteDriver({ onConnection: reconnect.update }));
   /** A resumed table catching up on the hand in play: at once, without its sounds. */
   let restoring = false;
-  const ui = new TableUI({ seats, viewer: watching ? null : 0, speed: () => (restoring ? 1000 : watching || spectating ? speed : 1), reduced: () => restoring || reducedMotion() });
+  const ui = new TableUI({ seats, viewer: watching ? null : 0, speed: () => (restoring ? 1000 : watching || spectating ? speed : 1), reduced: () => restoring || reducedMotion(), talkInChat: () => chatBesideTable(chat.el) });
   /** Play mode, after you went out: the AIs play on, faster, and you watch. */
   let spectating = false;
 

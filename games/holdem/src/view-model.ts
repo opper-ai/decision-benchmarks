@@ -67,6 +67,14 @@ export function bubbleMs(text: string, speed: number): number {
   return Math.max(1200, Math.round(read / Math.sqrt(Math.max(1, speed))));
 }
 
+/** Up to this many characters a speech bubble's words are at full size; a longer line (talk is at most 90) a step smaller, so it fits three lines. */
+export const BUBBLE_FULL_SIZE = 45;
+
+/** A speech bubble's text size for a line: 'full' or, for a long line, 'long' (a step smaller). */
+export function bubbleSize(text: string): 'full' | 'long' {
+  return [...text].length <= BUBBLE_FULL_SIZE ? 'full' : 'long';
+}
+
 /** What an empty thinking log says, by the styles at the table (null for you or a bot): why it is empty. */
 export function logNote(styles: readonly ('decision' | 'chat' | null)[]): string {
   return styles.includes('chat')

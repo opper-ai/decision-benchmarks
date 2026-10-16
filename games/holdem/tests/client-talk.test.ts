@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { actionChip, bubbleMs, logNote, STREET_NAMES } from '../src/view-model';
+import { MAX_SAY } from '../shared/questions';
+import { actionChip, BUBBLE_FULL_SIZE, bubbleMs, bubbleSize, logNote, STREET_NAMES } from '../src/view-model';
 
 const a = (kind: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'allin', to = 0, add = 0, allIn = false) => ({ kind, to, add, allIn });
 
@@ -30,6 +31,16 @@ describe('a speech bubble', () => {
     expect(long).toBeLessThanOrEqual(8000);
     expect(bubbleMs('I have been waiting all night for a hand like this one.', 4)).toBeLessThan(bubbleMs('I have been waiting all night for a hand like this one.', 1));
     expect(bubbleMs('Call.', 8)).toBeGreaterThanOrEqual(1200);
+  });
+
+  it('shows a short line at full size and a long one (up to the 90 characters talk can be) a step smaller', () => {
+    expect(bubbleSize('Call.')).toBe('full');
+    expect(bubbleSize('x'.repeat(BUBBLE_FULL_SIZE))).toBe('full');
+    expect(bubbleSize('x'.repeat(BUBBLE_FULL_SIZE + 1))).toBe('long');
+    expect(bubbleSize('I have been waiting all night for a hand like this one, and here it is at last, my friend.')).toBe('long');
+    expect(bubbleSize('y'.repeat(MAX_SAY))).toBe('long');
+    // Characters, not UTF-16 units: an emoji counts once.
+    expect(bubbleSize('🂡'.repeat(BUBBLE_FULL_SIZE))).toBe('full');
   });
 });
 

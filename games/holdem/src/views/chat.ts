@@ -267,6 +267,11 @@ export class ChatBox {
     const follow = mine || this.atBottom();
     // The note says why there are no words (decision models): until someone says something.
     if (el.matches('.chat-msg')) this.note.hidden = true;
+    // A new line someone said lights up for a moment (with the chat open beside the table it stands in for the bubble).
+    if (!this.quiet && !mine && el.querySelector('.chat-said')) {
+      el.classList.add('fresh');
+      el.addEventListener('animationend', () => el.classList.remove('fresh'), { once: true });
+    }
     this.scroller.append(el);
     while (this.scroller.childElementCount > KEEP + 1) this.scroller.children[1]!.remove();
     if (follow) this.toBottom();
@@ -309,6 +314,11 @@ function chev(): HTMLElement {
 }
 
 const CHAT_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><path d="M8 10h8M8 13h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+/** The chat open in its column beside the table (a wide screen, style.css), where table talk needs no bubbles. */
+export function chatBesideTable(chat: HTMLElement): boolean {
+  return chat.classList.contains('open') && typeof matchMedia === 'function' && matchMedia('(min-width: 1000px)').matches;
+}
 
 /** Where a wide screen remembers the chat open or folded. */
 const CHAT_OPEN_KEY = 'holdem:chat-open';
