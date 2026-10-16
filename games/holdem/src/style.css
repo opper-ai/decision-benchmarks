@@ -280,7 +280,7 @@
 .seat.out { opacity: 0.4; filter: grayscale(0.8); }
 .plate {
   display: grid; justify-items: center; min-width: 76px; max-width: 132px; padding: 4px 9px 4px; border-radius: 10px; margin-top: -6px; position: relative; z-index: 1;
-  background: var(--h-panel); border: 1px solid var(--h-line); backdrop-filter: blur(2px);
+  background: var(--h-panel); border: 1px solid var(--h-line);
 }
 .plate .name { font: 700 12.5px/1.25 var(--j-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .plate .stack { font: 700 13px/1.2 var(--j-display); color: var(--h-brass); font-variant-numeric: tabular-nums; }
@@ -687,7 +687,8 @@
 .lineup .add { justify-self: start; border: 1px dashed var(--h-line); background: none; color: var(--h-text); border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; }
 
 /* ---------- overlays: the end of the game, the hand review ---------- */
-.overlay { position: absolute; inset: 0; z-index: 20; overflow: auto; overscroll-behavior: contain; background: rgba(18, 9, 4, 0.94); backdrop-filter: blur(3px); display: grid; align-items: start; justify-items: center; padding: 14px 10px 24px; }
+/* No backdrop blur under a 94% opaque veil: it would show nowhere, yet blur the live table under it on every frame. */
+.overlay { position: absolute; inset: 0; z-index: 20; overflow: auto; overscroll-behavior: contain; background: rgba(18, 9, 4, 0.94); display: grid; align-items: start; justify-items: center; padding: 14px 10px 24px; }
 @media (min-width: 760px) { .overlay { padding: 28px 28px 36px; } }
 /* The end of the game: an ivory poster on the felt. */
 .poster {
@@ -861,7 +862,7 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 @media (max-width: 759px) { .reconnect { top: calc(var(--tb-h) + 6px); font-size: 12.5px; } }
 
 /* A small question over the table (views/confirm.ts): "Leave this table?", the safe answer first and focused. */
-.confirm-veil { align-items: start; padding-top: min(28%, 150px); background: rgba(18, 9, 4, 0.7); }
+.confirm-veil { align-items: start; padding-top: min(28%, 150px); background: rgba(18, 9, 4, 0.7); backdrop-filter: blur(3px); }
 .poster.confirm { width: min(100%, 360px); gap: 12px; padding: 22px 18px 18px; }
 .poster.confirm h2 { font-size: clamp(24px, 6.4vw, 30px); }
 .poster.confirm .sub { margin: -4px 0 4px; font-size: 14.5px; }
