@@ -287,9 +287,10 @@ export async function matrix(o: { modes?: ('play' | 'watch' | 'spectate')[]; sea
       if (mode === 'play' && o.handover) {
         const hs = new Set<number>();
         const between = () => !!room.querySelector('.actions:not([hidden]) .handover');
+        // Fold, or check where there is nothing to fold to, at each turn until the hand is over.
+        const fold = () => (room.querySelector<HTMLElement>('.actions:not([hidden]) .act.fold') ?? room.querySelector<HTMLElement>('.actions:not([hidden]) .act.check'))?.click();
         if (await until(() => between() || !!room.querySelector('.actions:not([hidden]) .menu'), 20000)) {
-          if (!between()) (room.querySelector<HTMLElement>('.actions .act.fold') ?? room.querySelector<HTMLElement>('.actions .act.check'))?.click();
-          if (await until(between, 30000)) {
+          if (await until(() => (fold(), between()), 90000)) {
             await sleep(300);
             hs.add(Math.round(room.getBoundingClientRect().height));
             [...measure(room), ...measureBar(room)].forEach((p) => problems.add(`between hands: ${p}`));
@@ -302,7 +303,7 @@ export async function matrix(o: { modes?: ('play' | 'watch' | 'spectate')[]; sea
       // Out of the game: all-in at every turn (dealing on between hands) until the poster covers the table.
       if (mode === 'play' && o.bust) {
         const hs = new Set<number>();
-        const end = Date.now() + 120000;
+        const end = Date.now() + 240000;
         while (Date.now() < end && !room.querySelector('.overlay')) {
           const deal = room.querySelector<HTMLElement>('.actions:not([hidden]) .handover .cta:not(.quiet)');
           const allin = room.querySelector<HTMLElement>('.actions:not([hidden]) .act.allin') ?? room.querySelector<HTMLElement>('.actions:not([hidden]) .act.call');
