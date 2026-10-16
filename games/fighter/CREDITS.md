@@ -45,5 +45,5 @@ keyboard controls, and the fight, replay, stats, timeline and pose views, with c
   Font License 1.1) and JetBrains Mono (JetBrains, SIL Open Font License 1.1), the latin subsets. The license texts are in
   `public/fonts/OFL.txt`.
 - The model logos in `public/logos/` are copied from JevMan (opper-ai/jevman-benchmark, its `public/logos/`): each is its
-  maker's own mark (TypeSafe, Cloudflare, OpenAI, Microsoft, EmpirioLabs, Convai Innovations, and Jared Palmer's avatar
-  for Kev), used to name the model, as on JevMan.
+  maker's own mark (TypeSafe, Cloudflare, OpenAI, Microsoft, EmpirioLabs, Upright, Convai Innovations, and Jared
+  Palmer's avatar for Kev), used to name the model, as on JevMan.

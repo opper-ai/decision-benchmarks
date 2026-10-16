@@ -15,6 +15,7 @@ describe('decision models', () => {
   it("lists Opper's decision model routes (GET /v3/models?type=evaluation), Jev first and default", () => {
     expect(DECISION_MODELS.map((m) => m.id)).toEqual([
       'typesafe/jev-1.13.0',
+      'typesafe/jev-1.14.0',
       'sference/clef',
       'cloudflare:global/clef-flash',
       'opper/kev-4b',
@@ -23,12 +24,16 @@ describe('decision models', () => {
       'azure:global/microsoft-decision-1',
       'empiriolabs/aplomb-1',
       'greenpt/metis',
+      'eevo:eu/eevo-1',
     ]);
     expect(DEFAULT_MODEL).toBe('typesafe/jev-1.13.0');
     expect(isModelId('opper/kev-4b')).toBe(true);
     expect(isModelId('opper/clef')).toBe(false); // retired by Opper (2026-10-08)
     expect(modelName('cloudflare:global/clef-flash')).toBe('Clef Flash');
     expect(modelMaker('greenpt/metis')).toBe('GreenPT');
+    expect(modelName('typesafe/jev-1.14.0')).toBe('Jev 1.14');
+    expect(modelMaker('eevo:eu/eevo-1')).toBe('Upright');
+    expect(isModelId('eevo/eevo-1')).toBe(false); // Upright's other route
     expect(modelName('someone/else')).toBe('someone/else');
   });
 
@@ -36,6 +41,9 @@ describe('decision models', () => {
     expect(upstreamModel('opper', 'opper/kev-4b')).toBe('opper/kev-4b');
     expect(upstreamModel('opper', 'azure:global/microsoft-decision-1')).toBe('azure:global/microsoft-decision-1');
     expect(upstreamModel('typesafe', 'typesafe/jev-1.13.0')).toBe('jev-1.13.0');
+    expect(upstreamModel('opper', 'typesafe/jev-1.14.0')).toBe('typesafe/jev-1.14.0');
+    expect(upstreamModel('typesafe', 'typesafe/jev-1.14.0')).toBeNull();
+    expect(upstreamModel('opper', 'eevo:eu/eevo-1')).toBe('eevo:eu/eevo-1');
     expect(upstreamModel('typesafe', 'opper/kev-4b')).toBeNull();
     expect(upstreamModel('opper', 'openai/gpt-5')).toBeNull();
   });
