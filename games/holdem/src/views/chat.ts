@@ -277,7 +277,10 @@ export class ChatBox {
     // A new line someone said lights up for a moment (with the chat open beside the table it stands in for the bubble).
     if (!this.quiet && !mine && el.querySelector('.chat-said')) {
       el.classList.add('fresh');
-      el.addEventListener('animationend', () => el.classList.remove('fresh'), { once: true });
+      // Off when the glow ends, or after its 1.6 s anyway: with reduced motion there is no animation to end.
+      const done = () => el.classList.remove('fresh');
+      el.addEventListener('animationend', done, { once: true });
+      setTimeout(done, 1700);
     }
     this.scroller.append(el);
     while (this.scroller.childElementCount > KEEP + 1) this.scroller.children[1]!.remove();
