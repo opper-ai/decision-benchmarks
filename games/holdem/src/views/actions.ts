@@ -2,12 +2,13 @@
 // Raise…, a small panel over the bar with a raise of your own: a brass slider with a chip for a thumb, ticks at the
 // menu's sizes that it snaps to, the amount in big blinds and as a share of the pot, −/+ by the minimum raise, and a
 // confirm button. On a phone the row keeps only fold, check or call, Raise… and all-in, and the menu's sizes become
-// quick picks in the panel, over the slider (style.css shows one or the other). Keys: F fold, C check or call, A all-in, R opens the raise panel (arrows adjust, Enter confirms,
-// Esc closes). The keys do nothing while a dialog (the hand review, the end) covers the table.
+// quick picks in the panel, over the slider (style.css shows one or the other). Keys: F fold, C check or call, 1 to 4
+// raise to the menu's sizes at once, A all-in, R opens the raise panel (arrows adjust, Enter confirms, Esc closes). The
+// keys do nothing while a dialog (the hand review, the end, Leave?) covers the table, or while you type.
 import type { Action } from '../../shared/engine.ts';
 import { h } from '../dom.ts';
 import type { HumanTurn } from '../driver.ts';
-import { chips, menuButtons } from '../view-model.ts';
+import { chips, menuButtons, quickBets } from '../view-model.ts';
 
 /** What the raise panel says about an amount: the pot and the big blind it is measured against. */
 export interface TableContext {
@@ -54,17 +55,21 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
       resolve(a);
     };
     const buttons = menuButtons(turn.options);
+    // The menu's sizes (none the all-in, none twice): keys 1 to 4, and the raise panel's quick picks.
+    const sizes = quickBets(turn.options);
     const canRaise = !!turn.raise && turn.raise.max > turn.raise.min;
     // data-custom: Raise… is there, so a phone can leave the sizes to its panel.
     const menu = h('div.menu', { role: 'group', 'aria-label': 'Your options', 'data-custom': canRaise });
-    const button = (b: (typeof buttons)[number]) =>
-      h(
+    const button = (b: (typeof buttons)[number]) => {
+      const key = b.shortcut ?? sizes.find((q) => q.key === b.key)?.shortcut;
+      return h(
         `button.act.${b.look}`,
-        { type: 'button', 'aria-label': b.label + (b.shortcut ? ` (${b.shortcut})` : ''), onclick: () => done({ key: b.key }) },
+        { type: 'button', 'aria-label': b.label + (key ? ` (${key})` : ''), onclick: () => done({ key: b.key }) },
         b.verb ? h('span.what', null, h('span.verb', null, `${b.verb} `), b.size ?? '') : h('span.what', null, b.what),
         b.amount ? h('span.amt', null, b.amount) : null,
-        b.shortcut ? h('kbd', null, b.shortcut) : null,
+        key ? h('kbd', null, key) : null,
       );
+    };
     const allin = buttons.find((b) => b.look === 'allin');
     for (const b of buttons) if (b !== allin) menu.append(button(b));
 
@@ -91,10 +96,11 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
       const range = h('input.rp-range', { type: 'range', min: 0, max: 1000, step: 1, value: Math.round(positionOf(value, plan) * 1000), 'aria-label': `${verb}, from ${chips(plan.min)} to ${chips(plan.max)} chips` }) as HTMLInputElement;
       const confirm = h('button.rp-go', { type: 'button' }) as HTMLButtonElement;
       // The menu's sizes as chips to tap (phones; the bar has them as buttons on a wide screen): each sets the amount.
-      const picks = plan.quick.map((q) => h('button.rp-pick', { type: 'button', 'aria-pressed': 'false', onclick: () => set(q.to) }, q.label) as HTMLButtonElement);
+      const quick = sizes.filter((q) => q.to >= plan.min && q.to <= plan.max);
+      const picks = quick.map((q) => h('button.rp-pick', { type: 'button', 'aria-pressed': 'false', 'aria-label': `${q.size}${q.word}, ${chips(q.to)}`, onclick: () => set(q.to) }, q.size + q.word) as HTMLButtonElement);
       const set = (v: number) => {
         value = Math.max(plan.min, Math.min(plan.max, v));
-        picks.forEach((p, i) => p.setAttribute('aria-pressed', String(plan.quick[i]!.to === value)));
+        picks.forEach((p, i) => p.setAttribute('aria-pressed', String(quick[i]!.to === value)));
         range.value = String(Math.round(positionOf(value, plan) * 1000));
         range.setAttribute('aria-valuenow', String(value));
         const all = value >= plan.max;
@@ -160,7 +166,7 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
       menu.append(opener);
     }
     if (allin) menu.append(button(allin));
-    host.replaceChildren(menu, h('p.hint', null, 'Keys: F fold, C check or call, R raise, A all-in'));
+    host.replaceChildren(menu, h('p.hint', null, `Keys: F fold, C check or call, ${sizes.length ? `${sizes.length > 1 ? `1–${sizes.length}` : '1'} sizes, ` : ''}R raise, A all-in`));
     host.hidden = false;
     (menu.querySelector('button.call') as HTMLElement | null)?.focus({ preventScroll: true });
 
@@ -184,7 +190,11 @@ export function askAction(host: HTMLElement, turn: HumanTurn, signal: AbortSigna
       else if (k === 'c' && (has('check') || has('call'))) done({ key: has('check') ? 'check' : 'call' });
       else if (k === 'a' && has('allin')) done({ key: 'allin' });
       else if (k === 'r' && canRaise) openPanel();
-      else return;
+      else {
+        const size = sizes.find((q) => q.shortcut === e.key);
+        if (!size) return;
+        done({ key: size.key });
+      }
       e.preventDefault();
     };
     /** A tap outside the panel (and not on Raise…) closes it. */

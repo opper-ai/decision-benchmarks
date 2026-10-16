@@ -77,6 +77,3 @@
   .replay-title > b { font-size: 15px; }
 }
 
-/* The review's Download clip: what it is doing. */
-.review-head .clip-status { flex-basis: 100%; min-height: 0; font-size: 13px; color: var(--h-dim); text-align: right; }
-.review-head .clip-status:empty { display: none; }

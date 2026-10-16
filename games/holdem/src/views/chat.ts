@@ -87,13 +87,13 @@ export class ChatBox {
     if (o.onSay) this.el.append(this.sayForm(o.onSay));
     this.button = h('button.tbtn.icon.chat-btn', { type: 'button', 'aria-label': 'Table talk', 'aria-expanded': 'false', title: 'Table talk', onclick: () => this.toggle() }) as HTMLButtonElement;
     this.button.innerHTML = CHAT_ICON;
-    // Open beside the table on a wide screen; shut (the toolbar's button opens it) on a phone; and again so when the
-    // window crosses from one to the other.
-    // On a wide screen it opens as the player last left it (CHAT_OPEN_KEY).
+    // Folded by default, so the talk shows as bubbles at the seats; on a wide screen it opens beside the table only once
+    // the player has opened it there (CHAT_OPEN_KEY), and again so when the window crosses from a phone's width.
     if (typeof matchMedia === 'function') {
       const wide = matchMedia('(min-width: 1000px)');
-      this.toggle(wide.matches && readStored(CHAT_OPEN_KEY) !== 'off');
-      const follow = (e: MediaQueryListEvent) => (this.el.isConnected ? this.toggle(e.matches) : wide.removeEventListener('change', follow));
+      const open = (isWide: boolean) => isWide && readStored(CHAT_OPEN_KEY) === 'on';
+      this.toggle(open(wide.matches));
+      const follow = (e: MediaQueryListEvent) => (this.el.isConnected ? this.toggle(open(e.matches)) : wide.removeEventListener('change', follow));
       wide.addEventListener('change', follow);
     } else this.toggle(false);
   }
@@ -105,6 +105,9 @@ export class ChatBox {
    * The chat as a sheet (a phone) or a panel (wide): open or shut. `remember`: the player's own choice, kept for a wide
    * screen's next table.
    */
+  /** Told when the chat opens (the table takes its bubbles away when the chat sits beside it). */
+  onOpen: (() => void) | null = null;
+
   toggle(open = !this.el.classList.contains('open'), remember = false): void {
     this.el.classList.toggle('open', open);
     this.el.classList.toggle('collapsed', !open);
@@ -114,6 +117,7 @@ export class ChatBox {
     if (open) {
       this.resetUnread();
       this.toBottom();
+      this.onOpen?.();
     }
     if (remember && typeof matchMedia === 'function' && matchMedia('(min-width: 1000px)').matches) {
       try {
@@ -267,6 +271,11 @@ export class ChatBox {
     const follow = mine || this.atBottom();
     // The note says why there are no words (decision models): until someone says something.
     if (el.matches('.chat-msg')) this.note.hidden = true;
+    // A new line someone said lights up for a moment (with the chat open beside the table it stands in for the bubble).
+    if (!this.quiet && !mine && el.querySelector('.chat-said')) {
+      el.classList.add('fresh');
+      el.addEventListener('animationend', () => el.classList.remove('fresh'), { once: true });
+    }
     this.scroller.append(el);
     while (this.scroller.childElementCount > KEEP + 1) this.scroller.children[1]!.remove();
     if (follow) this.toBottom();
@@ -310,8 +319,13 @@ function chev(): HTMLElement {
 
 const CHAT_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><path d="M8 10h8M8 13h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
-/** Where a wide screen remembers the chat open or folded. */
-const CHAT_OPEN_KEY = 'holdem:chat-open';
+/** The chat open in its column beside the table (a wide screen, style.css), where table talk needs no bubbles. */
+export function chatBesideTable(chat: HTMLElement): boolean {
+  return chat.classList.contains('open') && typeof matchMedia === 'function' && matchMedia('(min-width: 1000px)').matches;
+}
+
+/** Where a wide screen remembers the chat open or folded (v2: folded became the default; an old 'on' doesn't carry over). */
+const CHAT_OPEN_KEY = 'holdem:chat-open-v2';
 
 /** A stored setting, or null where there is none or storage is blocked. */
 function readStored(key: string): string | null {

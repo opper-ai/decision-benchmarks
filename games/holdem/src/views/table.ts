@@ -8,7 +8,7 @@ import { audio } from '../audio.ts';
 import { h, wait } from '../dom.ts';
 import type { ActionMeta, SeatConfig, TableSnapshot } from '../driver.ts';
 import { applyEvent, emptyModel, potsOfModel, type TableModel } from '../table-model.ts';
-import { actionTag, bubbleMs, chips, handName, ordinal, paced, personOf, potLabels, slotsFor, tellBars, type SeatPerson, type Slot } from '../view-model.ts';
+import { actionTag, bubbleMs, bubbleSize, chips, handName, ordinal, paced, personOf, potLabels, slotsFor, tellBars, type SeatPerson, type Slot } from '../view-model.ts';
 import { avatarEl, cardEl, chipsEl, flipUp, preloadFaces, setFaceMood } from './parts.ts';
 
 interface SeatEls {
@@ -28,6 +28,11 @@ export interface TableOptions {
   /** The watch speed (1 is normal) and reduced motion, read on every pause. */
   speed: () => number;
   reduced: () => boolean;
+  /**
+   * Whether talk shows in the chat beside the table (a wide screen with the chat open), read for every line: then no
+   * bubble, the speaker's face pulses and the chat lights the line up; else a bubble.
+   */
+  talkInChat?: () => boolean;
 }
 
 export class TableUI {
@@ -43,6 +48,7 @@ export class TableUI {
   private slots: Slot[];
   private model: TableModel;
   private bubbles = new Map<number, number>();
+  private pulses = new Map<number, number>();
   private o: TableOptions;
   private placesShown: (number | null)[] = [];
   /** The five cards each shown hand plays, from the showdown: lit up for the winners. */
@@ -501,19 +507,35 @@ export class TableUI {
     setFaceMood(this.seatEls[seat]!.avatar, this.people[seat]!, mood);
   }
 
-  /** A speech bubble with table talk, gone after a few seconds. */
+  /** Takes every speech bubble off the table (the chat opened beside it: the words are there now). */
+  clearBubbles(): void {
+    this.area.querySelectorAll('.bubble').forEach((b) => b.remove());
+    for (const t of this.bubbles.values()) clearTimeout(t);
+    this.bubbles.clear();
+  }
+
+  /** A speech bubble with table talk, gone after a few seconds; or, with the chat open beside the table, a pulse. */
   say(seat: number, text: string): void {
     const root = this.seatEls[seat]!.root;
-    // Five or six round the table leave no room for more than one: the newest talk replaces the others' (the chat
-    // keeps them all).
-    const crowded = this.people.length >= 5;
-    (crowded ? this.area : root).querySelectorAll('.bubble').forEach((b) => b.remove());
+    if (this.o.talkInChat?.()) {
+      // The chat has the words: the face says who spoke (a ring, about 600 ms; style.css keeps it still for reduced motion).
+      root.classList.remove('spoke');
+      void root.offsetWidth;
+      root.classList.add('spoke');
+      clearTimeout(this.pulses.get(seat));
+      this.pulses.set(seat, window.setTimeout(() => root.classList.remove('spoke'), 700));
+      return;
+    }
+    // Five or six round the table, or a phone, leave no room for more than one, nor beside the seats: the talk goes over
+    // the middle with the name, and the newest replaces the others' (the chat keeps them all).
+    const middle = this.people.length >= 5 || (typeof matchMedia === 'function' && matchMedia('(max-width: 759px)').matches);
+    (middle ? this.area : root).querySelectorAll('.bubble').forEach((b) => b.remove());
     clearTimeout(this.bubbles.get(seat));
-    // A table of five or six has no room beside the seats: the talk goes over the middle, with the name.
-    const middle = crowded;
+    // A long line (talk is at most 90 characters) a step smaller, so the whole of it fits (three lines at most).
+    const size = bubbleSize(text) === 'long' ? '.long' : '';
     const b = middle
-      ? h('div.bubble.center', { role: 'status' }, h('b', null, this.people[seat]!.short), h('span.bubble-text', null, `“${text}”`))
-      : h('div.bubble', { role: 'status' }, h('span.bubble-text', null, `“${text}”`));
+      ? h(`div.bubble.center${size}`, { role: 'status' }, h('b', null, this.people[seat]!.short), h('span.bubble-text', null, `“${text}”`))
+      : h(`div.bubble${size}`, { role: 'status' }, h('span.bubble-text', null, `“${text}”`));
     b.title = text;
     (middle ? this.area : root.querySelector('.who')!).append(b);
     // Long enough to read: longer for more words, shorter when the table is sped up (view-model.ts).

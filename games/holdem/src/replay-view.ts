@@ -10,7 +10,7 @@ import { endView } from './views/end.ts';
 import { reviewView } from './views/review.ts';
 import { TableUI } from './views/table.ts';
 import { aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
-import { ChatBox } from './views/chat.ts';
+import { ChatBox, chatBesideTable } from './views/chat.ts';
 import type { ActionMeta } from './driver.ts';
 
 export interface ReplayOptions {
@@ -75,6 +75,10 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
   });
   // The table chat: the dealer's lines, and what the models said and why (every card is up in a replay).
   const chat = new ChatBox({ people: seats.map(personOf), mode: 'watch', viewer: null });
+  // Opening the chat beside the table takes the bubbles away (ui is the table in play at the time).
+  chat.onOpen = () => {
+    if (chatBesideTable(chat.el)) ui.clearBubbles();
+  };
   let said: { seat: number; meta: ActionMeta } | undefined;
   const reviewBtn = h('button.tbtn', { type: 'button', onclick: () => void openReview() }, 'Review');
   const toolbar = h(
@@ -96,7 +100,7 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
   signal.addEventListener('abort', () => window.removeEventListener('keydown', onKey), { once: true });
 
   // ---------- the table ----------
-  let ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion });
+  let ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion, talkInChat: () => chatBesideTable(chat.el) });
   const tableHost = h('div.replay-table', null, ui.el);
   host.classList.add('watching');
   host.replaceChildren(toolbar, tableHost, chat.el);
@@ -145,7 +149,7 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     drawLevel(s);
   };
   const restart = async (s: TableSnapshot) => {
-    ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion });
+    ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion, talkInChat: () => chatBesideTable(chat.el) });
     tableHost.replaceChildren(ui.el);
     shown = 0;
     // The chat starts again too: from the first hand empty ("Watch it again"), or after a jump with the hands before

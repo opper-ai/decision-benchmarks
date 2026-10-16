@@ -31,7 +31,7 @@ describe('the seat picker', () => {
     expect(names('titan')).toEqual(['Fable 5.1', 'GPT-6 Astra', 'Gemini 4 Argon']);
     expect(names('more')).toEqual(['Grok 4.7', 'DeepSeek V4.1 Flash', 'DeepSeek V4 Pro', 'Qwen3.8 Flash-Next', 'Qwen3.8 Max', 'Kimi K3', 'GLM-5.3 Flash', 'GLM-5.3', 'MiniMax M3']);
     expect(GROUPS.flatMap((g) => MODELS.filter((m) => m.group === g)).length).toBe(MODELS.length);
-    expect(SETS.map((s) => s.name)).toEqual(['Gemini', 'Claude', 'GPT', 'Decision', 'Open models', 'Titans']);
+    expect(SETS.map((s) => s.name)).toEqual(['Decision', 'Open models', 'Titans', 'Gemini', 'Claude', 'GPT']);
     expect(SETS.filter((s) => s.free).map((s) => s.id)).toEqual(['decision']);
     expect(SETS.find((s) => s.id === 'titans')!.blurb).toBe('Fable, Astra and Argon. Big, expensive, very good.');
   });

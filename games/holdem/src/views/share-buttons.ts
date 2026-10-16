@@ -15,7 +15,6 @@ const ICONS = {
   image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5.5-5 4 3.5 2.5-2 4 3.5"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.2 1.2"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.2-1.2"/>',
   download: '<path d="M12 3.5V15M7.5 10.5L12 15l4.5-4.5M4.5 19.5h15"/>',
-  clip: '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M10 9.2v5.6l4.6-2.8z" fill="currentColor"/>',
 } as const;
 export type IconName = keyof typeof ICONS;
 

@@ -8,8 +8,11 @@
 // Every seat (face, name plate, tag, tell, hole cards), bet, the dealer button and every speech bubble must sit inside
 // the room with MARGIN px to spare, below the toolbar, and above the action bar's row; nothing at the table may
 // overlap another seat's face, plate or cards (a bubble may cover a bet or the button), and the action bar keeps to one
-// row clear of every seat and the board. The room's height is recorded
-// so a caller can check it does not change during a game.
+// row clear of every seat and the board. A bubble shows its whole line (talk is at most 90 characters): nothing cut off.
+// With the chat open beside the table (a wide screen) no bubble shows at all: matrix() checks that while it plays. The
+// room's height is recorded so a caller can check it does not change during a game.
+
+import { bubbleSize } from '../../src/view-model.ts';
 
 export const MARGIN = 8;
 
@@ -83,6 +86,8 @@ export function measure(room: Element = document.querySelector('#room')!): strin
     const slot = slotOf(el);
     const b = box(el);
     inside(`bubble ${slot}`, b);
+    const text = el.querySelector('.bubble-text') as HTMLElement | null;
+    if (text && (text.scrollHeight > text.clientHeight + 1 || text.scrollWidth > text.clientWidth + 1)) out.push(`bubble ${slot} is cut off`);
     for (const other of bubbles.slice(i + 1)) if (meet(b, box(other))) out.push(`bubble ${slot} meets bubble ${slotOf(other)}`);
     for (const p of parts) {
       const own = p.slot === slot;
@@ -95,16 +100,19 @@ export function measure(room: Element = document.querySelector('#room')!): strin
   return out;
 }
 
+/** One bubble at a time, over the middle: a table of five or six, or a phone (views/table.ts say()). */
+const middleTalk = (room: Element) => room.querySelectorAll('.seat').length >= 5 || innerWidth < 760;
+
 /**
  * Long talk on every seat that can talk (or `slot` alone), as the table would show it (views/table.ts say(): a table of
- * five or six shows it over the middle, with the name).
+ * five or six, or a phone, shows it over the middle, with the name).
  */
 export function talk(room: Element, text: string, slot?: string): void {
   room.querySelectorAll('.bubble').forEach((b) => b.remove());
   const felt = room.querySelector('.felt-area')!;
-  if (room.querySelectorAll('.seat').length >= 5) {
+  if (middleTalk(room)) {
     const b = document.createElement('div');
-    b.className = 'bubble center';
+    b.className = `bubble center${bubbleSize(text) === 'long' ? ' long' : ''}`;
     b.style.animation = 'none';
     b.innerHTML = `<b>${slot ?? 'Someone'}</b><span class="bubble-text"></span>`;
     b.querySelector('.bubble-text')!.textContent = `“${text}”`;
@@ -113,7 +121,7 @@ export function talk(room: Element, text: string, slot?: string): void {
   }
   for (const who of room.querySelectorAll(`.seat:not(.you)${slot ? `[data-slot='${slot}']` : ''} .who`)) {
     const b = document.createElement('div');
-    b.className = 'bubble';
+    b.className = `bubble${bubbleSize(text) === 'long' ? ' long' : ''}`;
     b.style.animation = 'none';
     const t = document.createElement('span');
     t.className = 'bubble-text';
@@ -123,7 +131,8 @@ export function talk(room: Element, text: string, slot?: string): void {
   }
 }
 
-const LONG = 'I have been waiting all night for a hand like this one, and here it is at last.';
+/** The longest talk there is: 90 characters (MAX_SAY). */
+export const LONG = 'I have been waiting all night for a hand like this one, and here it is at last, my friend.';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const until = async (test: () => boolean, ms: number) => {
   const end = Date.now() + ms;
@@ -131,11 +140,10 @@ const until = async (test: () => boolean, ms: number) => {
   return test();
 };
 
-/** Every bubble placement the table can show: all at once (up to four seats), else one seat at a time. */
+/** Every bubble placement the table can show, with the longest talk: all at once (up to four seats on a wide screen), else one seat at a time. */
 export function measureTalk(room: Element = document.querySelector('#room')!): string[] {
-  const seats = room.querySelectorAll('.seat').length;
   const out: string[] = [];
-  if (seats <= 4) {
+  if (!middleTalk(room)) {
     talk(room, LONG);
     out.push(...measure(room).filter((p) => p.includes('bubble')));
     talk(room, 'Call.');
@@ -195,6 +203,8 @@ export async function matrix(o: { modes?: ('play' | 'watch' | 'spectate')[]; sea
       if (o.chat && chat && chat.classList.contains('open') !== (o.chat === 'open')) (chat.querySelector('.chat-collapse') as HTMLElement | null)?.click();
       await sleep(400);
       const heights = new Set<number>();
+      // The chat open beside the table: talk shows there, never as a bubble.
+      const chatBeside = () => innerWidth >= 1000 && !!room.querySelector('.chat.open');
       const widths = new Set<number>([innerWidth]);
       const problems = new Set<string>();
       // Playing: wait for your turn (the action bar), so it is measured too.
@@ -204,9 +214,10 @@ export async function matrix(o: { modes?: ('play' | 'watch' | 'spectate')[]; sea
         heights.add(Math.round(room.getBoundingClientRect().height));
         widths.add(innerWidth);
         if (!room.querySelector('.overlay')) measure(room).forEach((p) => problems.add(p));
+        if (chatBeside() && room.querySelector('.felt-area .bubble')) problems.add('a bubble shows with the chat open beside the table');
         await sleep(400);
       }
-      if (!room.querySelector('.overlay')) measureTalk(room).forEach((p) => problems.add(p));
+      if (!room.querySelector('.overlay') && !chatBeside()) measureTalk(room).forEach((p) => problems.add(p));
       results.push({ widths: [...widths], mode, seats: n, problems: [...problems], heights: [...heights] });
       // Leave (and say yes when it asks).
       room.querySelector<HTMLElement>('.tools button[aria-label="Leave"]')?.click();
