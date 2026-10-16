@@ -40,6 +40,8 @@ export interface ChatOptions {
    * when it can't take it now (too many waiting: "Slow down a little").
    */
   onSay?: (text: string) => string | null;
+  /** The table's life: once it aborts (the player left), the chat stops following the window's width and can go. */
+  signal?: AbortSignal;
 }
 
 export class ChatBox {
@@ -94,7 +96,8 @@ export class ChatBox {
       const open = (isWide: boolean) => isWide && readStored(CHAT_OPEN_KEY) === 'on';
       this.toggle(open(wide.matches));
       const follow = (e: MediaQueryListEvent) => (this.el.isConnected ? this.toggle(open(e.matches)) : wide.removeEventListener('change', follow));
-      wide.addEventListener('change', follow);
+      // Removed when the table goes (else the window's media query would keep every old table's chat alive).
+      wide.addEventListener('change', follow, o.signal ? { signal: o.signal } : undefined);
     } else this.toggle(false);
   }
 

@@ -257,6 +257,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     people: seats.map(personOf),
     mode: watching ? 'watch' : 'play',
     viewer: watching ? null : 0,
+    signal,
     ...(watching ? {} : { onSay: (text: string) => driver.say?.(text) ?? null }),
   });
   // Opening the chat beside the table takes the bubbles away: its words are in the chat now.
