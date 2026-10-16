@@ -92,7 +92,9 @@ export class TableUI {
     const tell = p.style === 'decision' ? h('div.tell', { hidden: true, title: 'How sure it was: fold, call, raise', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')) : null;
     const plate = h('div.plate', null, tag, h('span.name', { title: p.name }, h('span.full', null, p.name), h('span.short', { 'aria-hidden': 'true' }, p.short)), p.badge ? h('span.badge2', null, h('span.full', null, p.badge), h('span.short', { 'aria-hidden': 'true' }, p.tag)) : null, stack);
     const shown = h('span.shown-name', { hidden: true });
-    const avatarWrap = h('div.avatar-wrap', null, avatar, tell);
+    // The time bank's ring (style.css): two halves, each with a half disc that turns away while the seat thinks.
+    const bank = h('span.bank', { 'aria-hidden': 'true' }, h('i'), h('i'));
+    const avatarWrap = h('div.avatar-wrap', null, bank, avatar, tell);
     const who = h('div.who', null, avatarWrap, plate, shown);
     const root = h(`div.seat${you ? '.you' : ''}`, { 'data-slot': slot, 'data-seat': String(seat), role: 'group', 'aria-label': p.name }, who, hole);
     const bet = h('div.bet.empty', { 'data-slot': slot, 'aria-hidden': 'true' });

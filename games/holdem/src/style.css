@@ -13,7 +13,6 @@
    600 to 900: the casino-poster face for titles, banners, card ranks and the big numbers. */
 @font-face { font-family: 'Fraunces'; src: url('/fonts/fraunces-latin.woff2') format('woff2'); font-weight: 600 900; font-display: swap; }
 @font-face { font-family: 'Caveat'; src: url('/fonts/caveat-latin.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
-@property --bank-left { syntax: '<number>'; inherits: false; initial-value: 1; }
 
 :root {
   --h-room: #1c100a;
@@ -256,15 +255,27 @@
 .avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; background: var(--h-felt-deep); box-shadow: 0 0 0 2.5px var(--h-brass), 0 6px 14px rgba(0, 0, 0, 0.55); transition: box-shadow 0.2s; }
 .avatar.mono { display: grid; place-items: center; font: 800 calc(var(--av) * 0.4) var(--h-poster); color: var(--h-ink); background: radial-gradient(circle at 35% 30%, #f3d78f, var(--h-brass) 60%, var(--h-brass-deep)); }
 .seat.to-act .avatar { box-shadow: 0 0 0 3px var(--h-amber), 0 0 26px rgba(255, 197, 107, 0.65); }
-/* The time bank: a ring that runs down while the seat thinks. */
-.avatar-wrap::before {
-  content: ''; position: absolute; inset: -7px; border-radius: 50%; opacity: 0; transition: opacity 0.2s;
-  background: conic-gradient(var(--h-amber) calc(var(--bank-left) * 1turn), rgba(255, 255, 255, 0.1) 0);
+/*
+ * The time bank: a ring that runs down while the seat thinks. Its amber is two half discs turned on the compositor
+ * (transform only), each seen through one half of the ring: the left half's turns away in the first half of the time,
+ * the right half's in the second. A seat thinking (a model's turn: most of a game) then costs no style or paint work.
+ */
+.bank {
+  position: absolute; inset: -7px; border-radius: 50%; opacity: 0; transition: opacity 0.2s; pointer-events: none; background: rgba(255, 255, 255, 0.1);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
   mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
 }
-.seat.thinking .avatar-wrap::before { opacity: 1; animation: bank var(--bank, 30s) linear forwards; }
-@keyframes bank { from { --bank-left: 1; } to { --bank-left: 0; } }
+.bank i { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; }
+.bank i:first-child { left: 50%; }
+.bank i:last-child { left: 0; }
+.bank i::before { content: ''; position: absolute; top: 0; bottom: 0; width: 200%; transform: rotate(180deg); }
+.bank i:first-child::before { left: -100%; background: linear-gradient(90deg, var(--h-amber) 50%, transparent 0); }
+.bank i:last-child::before { left: 0; background: linear-gradient(90deg, transparent 50%, var(--h-amber) 0); }
+.seat.thinking .bank { opacity: 1; }
+.seat.thinking .bank i:first-child::before { animation: bank-right var(--bank, 30s) linear forwards; }
+.seat.thinking .bank i:last-child::before { animation: bank-left var(--bank, 30s) linear forwards; }
+@keyframes bank-right { 0%, 50% { transform: rotate(180deg); } 100% { transform: rotate(0deg); } }
+@keyframes bank-left { 0% { transform: rotate(180deg); } 50%, 100% { transform: rotate(0deg); } }
 .seat.folded .avatar-wrap, .seat.folded .hole { opacity: 0.45; filter: saturate(0.4); }
 .seat.out { opacity: 0.4; filter: grayscale(0.8); }
 .plate {
@@ -382,10 +393,11 @@
 .tell i:nth-child(1) { background: #a35b4b; }
 .tell i:nth-child(2) { background: var(--h-ivory); }
 .tell i:nth-child(3) { background: var(--h-amber); }
-.seat.thinking .tell i { animation: wobble 0.7s ease-in-out infinite alternate; }
+.seat.thinking .tell i { height: 90%; transform-origin: bottom; transition: none; animation: wobble 0.7s ease-in-out infinite alternate; }
 .seat.thinking .tell i:nth-child(2) { animation-delay: -0.25s; }
 .seat.thinking .tell i:nth-child(3) { animation-delay: -0.5s; }
-@keyframes wobble { from { height: 20%; } to { height: 90%; } }
+/* The bars bob between a fifth and nine tenths of the meter: scaled (the compositor's work), not resized (a layout a frame). */
+@keyframes wobble { from { transform: scaleY(0.222); } to { transform: none; } }
 
 /*
  * Table talk: the models' own words, quoted, in a face made to read small. The whole line always shows: talk is at most
