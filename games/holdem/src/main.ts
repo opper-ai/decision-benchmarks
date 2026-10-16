@@ -402,6 +402,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     seeingAll = true;
     ui.seeAll();
     host.classList.add('all-up');
+    chat.revealThinking();
   };
   /** The chat already has these events (a resume laid the hand in play out with what was said): playNew skips it once. */
   let chatLaidOut = false;

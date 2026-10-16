@@ -934,6 +934,7 @@ body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-ins
 .chat-think .knob { position: relative; width: 26px; height: 15px; border-radius: 999px; background: rgba(255, 240, 210, 0.16); transition: background 0.15s; }
 .chat-think .knob::after { content: ''; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--h-dim); transition: translate 0.15s, background 0.15s; }
 .chat-think[aria-checked='true'] { color: var(--h-text); border-color: var(--h-brass); }
+.chat-think[hidden] { display: none; }
 .chat-think[aria-checked='true'] .knob { background: var(--h-brass-deep); }
 .chat-think[aria-checked='true'] .knob::after { translate: 11px 0; background: var(--h-ivory); }
 .chat-say { flex: none; display: flex; align-items: center; gap: 6px; padding: 8px; border-top: 1px solid rgba(215, 170, 82, 0.16); }
