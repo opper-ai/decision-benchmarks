@@ -626,7 +626,21 @@
 }
 @media (prefers-reduced-motion: reduce) { .raise-panel { animation: none; } }
 .hint { margin: 0; font-size: 12px; color: var(--h-dim); text-align: center; }
-.handover { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+/*
+ * Between hands: Deal the next hand and Review in one row inside the bar's place (--bar-h), as your options are, so the
+ * room keeps its height. A phone: the row is the bar's width, Next hand two thirds of it, Review the rest, at the
+ * height of your options' buttons; no keys line (one row is all 72 px holds).
+ */
+.handover { display: flex; flex-wrap: nowrap; gap: 8px; justify-content: center; }
+.handover .cta { white-space: nowrap; }
+.handover .ho-short { display: none; }
+@media (max-width: 759px) {
+  .handover { display: grid; grid-template-columns: 2fr 1fr; }
+  .handover .cta { min-height: 52px; padding: 0 10px; }
+  .handover .ho-long { display: none; }
+  .handover .ho-short { display: inline; }
+  .actions .hint { display: none; }
+}
 .cta {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 22px; border-radius: 999px; border: 1px solid #e0685d;
   background: linear-gradient(180deg, #c33d33, var(--h-red-deep)); color: var(--h-ivory); font: 800 16px var(--h-poster); box-shadow: 0 8px 20px -8px rgba(180, 40, 30, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.25);
