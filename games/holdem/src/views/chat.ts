@@ -87,13 +87,13 @@ export class ChatBox {
     if (o.onSay) this.el.append(this.sayForm(o.onSay));
     this.button = h('button.tbtn.icon.chat-btn', { type: 'button', 'aria-label': 'Table talk', 'aria-expanded': 'false', title: 'Table talk', onclick: () => this.toggle() }) as HTMLButtonElement;
     this.button.innerHTML = CHAT_ICON;
-    // Open beside the table on a wide screen; shut (the toolbar's button opens it) on a phone; and again so when the
-    // window crosses from one to the other.
-    // On a wide screen it opens as the player last left it (CHAT_OPEN_KEY).
+    // Folded by default, so the talk shows as bubbles at the seats; on a wide screen it opens beside the table only once
+    // the player has opened it there (CHAT_OPEN_KEY), and again so when the window crosses from a phone's width.
     if (typeof matchMedia === 'function') {
       const wide = matchMedia('(min-width: 1000px)');
-      this.toggle(wide.matches && readStored(CHAT_OPEN_KEY) !== 'off');
-      const follow = (e: MediaQueryListEvent) => (this.el.isConnected ? this.toggle(e.matches) : wide.removeEventListener('change', follow));
+      const open = (isWide: boolean) => isWide && readStored(CHAT_OPEN_KEY) === 'on';
+      this.toggle(open(wide.matches));
+      const follow = (e: MediaQueryListEvent) => (this.el.isConnected ? this.toggle(open(e.matches)) : wide.removeEventListener('change', follow));
       wide.addEventListener('change', follow);
     } else this.toggle(false);
   }
@@ -320,8 +320,8 @@ export function chatBesideTable(chat: HTMLElement): boolean {
   return chat.classList.contains('open') && typeof matchMedia === 'function' && matchMedia('(min-width: 1000px)').matches;
 }
 
-/** Where a wide screen remembers the chat open or folded. */
-const CHAT_OPEN_KEY = 'holdem:chat-open';
+/** Where a wide screen remembers the chat open or folded (v2: folded became the default; an old 'on' doesn't carry over). */
+const CHAT_OPEN_KEY = 'holdem:chat-open-v2';
 
 /** A stored setting, or null where there is none or storage is blocked. */
 function readStored(key: string): string | null {
