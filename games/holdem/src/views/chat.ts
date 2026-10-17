@@ -57,6 +57,12 @@ export class ChatBox {
   private o: ChatOptions;
   /** The switch: every thinking fold open. */
   private thinking = false;
+  private thinkSwitch!: HTMLButtonElement;
+
+  /** The cards are face up now (you are out): the models' thinking comes with their moves, so the switch shows. */
+  revealThinking(): void {
+    this.thinkSwitch.hidden = false;
+  }
 
   private setThinking(on: boolean, button: HTMLElement): void {
     this.thinking = on;
@@ -80,7 +86,10 @@ export class ChatBox {
     const collapse = h('button.chat-collapse', { type: 'button', 'aria-expanded': 'true', 'aria-label': 'Hide the chat', title: 'Hide the chat', onclick: (e: Event) => (e.stopPropagation(), this.toggle(undefined, true)) }, chev());
     // Show thinking: every "What it was thinking" open, or every one shut; remembered per kind of table.
     this.thinking = showThinking(o.mode, readStored(thinkingKey(o.mode)));
-    const think = h('button.chat-think', { type: 'button', role: 'switch', 'aria-checked': String(this.thinking), title: 'Open or close every model’s thinking', onclick: () => this.setThinking(!this.thinking, think) }, h('span.knob', { 'aria-hidden': 'true' }), 'Show thinking') as HTMLButtonElement;
+    // While you play, the models' reasoning stays secret (the review has it once a hand is over), so there is nothing for
+    // the switch to show: it appears when the cards are face up (watching, a replay, or once you are out: revealThinking).
+    const think = h('button.chat-think', { type: 'button', role: 'switch', 'aria-checked': String(this.thinking), title: 'Open or close every model’s thinking', hidden: o.mode === 'play', onclick: () => this.setThinking(!this.thinking, think) }, h('span.knob', { 'aria-hidden': 'true' }), 'Show thinking') as HTMLButtonElement;
+    this.thinkSwitch = think;
     // Folded on a wide screen, the header is a bar at the room's foot: what came meanwhile, and a tap opens it.
     this.badge = h('span.chat-unread', { hidden: true, 'aria-label': 'new messages' });
     const head = h('header.chat-head', { onclick: () => !this.el.classList.contains('open') && this.toggle(true, true) }, h('h3', null, 'Table talk'), this.badge, think, collapse);

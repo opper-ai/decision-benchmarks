@@ -402,6 +402,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
     seeingAll = true;
     ui.seeAll();
     host.classList.add('all-up');
+    chat.revealThinking();
   };
   /** The chat already has these events (a resume laid the hand in play out with what was said): playNew skips it once. */
   let chatLaidOut = false;
@@ -581,8 +582,10 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
         if (overlay || host.querySelector('.confirm-veil') || e.metaKey || e.ctrlKey || e.altKey || t?.tagName === 'INPUT') return;
         if (e.key === 'n' || e.key === 'N') go();
       };
-      const deal = h('button.cta', { type: 'button', onclick: go }, 'Deal the next hand');
-      actions.replaceChildren(h('div.handover', null, deal, h('button.cta.quiet', { type: 'button', onclick: () => void openReview(snap.hand) }, 'Review this hand')), h('p.hint', null, 'Key: N deals the next hand'));
+      // One row in the bar's own height, the bar's place kept (style.css): the short words on a phone.
+      const words = (long: string, short: string) => [h('span.ho-long', null, long), h('span.ho-short', null, short)];
+      const deal = h('button.cta', { type: 'button', 'aria-keyshortcuts': 'N', onclick: go }, ...words('Deal the next hand', 'Next hand'));
+      actions.replaceChildren(h('div.handover', null, deal, h('button.cta.quiet', { type: 'button', onclick: () => void openReview(snap.hand) }, ...words('Review this hand', 'Review'))), h('p.hint', null, 'Key: N deals the next hand'));
       actions.hidden = false;
       deal.focus({ preventScroll: true });
       window.addEventListener('keydown', onKey);
