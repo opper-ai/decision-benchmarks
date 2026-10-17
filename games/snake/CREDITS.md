@@ -10,5 +10,5 @@ rather than ported to it. The game of Snake itself is a classic with no single a
   1.1), Press Start 2P (CodeMan38, SIL Open Font License 1.1) and JetBrains Mono (JetBrains, SIL Open Font License
   1.1). The license texts are in `public/fonts/OFL.txt`.
 - The model logos in `public/logos/` are copied from JevMan (opper-ai/jevman-benchmark, its `public/logos/`), as on
-  Jev Fighter: each is its maker's own mark (TypeSafe, Cloudflare, OpenAI, Microsoft, EmpirioLabs, Convai Innovations,
-  and Jared Palmer's avatar for Kev), used to name the model.
+  Jev Fighter: each is its maker's own mark (TypeSafe, Cloudflare, OpenAI, Microsoft, EmpirioLabs, Upright, Convai
+  Innovations, and Jared Palmer's avatar for Kev), used to name the model.

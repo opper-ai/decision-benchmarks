@@ -65,6 +65,8 @@ export const LINK_MODELS: readonly string[] = [
   'vertexai/gemini-3.1-pro-preview',
   'vertexai/gemini-3.8-flash-eu',
   'vertexai/gemini-3.5-flash-lite-eu',
+  'typesafe/jev-1.14.0',
+  'eevo:eu/eevo-1',
 ];
 
 /**

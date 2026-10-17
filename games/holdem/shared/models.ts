@@ -22,6 +22,10 @@
 //     river, so its late-street decisions often run out the 20 s and fall back.
 // - Qwen3.8 Flash is not here: its routes (novita/, deepinfra/) always think and ignore the effort, 16 s to over 60 s a
 //   decision. Qwen3.8 Flash-Next takes its place. fal/minimax-h3 is a video model, so MiniMax plays as MiniMax M3.
+// - The Decision set is Jev 1.14, Clef and GPT-6 Luna Decisions (2026-10-16): strong decision models on JevMan's
+//   leaderboard, one Jev only, each answering the table's question in 0.2 to 1.4 s. Eevo 1 is stronger but costs about
+//   45 times as much a decision as Jev (about $0.002 against $0.00004), and the free credits pay for the set, so it sits
+//   in the seat picker only.
 //
 // avatars/index.json is keyed by these ids. Isomorphic.
 import type { ChatModel } from '../../../packages/kit/shared/chat.ts';
@@ -53,7 +57,8 @@ export interface HoldemModel {
   maxTokens?: number;
 }
 
-const DECISION_SET: readonly string[] = ['typesafe/jev-1.13.0', 'sference/clef', 'openai/gpt-6-luna-decisions'];
+/** The Decision set, strongest first: the lobby seats them in this order. */
+const DECISION_SET: readonly string[] = ['typesafe/jev-1.14.0', 'sference/clef', 'openai/gpt-6-luna-decisions'];
 
 /** A chat model: low reasoning effort unless `effort` says otherwise (null: none is sent, the route's default). */
 const chat = (id: string, name: string, maker: string, sets: SetId[], effort: 'none' | 'low' | null = 'low'): HoldemModel => ({
@@ -98,7 +103,7 @@ export const HOLDEM_MODELS: readonly HoldemModel[] = [
 export const SETS: readonly { id: SetId; name: string; models: readonly string[] }[] = (['decision', 'open', 'titans', 'gemini', 'claude', 'gpt'] as const).map((id) => ({
   id,
   name: { decision: 'Decision models', claude: 'Claude', gpt: 'GPT', gemini: 'Gemini', open: 'Open models', titans: 'Titans' }[id],
-  models: HOLDEM_MODELS.filter((m) => m.sets.includes(id)).map((m) => m.id),
+  models: id === 'decision' ? DECISION_SET : HOLDEM_MODELS.filter((m) => m.sets.includes(id)).map((m) => m.id),
 }));
 
 export const holdemModel = (id: string): HoldemModel | undefined => HOLDEM_MODELS.find((m) => m.id === id);

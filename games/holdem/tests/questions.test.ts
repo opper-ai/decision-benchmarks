@@ -1,6 +1,6 @@
 // The question every model gets: built from the seat's own observation, so it never shows another seat's cards or the
 // deck, its options are exactly the legal ones, and a chat model's reply is read strictly.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { chatRequestBody, REFUSAL } from '../../../packages/kit/shared/chat';
 import { botDecide, BOT_NAMES } from '../shared/bots';
@@ -9,6 +9,7 @@ import { applyAction, legalOptions, newHand, observe, toAct, type HandState } fr
 import { CHAT_MODELS, HOLDEM_MODELS, SETS } from '../shared/models';
 import { CHAT_FORMAT, CHAT_SYSTEM, chatFormatFor, chatSchema, LIVE_CHAT_FORMAT, LIVE_CHAT_SYSTEM, LIVE_TABLE, MAX_REASONING, MAX_SAY, parseChatAnswer, QUESTION, questionFor, readAnswer, requestFor, stateFor } from '../shared/questions';
 import { actSitAndGo, newSitAndGo } from '../shared/sitngo';
+import { modelById } from '../src/roster';
 import { deriveSeed, keyFromSeed } from '../shared/rng';
 import { deal, act } from './support';
 
@@ -224,7 +225,12 @@ describe('the models', () => {
 
   it('has an avatar for every model, keyed by the same id', () => {
     const index = JSON.parse(readFileSync(new URL('../public/avatars/index.json', import.meta.url), 'utf8')) as Record<string, { slug: string }>;
-    for (const m of HOLDEM_MODELS) expect(index[m.id], m.id).toBeDefined();
+    for (const m of HOLDEM_MODELS) {
+      expect(index[m.id], m.id).toBeDefined();
+      // The page draws from the roster's folder: the same one, with every face in it.
+      expect(modelById(m.id)!.slug, m.id).toBe(index[m.id]!.slug);
+      for (const mood of ['relaxed', 'confident', 'nervous', 'annoyed', 'smug']) expect(existsSync(new URL(`../public/avatars/${index[m.id]!.slug}/${mood}.webp`, import.meta.url)), `${m.id} ${mood}`).toBe(true);
+    }
   });
 });
 

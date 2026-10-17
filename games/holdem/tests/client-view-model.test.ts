@@ -57,6 +57,9 @@ describe('view model', () => {
     expect(personOf({ kind: 'model', id: 'sference/clef' })).toMatchObject({ badge: 'Decision model', style: 'decision' });
     expect(personOf({ kind: 'model', id: 'azure/gpt-6-astra-global' })).toMatchObject({ badge: 'Titan', short: 'Astra', tag: 'GPT-6' });
     expect(personOf({ kind: 'model', id: 'openai/gpt-6-luna-decisions' })).toMatchObject({ short: 'Luna', tag: 'GPT-6 Decisions' });
+    // A new version keeps its character; the tag tells the versions apart.
+    expect(personOf({ kind: 'model', id: 'typesafe/jev-1.14.0' })).toEqual({ name: 'Jev 1.14', short: 'Jev', tag: 'Jev 1.14', badge: 'Decision model', slug: 'typesafe-jev-1-13-0', style: 'decision' });
+    expect(personOf({ kind: 'model', id: 'eevo:eu/eevo-1' })).toEqual({ name: 'Eevo 1', short: 'Eevo', tag: 'Eevo 1', badge: 'Decision model', slug: 'upright-eevo-1', style: 'decision' });
     expect(personOf({ kind: 'model', id: 'vertexai/gemini-4-argon-eu' })).toEqual({ name: 'Gemini 4 Argon', short: 'Argon', tag: 'Gemini 4', badge: 'Titan', slug: 'google-gemini-4-argon', style: 'chat' });
     expect(personOf({ kind: 'model', id: 'vertexai/gemini-3.8-flash-eu' })).toEqual({ name: 'Gemini 3.8 Flash', short: 'Flash', tag: 'Gemini 3.8', badge: 'Gemini', slug: 'google-gemini-3-8-flash', style: 'chat' });
     // Outside the sets, the badge is the maker.
