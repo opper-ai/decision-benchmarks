@@ -443,6 +443,12 @@
   /* Two lines for the longest talk where the felt is wide (its talk then stays below the top seat's), three on a tablet. */
   /* Measured on the felt (cqw), not the window: it is narrower while the chat column beside it opens or folds away. */
   .seat:is([data-slot='left'], [data-slot='right']) .bubble { max-width: min(320px, 36cqw); }
+  /*
+   * Every card up (watching, or out of the game), the top seat's cards are larger and reach further right of the middle
+   * (half its face and about 89 px): the right seat's talk keeps left of them, with a fourth line where that narrows it.
+   */
+  :is(.watching, .all-up) .seat[data-slot='right'] .bubble { max-width: min(320px, 36cqw, 50cqw - var(--av) / 2 - 108px); }
+  :is(.watching, .all-up) .seat[data-slot='right'] .bubble-text { -webkit-line-clamp: 4; line-clamp: 4; }
   /* At most the room left of the seat, which sits at the middle (50cqw less half its width), less the gap and 8 px. */
   .seat:is([data-slot='top'], [data-slot='bottom']) .bubble { top: 6px; bottom: auto; left: auto; right: calc(100% + 10px); translate: none; max-width: min(280px, 50cqw - 50% - 18px); }
   .seat:is([data-slot='top'], [data-slot='bottom']) .bubble::after { top: 16px; bottom: auto; left: auto; right: -4px; }
