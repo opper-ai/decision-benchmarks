@@ -3,7 +3,10 @@
 Issues and pull requests are welcome. Before opening a pull request, run `npm run typecheck` and `npm test`.
 
 Want a game hosted here? Open a [Suggest a game](https://github.com/opper-ai/decision-benchmarks/issues/new?template=suggest-a-game.yml)
-issue. We port and review every game ourselves: only our own code runs on opper.ai.
+issue. We port and review every game ourselves: only our own code runs on opper.ai. Building one? The
+[decision-models guide](https://github.com/opper-ai/opper-skills/tree/main/guides/decision-models) is what we learned
+making these games, written for coding agents: what makes a game measurable (seeds, a score, a weak fallback,
+baselines) and how to write questions models play well.
 
 ## Benchmark your own model
 

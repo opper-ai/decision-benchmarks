@@ -10,6 +10,9 @@ body:
         original repository runs on opper.ai as it is. We ask the author before porting, and credit them on the
         game's card and in its CREDITS.md. We read every suggestion and aim to reply with yes, not now, or no, and
         the reason.
+
+        Still building it? The [decision-models guide](https://github.com/opper-ai/opper-skills/tree/main/guides/decision-models)
+        is what we learned making these games, written for coding agents.
   - type: input
     id: repo
     attributes:
