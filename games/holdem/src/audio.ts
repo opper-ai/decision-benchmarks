@@ -27,13 +27,15 @@ class TableAudio {
 
   constructor() {
     if (typeof window === 'undefined') return;
+    // A touch's pointerdown is not a gesture that may start audio (iOS, Android): its pointerup is, as is a click or a
+    // key. The first of them unlocks it; the rest find it running.
+    const GESTURES = ['pointerdown', 'pointerup', 'click', 'keydown'] as const;
     const unlock = () => {
-      void this.ensure();
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
+      void this.ensure().then(() => {
+        if (this.ctx?.state === 'running') for (const g of GESTURES) window.removeEventListener(g, unlock);
+      }, () => {});
     };
-    window.addEventListener('pointerdown', unlock);
-    window.addEventListener('keydown', unlock);
+    for (const g of GESTURES) window.addEventListener(g, unlock);
   }
 
   private async ensure(): Promise<void> {

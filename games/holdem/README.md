@@ -183,7 +183,7 @@ nothing for this game.
   model and the mood from the sealed token (only the hand in play's talk is in it), speaks it with the table's payer
   (the player's key, or the local key; the free credits' accounting if a talking table ever ran on them), and answers
   `{ audio, format: 'mp3', voice }`. Per visitor, a line a second after a burst of 20; a line asked for again within
-  five minutes (a retry, a second tab) gets the same audio without a second call. The log has the model, the voice,
+  five minutes (the same words, as a second tab may ask) gets the same audio without a second call. The log has the model, the voice,
   the time and the cost. The page (`src/voice.ts`, `src/speaker.ts`) speaks from `TableUI`'s talk hook through the page's
   Web Audio context: one line at a time in order, the next one loading while one plays; a line not started within 4 s
   of being said is dropped, so speech never trails the table; at 4× and 8× a line plays 1.1 and 1.2 times as fast

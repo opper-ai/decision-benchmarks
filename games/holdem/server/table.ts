@@ -31,7 +31,7 @@
 // token from that hand; the server reads the line, the speaker and their mood from the sealed token (only a chat
 // model's `say` is there) and speaks it in the model's voice (shared/voices.ts) through Opper's speech API, paid as the
 // table's model calls are. Each visitor may ask for a line a second after a burst of 20, and a line asked for again
-// within ANSWER_TTL_MS (a retry, a second tab) gets the same audio without a second call. A table is spoken only while
+// within ANSWER_TTL_MS (the same words, as a second tab may ask) gets the same audio without a second call. A table is spoken only while
 // the page's Voice switch is on; nothing is spoken on its own.
 //
 // Known limits (fine for v1, which keeps no public scores):
@@ -575,12 +575,8 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
   };
 
   /**
-   * Back at the table after a reload or a dropped page: the table as the token's seat may see it (the same secrecy as
-   * every answer). A token from inside a hand this table has finished is stale, unless it is the token of the request
-   * that finished it, whose answer was lost: then the table as that answer left it.
-   */
-  /**
-   * Lines spoken (request key of the table id, hand and action), in the order asked, each the speech call's answer
+   * Lines spoken (request key of the table id, hand, action, words and voice: a second tab stepping the same token may
+   * have heard other words at the same place), in the order asked, each the speech call's answer
    * (in flight or done) for ANSWER_TTL_MS: the same line asked for again joins it or gets it, never a second call. A
    * line that could not be spoken is forgotten, so asking again tries again. At most SPOKEN_LINES, the oldest first to go.
    */
@@ -606,7 +602,7 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
       if (spoken.size > SPOKEN_LINES || now - s.at > ANSWER_TTL_MS) spoken.delete(k);
       else break;
     }
-    const request = requestKey('speak', { id: t.st.id, hand, action });
+    const request = requestKey('speak', { id: t.st.id, hand, action, say: x.say, voice });
     const kept = spoken.get(request);
     if (kept) {
       call.log(`table ${t.st.id}: hand ${hand}, action ${action} ${model.id} spoken again (${voice}), no new call`);
@@ -635,6 +631,11 @@ export function tableApi(deps: TableDeps = DEFAULT_DEPS, limits: Partial<TableLi
     return reply;
   };
 
+  /**
+   * Back at the table after a reload or a dropped page: the table as the token's seat may see it (the same secrecy as
+   * every answer). A token from inside a hand this table has finished is stale, unless it is the token of the request
+   * that finished it, whose answer was lost: then the table as that answer left it.
+   */
   const resume = async (call: GameApiCall): Promise<GameApiResponse> => {
     const refused = moveTooFast(call);
     if (refused) return refused;

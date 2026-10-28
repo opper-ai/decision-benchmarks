@@ -102,6 +102,20 @@ describe('the table speaks a line of talk', () => {
     expect(t.logs.filter((l) => l.includes('spoken again'))).toHaveLength(2);
   });
 
+  it('speaks a different line at the same place as itself: a second tab stepping the same token hears its own words', async () => {
+    const s = await setup({ signedIn: true });
+    const token = ((await s.call('start', WATCH(CHAT, LUNA))).body as unknown as SnapshotReply).token;
+    // The first step talks (the fake model always does); step the same token twice, as two tabs would.
+    const a = (await s.call('step', { token })).body as unknown as StepReply;
+    const b = (await s.call('step', { token })).body as unknown as StepReply;
+    expect(a.result.meta.say).toBeTruthy();
+    expect(b.result.meta.say).not.toBe(a.result.meta.say);
+    const heard = async (r: StepReply) => Buffer.from((await s.call('speak', { token: r.token, hand: r.result.snapshot.hand, action: 0 })).body.audio as string, 'base64').toString();
+    expect(await heard(a)).toContain(a.result.meta.say!);
+    expect(await heard(b)).toContain(b.result.meta.say!);
+    expect(speechCalls(s.up)).toHaveLength(2);
+  });
+
   it('tries again after a failed line, and passes on a wallet that is empty', async () => {
     let n = 0;
     const t = await talked({ signedIn: true, up: { speech: () => (++n === 1 ? { status: 500, body: { error: 'boom' } } : n === 2 ? { status: 402, body: { error: 'no money' } } : { status: 200, body: { audio: { b64_json: 'AAAA' }, usage: { cost: 0.001 } } }) } });
