@@ -195,12 +195,17 @@ nothing for this game.
     visitor, a line a second after a burst of 20; a line asked for again within five minutes (the same words and voice,
     as a second tab may ask) gets the same audio without a second call. The log has the model, the voice, whether the
     line was tagged, the time and the cost.
-  - The page (`src/voice.ts`, `src/speaker.ts`) speaks from `TableUI`'s talk hook through the page's Web Audio context:
-    one line at a time in order, the next one loading while one plays; a line not started within 4 s of being said is
-    dropped, so speech never trails the table; at 4× and 8× a line plays 1.1 and 1.2 times as fast (talk at a live
-    table comes at the models' pace whatever the speed, and 4× is where a player who went out watches, so the voices
-    stay); silent while a resumed hand is laid out again; stopped on leaving, a new table, or the page hidden. Grok
-    TTS takes no speed of its own (a `speed`, top-level or in `parameters`, left the clips' length unchanged).
+  - The page (`src/voice.ts`, `src/speaker.ts`) speaks from `TableUI`'s talk hook through one audio element (a blob URL
+    of the mp3, revoked when the line ends; an element because it speeds a voice up with its pitch kept): one line at a
+    time in order, the next one loading while one plays, at 1.2× (Grok's delivery is unhurried), 1.3× at 4× and 1.4× at
+    8× (talk at a live table comes at the models' pace whatever the speed, and 4× is where a player who went out
+    watches, so the voices stay). Grok TTS takes no speed of its own (a `speed`, top-level or in `parameters`, left the
+    clips' length unchanged), so the rate is the page's alone. With Voice on the table waits for the speaker
+    (`speaker.settled()`): before the next model's move is shown, at a live table and in a replay, the lines said so
+    far finish, for at most 3.5 s more; the player's own turn never waits, and with Voice off, or a line failed or
+    dropped, nothing waits. A line not started within 4 s of being said is still dropped, so speech never trails the
+    table. Silent while a resumed hand is laid out again; stopped on leaving, a new table, or the page hidden. A line
+    the browser refuses to play (no click or key yet) is dropped quietly.
     Practice (`?practice`) has no server, so no Voice switch.
 - **Known limits (v1):** the token is stateless, so an older token can be sent again to take back a decision, or a step
   repeated to have an AI decide again. Replaying a hand this instance saw finish (fold, read the cards, play the old

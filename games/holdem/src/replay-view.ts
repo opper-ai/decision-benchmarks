@@ -218,6 +218,8 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     // A moment to think: the move's own latency, shortened, at the replay's speed.
     ui.thinking(seat, null);
     await wait(paced(Math.min(1400, 350 + (next?.latencyMs ?? 0) / 4), speed, reducedMotion()));
+    // Voice on: the line being spoken finishes first (capped).
+    await speaker.settled();
     ui.stopThinking(seat);
     move = { hand: snap!.hand, action: driver.position().move };
     const r = await driver.step();

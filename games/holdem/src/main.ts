@@ -504,6 +504,8 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
       ui.thinking(seat, snap.timeBankMs);
       try {
         r = await driver.step(signal);
+        // Voice on: the line being spoken finishes first (capped), so a move is heard with its own words.
+        await speaker.settled();
       } catch (e) {
         // Too fast for the free credits' fair use: wait a moment and ask again.
         if (e instanceof TableError && e.kind === 'rate') {
