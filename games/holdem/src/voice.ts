@@ -66,14 +66,14 @@ export function voiceButton(signal: AbortSignal): HTMLButtonElement {
 export type LineSource = (signal: AbortSignal) => Promise<ArrayBuffer | null>;
 
 /**
- * The table's speaker for one game (or replay): silent while Voice is off or the table is hushed (a resume catching
- * up), stopped when Voice goes off, the page is hidden, or `signal` aborts (leaving, a new table).
+ * The table's speaker for one game (or replay): silent while Voice is off, the page is hidden or the table is hushed (a
+ * resume catching up), stopped when Voice goes off, the page is hidden, or `signal` aborts (leaving, a new table).
  */
 export function tableSpeaker(o: { signal: AbortSignal; speed?: () => number }): Speaker<LineSource, AudioBuffer> {
   let ctx: AudioContext | null = null;
   const speaker = new Speaker<LineSource, AudioBuffer>({
     now: () => performance.now(),
-    enabled: () => voice.on && !audio.hushed && !o.signal.aborted,
+    enabled: () => voice.on && !audio.hushed && !o.signal.aborted && !document.hidden,
     ...(o.speed ? { speed: o.speed } : {}),
     load: async (line, signal) => {
       const data = await line(signal);
