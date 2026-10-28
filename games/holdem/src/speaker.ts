@@ -1,5 +1,5 @@
 // The table's speaker: the models' lines of talk, spoken one at a time in the order they were said (voice.ts wires it to
-// the page: the speak route or a replay's pre-rendered files, and the page's audio context). No DOM here, so the tests
+// the page: the speak route or a replay's pre-rendered files, played by an audio element). No DOM here, so the tests
 // run it in node.
 //
 // - A line starts loading as soon as it is said, so the next one is ready when the one before it ends.
@@ -8,17 +8,22 @@
 // - Nothing is loaded or played while `enabled()` is false (the Voice switch off, or a resumed table catching up on its
 //   hand): a line said then is never spoken, and no speak call is made for it.
 // - clear() stops the line playing and forgets the rest (leaving, a new table, the page hidden, Voice switched off).
-// - Watch speeds: 1× and 2× speak as said; 4× and 8× speak a little faster (voiceRate). A chat table's talk comes at the
-//   models' own pace (seconds a decision) whatever the speed, and 4× is where a player who went out watches the rest,
-//   so skipping talk there would silence the table just when there is time to listen; a slightly faster delivery, with
-//   the stale drop, keeps the voices in step with a fast table instead.
+// - The table waits for the speaker (settled): before the next model's move is shown, the lines said so far finish,
+//   for at most a cap, so a line is heard with the move it came with and a long one never stalls the table.
+// - Rates (voiceRate, the pitch kept): 1.2× at 1× and 2× (Grok's delivery is unhurried, and the table waits for it);
+//   1.3× and 1.4× at 4× and 8×. A chat table's talk comes at the models' own pace (seconds a decision) whatever the
+//   speed, and 4× is where a player who went out watches the rest, so skipping talk there would silence the table just
+//   when there is time to listen; a faster delivery, with the stale drop, keeps the voices in step instead.
 
 /** How long a line may wait to start before it is dropped. */
 export const MAX_LAG_MS = 4000;
 
-/** The playback rate at a watch speed: as said up to 2×, a little faster at 4× and 8× (the pitch rises with it). */
+/** How long the table waits at most for the lines said so far to finish before it shows the next move. */
+export const SETTLE_CAP_MS = 3500;
+
+/** The playback rate at a watch speed (the player keeps the pitch). */
 export function voiceRate(speed: number): number {
-  return speed >= 8 ? 1.2 : speed >= 4 ? 1.1 : 1;
+  return speed >= 8 ? 1.4 : speed >= 4 ? 1.3 : 1.2;
 }
 
 /** A line playing: done when it ends (or is stopped). */
@@ -31,7 +36,7 @@ export interface SpeakerDeps<L, A> {
   now(): number;
   /** The line's audio, or null when it can't be had; `signal` aborts when the line is dropped. */
   load(line: L, signal: AbortSignal): Promise<A | null>;
-  /** Plays loaded audio at a rate; null when it can't play (no audio context yet). */
+  /** Plays loaded audio at a rate; null when it can't play. A line the browser refuses to play ends at once (done). */
   play(audio: A, rate: number): Playing | null;
   /** Voice on and not hushed: read when a line is said and again when it would start. */
   enabled(): boolean;
@@ -53,6 +58,8 @@ export class Speaker<L, A> {
   /** Bumped by clear(): a loop from before it stops. */
   private generation = 0;
   private readonly d: SpeakerDeps<L, A>;
+  /** Told when the speaker has nothing left to say (settled). */
+  private idlers: (() => void)[] = [];
 
   constructor(deps: SpeakerDeps<L, A>) {
     this.d = deps;
@@ -76,6 +83,32 @@ export class Speaker<L, A> {
     if (!this.running) void this.run();
   }
 
+  /** Nothing playing, loading or waiting. */
+  get idle(): boolean {
+    return !this.running && !this.playing && !this.queue.length;
+  }
+
+  /**
+   * Resolves once every line said so far has been spoken (or dropped, or failed), or after `capMs`, whichever is first;
+   * at once when there is nothing to say (Voice off). The table awaits it before showing the next model's move.
+   */
+  settled(capMs = SETTLE_CAP_MS): Promise<void> {
+    if (this.idle) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.idlers = this.idlers.filter((f) => f !== done);
+        resolve();
+      };
+      const timer = setTimeout(done, capMs);
+      this.idlers.push(done);
+    });
+  }
+
+  private wake(): void {
+    if (this.idle) for (const f of [...this.idlers]) f();
+  }
+
   /** Stops the line playing and drops every line waiting. */
   clear(): void {
     this.generation++;
@@ -84,6 +117,7 @@ export class Speaker<L, A> {
     for (const q of this.queue.splice(0)) q.ac.abort();
     this.playing?.stop();
     this.playing = null;
+    this.wake();
   }
 
   private async run(): Promise<void> {
@@ -112,7 +146,10 @@ export class Speaker<L, A> {
       }
     } finally {
       // After a clear() the flag is a newer loop's.
-      if (gen === this.generation) this.running = false;
+      if (gen === this.generation) {
+        this.running = false;
+        this.wake();
+      }
     }
   }
 }

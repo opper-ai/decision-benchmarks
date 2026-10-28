@@ -127,12 +127,66 @@ describe('the speaker', () => {
     expect(r.played.map((p) => p.audio)).toEqual(['B']);
   });
 
-  it('speaks a little faster at 4× and 8×, as said up to 2×', async () => {
-    expect([1, 2, 4, 8].map(voiceRate)).toEqual([1, 1, 1.1, 1.2]);
+  it('speaks at 1.2× up to 2×, 1.3× at 4× and 1.4× at 8×', async () => {
+    expect([1, 2, 4, 8].map(voiceRate)).toEqual([1.2, 1.2, 1.3, 1.4]);
     const r = rig({ speed: 8 });
     r.s.say('a');
     r.loads[0]!.resolve('A');
     await tick();
-    expect(r.played[0]!.rate).toBe(1.2);
+    expect(r.played[0]!.rate).toBe(1.4);
+  });
+});
+
+describe('the table waiting for the speaker', () => {
+  const settledWithin = async (p: Promise<void>, ms: number) => Promise.race([p.then(() => true), tick(ms).then(() => false)]);
+
+  it('goes on at once when there is nothing to say (Voice off, or nothing said)', async () => {
+    const r = rig();
+    expect(await settledWithin(r.s.settled(1000), 5)).toBe(true);
+    r.setOn(false);
+    r.s.say('a');
+    expect(await settledWithin(r.s.settled(1000), 5)).toBe(true);
+  });
+
+  it('waits for the line playing, and the ones loading after it, to finish', async () => {
+    const r = rig();
+    r.s.say('a');
+    r.s.say('b');
+    r.loads[0]!.resolve('A');
+    await tick();
+    const waited = r.s.settled(1000);
+    expect(await settledWithin(waited, 10)).toBe(false);
+    r.played[0]!.end();
+    r.loads[1]!.resolve('B');
+    await tick();
+    expect(await settledWithin(waited, 10)).toBe(false);
+    r.played[1]!.end();
+    expect(await settledWithin(waited, 10)).toBe(true);
+    expect(r.s.idle).toBe(true);
+  });
+
+  it('never waits past the cap, however long the line', async () => {
+    const r = rig();
+    r.s.say('a');
+    r.loads[0]!.resolve('A');
+    await tick();
+    const started = performance.now();
+    await r.s.settled(40);
+    expect(performance.now() - started).toBeLessThan(200);
+    expect(r.s.speaking).toBe(true);
+  });
+
+  it('goes on when a line fails, or is dropped, or the speaker is cleared', async () => {
+    const r = rig();
+    r.s.say('a');
+    const failed = r.s.settled(1000);
+    r.loads[0]!.resolve(null);
+    expect(await settledWithin(failed, 10)).toBe(true);
+    r.s.say('b');
+    r.loads[1]!.resolve('B');
+    await tick();
+    const cleared = r.s.settled(1000);
+    r.s.clear();
+    expect(await settledWithin(cleared, 10)).toBe(true);
   });
 });
