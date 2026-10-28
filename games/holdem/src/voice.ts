@@ -1,12 +1,14 @@
 // Spoken table talk on the page: the Voice switch (off by default, remembered per browser, independent of Sound), and
-// the table's speaker (speaker.ts) wired to the page's audio context (audio.ts). A line comes from the table's speak
-// route (POST api/table/speak, server/table.ts: the server reads the line from the table's sealed token) or, in a
-// curated replay, from the mp3s scripts/voices.ts rendered once into public/voices/<replay>/. The audio is decoded
-// through Web Audio from the bytes fetched (the CSP allows connect-src 'self'), never a data: URI.
+// the table's speaker (speaker.ts). A line comes from the table's speak route (POST api/table/speak, server/table.ts:
+// the server reads the line from the table's sealed token) or, in a curated replay, from the mp3s scripts/voices.ts
+// rendered once into public/voices/<replay>/. It plays through one audio element from a blob URL of the bytes fetched
+// (the CSP allows connect-src 'self' and media-src blob:; never a data: URI), revoked once the line ends: an element,
+// not Web Audio, because it speeds a voice up without raising its pitch (preservesPitch). The element is unlocked by
+// the first click or key with Voice on; a line the browser still refuses to play is dropped quietly.
 import { appPath } from '../../../packages/kit/client/paths.ts';
 import { audio } from './audio.ts';
 import { h } from './dom.ts';
-import { Speaker } from './speaker.ts';
+import { Speaker, type Playing } from './speaker.ts';
 
 const STORE = 'ai-holdem.voice';
 /** The voices a little under the effects' loudest, so a win's fanfare doesn't drown a line. */
@@ -31,8 +33,8 @@ class VoiceSwitch {
     } catch {
       // storage blocked: for this visit only
     }
-    // Switching on is a click: the audio context may start now.
-    if (on) void audio.context();
+    // Switching on is a click: the voice's element may start now.
+    if (on) unlock();
     for (const f of this.listeners) f();
   }
 
@@ -46,6 +48,84 @@ class VoiceSwitch {
 }
 
 export const voice = new VoiceSwitch();
+
+/** The one element every line plays through, made on first use (a browser that let it play once lets it play again). */
+let element: HTMLAudioElement | null = null;
+const player = (): HTMLAudioElement => (element ??= new Audio());
+
+/** A tenth of a second of silence (8 kHz, 8-bit WAV), to play in a gesture so later lines may play. */
+function silence(): Blob {
+  const n = 800;
+  const b = new DataView(new ArrayBuffer(44 + n));
+  const text = (at: number, s: string) => [...s].forEach((c, i) => b.setUint8(at + i, c.charCodeAt(0)));
+  text(0, 'RIFF');
+  b.setUint32(4, 36 + n, true);
+  text(8, 'WAVEfmt ');
+  b.setUint32(16, 16, true);
+  b.setUint16(20, 1, true);
+  b.setUint16(22, 1, true);
+  b.setUint32(24, 8000, true);
+  b.setUint32(28, 8000, true);
+  b.setUint16(32, 1, true);
+  b.setUint16(34, 8, true);
+  text(36, 'data');
+  b.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) b.setUint8(44 + i, 128);
+  return new Blob([b.buffer], { type: 'audio/wav' });
+}
+
+let unlocked = false;
+/** Plays the silence in a gesture (the Voice switch, or the first click or key with Voice on), once it works. */
+function unlock(): void {
+  if (unlocked || typeof Audio === 'undefined') return;
+  const el = player();
+  if (!el.paused) return;
+  const url = URL.createObjectURL(silence());
+  el.src = url;
+  el.play().then(
+    () => (unlocked = true),
+    () => {},
+  ).finally(() => URL.revokeObjectURL(url));
+}
+if (typeof window !== 'undefined') {
+  const onGesture = () => {
+    if (voice.on) unlock();
+    if (unlocked) for (const g of ['pointerup', 'click', 'keydown']) window.removeEventListener(g, onGesture);
+  };
+  for (const g of ['pointerup', 'click', 'keydown']) window.addEventListener(g, onGesture);
+}
+
+/** Plays a line's mp3 at `rate`, its pitch kept; ends at once when the browser refuses to play it. */
+function playLine(mp3: Blob, rate: number): Playing {
+  const el = player();
+  const url = URL.createObjectURL(mp3);
+  let finish!: () => void;
+  const done = new Promise<void>((resolve) => (finish = resolve));
+  let over = false;
+  const end = () => {
+    if (over) return;
+    over = true;
+    el.removeEventListener('ended', end);
+    el.removeEventListener('error', end);
+    URL.revokeObjectURL(url);
+    finish();
+  };
+  el.addEventListener('ended', end);
+  el.addEventListener('error', end);
+  el.src = url;
+  el.preservesPitch = true;
+  el.defaultPlaybackRate = rate;
+  el.playbackRate = rate;
+  el.volume = VOICE_GAIN;
+  el.play().catch(end);
+  return {
+    done,
+    stop: () => {
+      el.pause();
+      end();
+    },
+  };
+}
 
 const VOICE_ON = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 5h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" fill="currentColor"/><path d="M19.5 7.5a4.5 4.5 0 0 1 0 5M21.8 5.5a7.5 7.5 0 0 1 0 9" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>';
 const VOICE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 5h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" fill="currentColor" opacity=".55"/><path d="M3 3l18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -69,39 +149,16 @@ export type LineSource = (signal: AbortSignal) => Promise<ArrayBuffer | null>;
  * The table's speaker for one game (or replay): silent while Voice is off, the page is hidden or the table is hushed (a
  * resume catching up), stopped when Voice goes off, the page is hidden, or `signal` aborts (leaving, a new table).
  */
-export function tableSpeaker(o: { signal: AbortSignal; speed?: () => number }): Speaker<LineSource, AudioBuffer> {
-  let ctx: AudioContext | null = null;
-  const speaker = new Speaker<LineSource, AudioBuffer>({
+export function tableSpeaker(o: { signal: AbortSignal; speed?: () => number }): Speaker<LineSource, Blob> {
+  const speaker = new Speaker<LineSource, Blob>({
     now: () => performance.now(),
     enabled: () => voice.on && !audio.hushed && !o.signal.aborted && !document.hidden,
     ...(o.speed ? { speed: o.speed } : {}),
     load: async (line, signal) => {
       const data = await line(signal);
-      if (!data || signal.aborted) return null;
-      ctx = await audio.context();
-      return ctx && !signal.aborted ? await ctx.decodeAudioData(data) : null;
+      return data && !signal.aborted ? new Blob([data], { type: 'audio/mpeg' }) : null;
     },
-    play: (buf, rate) => {
-      if (!ctx || ctx.state !== 'running') return null;
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.playbackRate.value = rate;
-      const g = ctx.createGain();
-      g.gain.value = VOICE_GAIN;
-      src.connect(g).connect(ctx.destination);
-      const done = new Promise<void>((resolve) => src.addEventListener('ended', () => resolve(), { once: true }));
-      src.start();
-      return {
-        done,
-        stop: () => {
-          try {
-            src.stop();
-          } catch {
-            // already ended
-          }
-        },
-      };
-    },
+    play: playLine,
   });
   const offSwitch = voice.onChange(() => {
     if (!voice.on) speaker.clear();
