@@ -106,6 +106,11 @@
   .room.watching .toolbar:not(:has(.replay-title)) .tools { flex: 1 0 100%; flex-wrap: nowrap; justify-content: space-between; gap: 4px; }
   .room.watching .practice { display: none; }
 }
+/* The narrowest phones: the speeds and six buttons (Voice among them) still fit one line without a sideways scroll. */
+@media (max-width: 374px) {
+  .room.watching .toolbar:not(:has(.replay-title)) .tools { gap: 2px; }
+  .room.watching .toolbar:not(:has(.replay-title)) .speed button { min-width: 30px; padding: 0 5px; }
+}
 .speed { display: inline-flex; border: 1px solid var(--h-line); border-radius: 999px; overflow: hidden; }
 .speed button { height: 30px; min-width: 38px; padding: 0 8px; border: 0; background: none; color: var(--h-dim); font: 700 12px var(--j-display); }
 .speed button[aria-checked='true'] { background: var(--h-brass); color: var(--h-ink); }
