@@ -8,7 +8,7 @@ No-limit Texas Hold'em against AI models, built (v1) from the plan in
   asks the models, chat models with the live table's prompt;
 - the page (`src/`): play a Sit & Go or watch models play live, the hand review with every AI's cards and reasoning,
   the end screen with a share image and link, the curated replays, and the leaderboard;
-- the curated replays and the poster (`scripts/`);
+- the curated replays, their spoken talk and the poster (`scripts/`);
 - the models: the decision models (the Decision set is Jev 1.14, Clef and GPT-6 Luna Decisions; any seat can pick
   the others), the Claude, GPT, Gemini, Open models (DeepSeek V4 Pro, Kimi K3, GLM-5.3) and Titans sets, and more chat
   models any seat can pick (Grok, more DeepSeek, Qwen, GLM, MiniMax).
@@ -174,6 +174,23 @@ nothing for this game.
   The lines come back as `result.talk` (and `talk` on next), in the finished hand's review and in the recording's
   hand (`talk`, ignored by verify and the fingerprint; share links don't carry it). The same request sent again says a
   line once: the talk is applied to the token it comes with.
+- **Spoken table talk:** with the toolbar's Voice switch on (off by default, `ai-holdem.voice` in localStorage,
+  independent of Sound), each model's line is spoken in its own voice: Mistral's Voxtral TTS 3 through Opper's speech
+  API (EU, about a second and $0.001 a line). The casting is `shared/voices.ts`, one voice per chat model after its
+  avatar's character, distinct at every preset table and curated replay, with a mood (`relaxed`, `confident`,
+  `nervous`, `annoyed`, `smug`) spoken in the speaker's emotion variant where it has one (Paul, Oliver and Jane).
+  `POST api/table/speak { token, hand, action }` is never an open text-to-speech proxy: the server reads the line, the
+  model and the mood from the sealed token (only the hand in play's talk is in it), speaks it with the table's payer
+  (the player's key, or the local key; the free credits' accounting if a talking table ever ran on them), and answers
+  `{ audio, format: 'mp3', voice }`. Per visitor, a line a second after a burst of 20; a line asked for again within
+  five minutes (a retry, a second tab) gets the same audio without a second call. The log has the model, the voice,
+  the time and the cost. The page (`src/voice.ts`, `src/speaker.ts`) speaks from `TableUI`'s talk hook through the page's
+  Web Audio context: one line at a time in order, the next one loading while one plays; a line not started within 4 s
+  of being said is dropped, so speech never trails the table; at 4× and 8× a line plays 1.1 and 1.2 times as fast
+  (talk at a live table comes at the models' pace whatever the speed, and 4× is where a player who went out watches,
+  so the voices stay); silent while a resumed hand is laid out again; stopped on leaving, a new table, or the page
+  hidden. Practice (`?practice`) has no server, so no Voice switch. The provider refuses the odd line every time (502
+  "TTS provider is unavailable" for one exact text): that line stays silent.
 - **Known limits (v1):** the token is stateless, so an older token can be sent again to take back a decision, or a step
   repeated to have an AI decide again. Replaying a hand this instance saw finish (fold, read the cards, play the old
   token again) is refused (409) while the instance remembers it: until the table closes, for up to 50,000 tables, more
@@ -207,6 +224,16 @@ picks the bluff over that hand's hero call:
 ```bash
 GAME=holdem npm run dev -- --port 5199
 node games/holdem/scripts/poster.ts --url http://localhost:5199/holdem/ --file claude-vs-gpt.json.gz --hand 16 --kind bluff
+```
+
+The curated replays speak their talk from files, never a live call (anyone may watch them): `scripts/voices.ts` renders
+every chat model's line once to `public/voices/<replay>/<hand>-<action>.mp3` (mono, 22.05 kHz, 24 kbps) with an
+`index.json` of each line's file, words and voice; the replay view has a Voice switch when a replay has voices, and plays
+a line only while the recording still says those words. A line already rendered with the same words and voice is kept,
+so the script only speaks what changed. The three talking replays took 583 lines, 6.8 MB and $0.54 (2026-10-28).
+
+```bash
+OPPER_API_KEY=... OPPER_PROJECT=... node games/holdem/scripts/voices.ts [--only claude-vs-gpt] [--force]
 ```
 
 ## Sharing (`src/social.ts`, `src/views/share-buttons.ts`, `src/share.ts`)
