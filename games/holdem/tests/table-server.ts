@@ -21,7 +21,7 @@ export const CHAT = 'aws/claude-haiku-5-5-eu';
 export const SECRET_REASONING = 'PRIVATE-REASONING';
 
 type Reply = { status: number; body: unknown; headers?: Record<string, string>; delayMs?: number };
-type Upstream = { calls: { path: string; body: Record<string, unknown>; headers: IncomingMessage['headers'] }[]; decide?: (body: Record<string, unknown>, n: number) => Reply; chat?: (body: Record<string, unknown>, n: number) => Reply };
+type Upstream = { calls: { path: string; body: Record<string, unknown>; headers: IncomingMessage['headers'] }[]; decide?: (body: Record<string, unknown>, n: number) => Reply; chat?: (body: Record<string, unknown>, n: number) => Reply; speech?: (body: Record<string, unknown>, n: number) => Reply };
 
 const servers: Server[] = [];
 afterEach(async () => {
@@ -84,6 +84,10 @@ async function fakeOpper(up: Upstream): Promise<string> {
         const content = JSON.stringify({ action, say: `Talk ${n}`, mood: 'confident', reasoning: `${SECRET_REASONING} ${n}`, turn_complete: true });
         return send({ status: 200, body: { choices: [{ finish_reason: 'stop', message: { content } }], usage: { prompt_tokens: 1500, completion_tokens: 80 } }, headers: { 'x-opper-cost': '0.0012' } });
       }
+      if (req.url === '/v3/audio/speech') {
+        if (up.speech) return send(up.speech(body, n));
+        return send({ status: 200, body: { id: `spch_${n}`, model: body.model, audio: { b64_json: Buffer.from(`mp3:${String(body.voice)}:${String(body.input)}`).toString('base64'), mime_type: 'audio/mpeg' }, usage: { cost: 0.0009, characters: String(body.input).length } } });
+      }
       send({ status: 404, body: {} });
     });
   });
@@ -106,7 +110,7 @@ export interface Setup {
 }
 
 /** Limits a test's instant play never meets; the defaults are tested on their own, at a person's pace. */
-export const LOOSE: Partial<TableLimits> = { starts: { ratePerSec: 1e6, burst: 1e6 }, moves: { ratePerSec: 1e6, burst: 1e6 }, steps: { ratePerSec: 1e6, burst: 1e6 }, talk: { ratePerSec: 1e6, burst: 1e6 } };
+export const LOOSE: Partial<TableLimits> = { starts: { ratePerSec: 1e6, burst: 1e6 }, moves: { ratePerSec: 1e6, burst: 1e6 }, steps: { ratePerSec: 1e6, burst: 1e6 }, talk: { ratePerSec: 1e6, burst: 1e6 }, speak: { ratePerSec: 1e6, burst: 1e6 } };
 
 export async function setup(o: Setup = {}) {
   const up: Upstream = { calls: [], ...o.up };
