@@ -51,7 +51,7 @@ async function route(): Promise<void> {
     const entry = entries.find((e) => e.file === file);
     const recording = await loadDemo(appPath(`/demo/${file}`));
     track('replay_open', { game: 'holdem', kind: 'demo', file });
-    await playReplay(room, { recording, title: entry?.title ?? 'A recorded game', onLeave: leave }, ac.signal);
+    await playReplay(room, { recording, title: entry?.title ?? 'A recorded game', onLeave: leave, voices: file.replace(/\.json\.gz$/, '') }, ac.signal);
   } catch (e) {
     ac.abort();
     room.classList.remove('watching');
