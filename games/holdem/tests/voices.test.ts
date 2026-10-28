@@ -1,9 +1,10 @@
 // The table talk's casting (shared/voices.ts): every chat model speaks in a real Voxtral voice, decision models never
 // talk, and the players who meet at a preset table or in a curated replay sound different.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { HOLDEM_MODELS, SETS } from '../shared/models';
-import { MOODS } from '../shared/recording';
+import { MOODS, type Recording } from '../shared/recording';
 import { speakerOf, voiceFor, VOICES, VOXTRAL_VOICES } from '../shared/voices';
 
 const chat = HOLDEM_MODELS.filter((m) => m.kind === 'chat');
@@ -42,5 +43,32 @@ describe('the voices of the table talk', () => {
       const speakers = g.ids.map((id) => speakerOf(VOICES[id]!.voice));
       expect(new Set(speakers).size, `${g.name}: ${speakers.join(', ')}`).toBe(speakers.length);
     }
+  });
+});
+
+describe("the curated replays' voices (scripts/voices.ts)", () => {
+  it('speaks each line the recording says, in the voice the casting gives, and stays small', () => {
+    let bytes = 0;
+    for (const r of replays) {
+      const name = r.file.replace(/\.json\.gz$/, '');
+      const rec = JSON.parse(gunzipSync(readFileSync(new URL(`../public/demo/${r.file}`, import.meta.url))).toString('utf8')) as Recording;
+      const talk = rec.hands.flatMap((h, i) => h.actions.flatMap((x, a) => (x.say ? [{ key: `${i + 1}-${a}`, say: x.say, voice: voiceFor(rec.players[x.seat]!.id, x.mood) }] : [])));
+      const dir = new URL(`../public/voices/${name}/`, import.meta.url);
+      if (!talk.length) {
+        expect(existsSync(dir), name).toBe(false);
+        continue;
+      }
+      const index = JSON.parse(readFileSync(new URL('index.json', dir), 'utf8')) as { format: number; lines: Record<string, { file: string; say: string; voice: string }> };
+      expect(index.format).toBe(1);
+      const byKey = new Map(talk.map((t) => [t.key, t]));
+      // Nearly every line (the provider refuses the odd one), each the recording's own words in its casting's voice.
+      expect(Object.keys(index.lines).length, name).toBeGreaterThanOrEqual(talk.length - 3);
+      for (const [key, l] of Object.entries(index.lines)) {
+        expect(byKey.get(key), `${name} ${key}`).toMatchObject({ say: l.say, voice: l.voice });
+        expect(l.file).toBe(`${key}.mp3`);
+        bytes += statSync(new URL(l.file, dir)).size;
+      }
+    }
+    expect(bytes).toBeLessThan(15e6);
   });
 });
