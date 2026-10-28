@@ -33,6 +33,8 @@ export interface TableOptions {
    * bubble, the speaker's face pulses and the chat lights the line up; else a bubble.
    */
   talkInChat?: () => boolean;
+  /** A model's line of talk came with its action (showMeta), with its mood: the speaker speaks it (voice.ts). */
+  onTalk?: (seat: number, text: string, mood?: Mood) => void;
 }
 
 export class TableUI {
@@ -497,7 +499,10 @@ export class TableUI {
   showMeta(seat: number, meta: ActionMeta): void {
     const el = this.seatEls[seat]!;
     if (meta.mood) this.setMood(seat, meta.mood);
-    if (meta.say) this.say(seat, meta.say);
+    if (meta.say) {
+      this.say(seat, meta.say);
+      this.o.onTalk?.(seat, meta.say, meta.mood);
+    }
     if (el.tell) {
       const bars = tellBars(meta.probabilities);
       el.tell.hidden = !bars;

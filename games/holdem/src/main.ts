@@ -8,6 +8,7 @@ import { warmUp } from '../../../packages/kit/client/transport.ts';
 import { ModelWarming } from '../../../packages/kit/client/warming.ts';
 import { track, trackClicks } from '../../../packages/kit/client/track.ts';
 import { audio } from './audio.ts';
+import { spokenLine, tableSpeaker, voiceButton } from './voice.ts';
 import { focusDialog, h, reducedMotion, wait } from './dom.ts';
 import type { ActionMeta, StepResult, TableDriver, TableSnapshot } from './driver.ts';
 import { LocalDriver } from './local-driver.ts';
@@ -245,7 +246,13 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
   const driver: TableDriver = local ?? (liveRemote = new RemoteDriver({ onConnection: reconnect.update }));
   /** A resumed table catching up on the hand in play: at once, without its sounds. */
   let restoring = false;
-  const ui = new TableUI({ seats, viewer: watching ? null : 0, speed: () => (restoring ? 1000 : watching || spectating ? speed : 1), reduced: () => restoring || reducedMotion(), talkInChat: () => chatBesideTable(chat.el) });
+  // The models' talk spoken (Voice on): each line by its place at the table, which the server speaks. Practice has none.
+  const speaker = tableSpeaker({ signal, speed: () => (watching || spectating ? speed : 1) });
+  const speakLast = () => {
+    const at = driver instanceof RemoteDriver ? driver.lastAction() : null;
+    if (at) speaker.say(spokenLine(at));
+  };
+  const ui = new TableUI({ seats, viewer: watching ? null : 0, speed: () => (restoring ? 1000 : watching || spectating ? speed : 1), reduced: () => restoring || reducedMotion(), talkInChat: () => chatBesideTable(chat.el), onTalk: speakLast });
   /** Play mode, after you went out: the AIs play on, faster, and you watch. */
   let spectating = false;
 
@@ -313,7 +320,7 @@ async function playGame(host: HTMLElement, choice: LobbyChoice, signal: AbortSig
       }),
     );
   };
-  tools.append(reviewBtn, soundBtn, h('button.tbtn.word', { type: 'button', 'aria-label': 'Leave', title: 'Leave the table', onclick: askLeave }, svg(LEAVE_ICON), h('span.lbl', null, 'Leave')));
+  tools.append(reviewBtn, soundBtn, ...(PRACTICE ? [] : [voiceButton(signal)]), h('button.tbtn.word', { type: 'button', 'aria-label': 'Leave', title: 'Leave the table', onclick: askLeave }, svg(LEAVE_ICON), h('span.lbl', null, 'Leave')));
   if (PRACTICE) tools.prepend(h('span.practice', { title: 'Bots stand in for the models (?practice)' }, 'Practice'));
   const toolbar = h('div.toolbar', null, level, tools);
   const actions = h('div.actions', { hidden: true });

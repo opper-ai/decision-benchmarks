@@ -71,6 +71,20 @@ class TableAudio {
     src.start(this.ctx.currentTime + (o.delay ?? 0));
   }
 
+  /**
+   * The page's audio context, running, for the spoken table talk (voice.ts), whatever the sound switch says; null
+   * where there is none. Before the first click or key it waits for one, as browsers require.
+   */
+  async context(): Promise<AudioContext | null> {
+    if (typeof AudioContext === 'undefined') return null;
+    try {
+      await this.ensure();
+    } catch {
+      return null;
+    }
+    return this.ctx;
+  }
+
   set(on: boolean): void {
     this.on = on;
     try {
