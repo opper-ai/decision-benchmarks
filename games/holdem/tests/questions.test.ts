@@ -179,7 +179,10 @@ describe('a live table', () => {
     expect(LIVE_TABLE).toMatch(/on every action, say something out loud/i);
     for (const mood of ['annoyed', 'nervous', 'smug']) expect(LIVE_TABLE).toContain(mood);
     expect(LIVE_TABLE).not.toMatch(/fold|call|raise|bet|equity|odds|position|should|strong|weak|cards|hand\b|reveal|hide/i);
-    expect(LIVE_TABLE.length).toBeLessThan(450);
+    // The delivery tags (shared/delivery.ts) take most of the rest.
+    expect(LIVE_TABLE.length).toBeLessThan(900);
+    for (const tag of ['[pause]', '[long-pause]', '[laugh]', '[sigh]', '[breath]', '<whisper>', '<slow>', '<soft>']) expect(LIVE_TABLE).toContain(tag);
+    expect(LIVE_TABLE).toMatch(/up to 2 delivery tags/);
   });
 
   it('lists the moods in a neutral (alphabetical) order, in the description and the schema', () => {

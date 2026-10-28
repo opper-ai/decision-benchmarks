@@ -14,6 +14,7 @@ import { holdemModel } from '../shared/models.ts';
 import { isTableKey } from '../shared/rng.ts';
 import { MOODS, type FallbackReason, type Mood, type RecordedAction, type TalkLine } from '../shared/recording.ts';
 import { MAX_SAY } from '../shared/questions.ts';
+import { isSpoken } from '../shared/delivery.ts';
 import { actSitAndGo, MAX_SEATS, MIN_SEATS, newSitAndGo, nextHand, type SitAndGo } from '../shared/sitngo.ts';
 import { finishedHandOf, type ReviewHand } from '../shared/table.ts';
 
@@ -26,8 +27,9 @@ export const MAX_HAND_TALK = 60;
 
 /** One action's metadata, keys kept short (the token goes back and forth with every request). */
 export interface CompactMeta {
-  /** say, mood, reasoning, probabilities, latency (ms), cost (USD) */
+  /** say, its spoken form with delivery tags (only when it has any), mood, reasoning, probabilities, latency (ms), cost (USD) */
   s?: string;
+  v?: string;
   m?: Mood;
   r?: string;
   p?: Partial<Record<OptionKey, number>>;
@@ -82,10 +84,20 @@ export function decodeAction(code: string, seat: number, human: boolean): Record
 
 export const toEngine = (x: RecordedAction): Action => (x.key !== undefined ? { key: x.key } : { kind: 'raise', to: x.to! });
 
+/**
+ * An action at the table: a recorded action, and for a chat model's line with delivery tags (shared/delivery.ts) its
+ * spoken form, which only the token and the speak route hold: publicAction takes it off whatever leaves the server.
+ */
+export type TableAction = RecordedAction & { spoken?: string };
+
+/** The action as the page, the review and the recording get it: never the spoken form. */
+export const publicAction = ({ spoken: _spoken, ...x }: TableAction): RecordedAction => x;
+
 /** The metadata a recorded action keeps, compacted (only what is there; reasoning only when `reasoning`). */
-export function compactMeta(x: RecordedAction, reasoning: boolean): CompactMeta {
+export function compactMeta(x: TableAction, reasoning: boolean): CompactMeta {
   const m: CompactMeta = {};
   if (x.say) m.s = x.say;
+  if (x.say && x.spoken) m.v = x.spoken;
   if (x.mood) m.m = x.mood;
   if (reasoning && x.reasoning) m.r = x.reasoning;
   if (x.probabilities) m.p = x.probabilities;
@@ -94,11 +106,12 @@ export function compactMeta(x: RecordedAction, reasoning: boolean): CompactMeta 
   return m;
 }
 
-const withMeta = (x: RecordedAction, m: CompactMeta | undefined): RecordedAction => ({
+const withMeta = (x: RecordedAction, m: CompactMeta | undefined): TableAction => ({
   ...x,
   ...(m?.l !== undefined ? { latencyMs: m.l } : {}),
   ...(m?.c !== undefined ? { costUsd: m.c } : {}),
   ...(m?.s !== undefined ? { say: m.s } : {}),
+  ...(m?.s !== undefined && m.v !== undefined ? { spoken: m.v } : {}),
   ...(m?.m !== undefined ? { mood: m.m } : {}),
   ...(m?.r !== undefined ? { reasoning: m.r } : {}),
   ...(m?.p !== undefined ? { probabilities: m.p } : {}),
@@ -114,7 +127,7 @@ export function parseState(v: unknown): TableState | null {
   const seats = v.seats;
   if (!Array.isArray(seats) || seats.length < MIN_SEATS || seats.length > MAX_SEATS || !seats.every((s) => s === null || (typeof s === 'string' && holdemModel(s)))) return null;
   if (seats.filter((s) => s === null).length !== (v.mode === 'play' ? 1 : 0)) return null;
-  for (const m of v.meta as Record<string, unknown>[]) if (m.m !== undefined && !MOODS.includes(m.m as Mood)) return null;
+  for (const m of v.meta as Record<string, unknown>[]) if ((m.m !== undefined && !MOODS.includes(m.m as Mood)) || (m.v !== undefined && !isSpoken(m.v))) return null;
   if (v.t !== undefined && !(Array.isArray(v.t) && v.t.length <= MAX_HAND_TALK && v.t.every((x) => Array.isArray(x) && x.length === 2 && isInt(x[0]) && typeof x[1] === 'string' && x[1].length <= MAX_SAY))) return null;
   return v as unknown as TableState;
 }
@@ -123,7 +136,7 @@ export function parseState(v: unknown): TableState | null {
 export interface Table {
   st: TableState;
   g: SitAndGo;
-  hands: RecordedAction[][];
+  hands: TableAction[][];
   /** The human's table talk in the hand in play, in order. */
   talk: TalkLine[];
   /** With `finished`: every hand played to its end, face up, for the review. */
@@ -133,14 +146,14 @@ export interface Table {
 /** Replays the state's actions from its key; throws if they do not replay (a token from another version of the rules). */
 export function rebuild(st: TableState, o: { finished?: boolean } = {}): Table {
   let g = newSitAndGo({ seats: st.seats.length, key: st.key });
-  const hands: RecordedAction[][] = [];
+  const hands: TableAction[][] = [];
   const finished: ReviewHand[] = [];
   const human = st.seats.indexOf(null);
   const talk: TalkLine[] = (st.t ?? []).map(([after, say]) => ({ seat: human, after, say }));
   st.log.forEach((line, h) => {
     if (h > 0) g = nextHand(g);
     const last = h === st.log.length - 1;
-    const actions: RecordedAction[] = [];
+    const actions: TableAction[] = [];
     for (const [i, code] of (line ? line.split(',') : []).entries()) {
       const seat = g.hand.toAct;
       if (seat === null) throw new Error(`hand ${h + 1}: an action after the hand ended`);
@@ -151,7 +164,7 @@ export function rebuild(st: TableState, o: { finished?: boolean } = {}): Table {
     }
     if (!last && g.hand.street !== 'done') throw new Error(`hand ${h + 1} stops before it ended`);
     hands.push(actions);
-    if (o.finished && g.hand.street === 'done') finished.push(finishedHandOf(g, actions, last ? talk : []));
+    if (o.finished && g.hand.street === 'done') finished.push(finishedHandOf(g, actions.map(publicAction), last ? talk : []));
   });
   return { st, g, hands, talk, finished };
 }

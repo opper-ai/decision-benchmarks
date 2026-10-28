@@ -1,9 +1,10 @@
 // Spoken table talk over HTTP (server/table.ts speak): the page names a line by hand and action with a token of that
 // hand, and the server speaks only a line its sealed token holds, in the model's voice, paid as the table is.
 import { describe, expect, it } from 'vitest';
+import { purposeKey, seal, unseal } from '../../../packages/kit/server/session';
 import type { SnapshotReply, StepReply } from '../shared/table';
 import { voiceFor } from '../shared/voices';
-import { CHAT, DECISION, LOOSE, setup, type Setup } from './table-server';
+import { CHAT, DECISION, LOOSE, SECRET, setup, type Setup } from './table-server';
 
 const LUNA = 'azure:eu/gpt-6-luna';
 const WATCH = (...models: string[]) => ({ mode: 'watch', seats: models.map((id) => ({ kind: 'model', id })) });
@@ -29,25 +30,61 @@ async function talked(o: Setup = { signedIn: true }, models = [CHAT, LUNA]) {
 }
 
 describe('the table speaks a line of talk', () => {
-  it("speaks the line the token holds, in the speaker's voice and mood, on the player's key, and logs the voice, the time and the cost", async () => {
+  it("speaks the line the token holds, in the speaker's voice, on the player's key, and logs the model, the voice, the time and the cost", async () => {
     const t = await talked();
     const r = await t.call('speak', { token: t.token, hand: t.hand, action: t.action });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     const model = [CHAT, LUNA][t.seat]!;
-    const voice = voiceFor(model, t.mood)!;
+    const voice = voiceFor(model)!;
     expect(r.body).toMatchObject({ format: 'mp3', voice });
     expect(Buffer.from(r.body.audio as string, 'base64').toString()).toBe(`mp3:${voice}:${t.say}`);
     const [sp] = speechCalls(t.up);
-    expect(sp!.body).toEqual({ model: 'mistral/voxtral-mini-tts-3-0', input: t.say, voice, format: 'mp3' });
+    expect(sp!.body).toEqual({ model: 'xai/tts', input: t.say, voice, format: 'mp3' });
     expect(sp!.headers.authorization).toBe('Bearer op-player');
-    expect(t.logs.some((l) => l.includes(`${model} spoken (${voice}, player) in`) && l.includes('$0.0009'))).toBe(true);
+    expect(t.logs.some((l) => l.includes(`${model} spoken (xai/tts ${voice}, player) in`) && l.includes('$0.0009'))).toBe(true);
   });
 
-  it('speaks a mood in its variant (Luna, confident: Jane, confident)', async () => {
-    const t = await talked({ signedIn: true }, [LUNA, LUNA]);
-    expect(t.mood).toBe('confident');
-    const r = await t.call('speak', { token: t.token, hand: t.hand, action: t.action });
-    expect(r.body.voice).toBe('gb_jane_confident');
+  it('speaks a line with the delivery tags its model added, and never shows a tag: not in the answers, the review, the recording or the next prompt', async () => {
+    const said = 'Nice try. [laugh] <whisper>For now.</whisper> <script>x</script> [emotion=smug] [sigh] [pause]';
+    // The fake models check or call, each saying the tagged line.
+    const chat = (body: Record<string, unknown>) => {
+      const keys = (body.response_format as { json_schema: { schema: { properties: { action: { enum: string[] } } } } }).json_schema.schema.properties.action.enum;
+      const action = keys.includes('check') ? 'check' : keys.includes('call') ? 'call' : keys[0]!;
+      return { status: 200, body: { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ action, say: said, mood: 'smug', reasoning: 'r', turn_complete: true }) } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }, headers: { 'x-opper-cost': '0.001' } };
+    };
+    const s = await setup({ signedIn: true, up: { chat } });
+    let token = ((await s.call('start', WATCH(CHAT, LUNA))).body as unknown as SnapshotReply).token;
+    let first: StepReply | undefined;
+    for (let i = 0; i < 40; i++) {
+      const reply = (await s.call('step', { token })).body as unknown as StepReply;
+      first ??= reply;
+      token = reply.token;
+      if (reply.finished) break;
+    }
+    expect(first!.result.meta.say).toBe('Nice try. For now. x');
+    const r = await s.call('speak', { token, hand: 1, action: 0 });
+    expect(r.status).toBe(200);
+    // Two tags at most: the laugh and the whisper; the rest is gone, its words kept plain.
+    expect(speechCalls(s.up)[0]!.body.input).toBe('Nice try. [laugh] <whisper>For now.</whisper> x');
+    expect(s.logs.some((l) => l.includes('tagged'))).toBe(true);
+    const review = await s.call('review', { token });
+    for (const res of [...s.responses.filter((x) => x.path !== 'speak'), { path: 'review', text: JSON.stringify(review.body) }]) {
+      expect(res.text, res.path).not.toMatch(/\[laugh\]|whisper|script|emotion|\[sigh\]/);
+    }
+    // The next model hears the words as shown.
+    const prompts = s.up.calls.filter((c) => c.path === '/v3/compat/chat/completions').map((c) => JSON.stringify((c.body.messages as unknown[])[1]));
+    expect(prompts.some((p) => p.includes('Nice try. For now. x'))).toBe(true);
+    for (const p of prompts) expect(p).not.toMatch(/\[laugh\]|<whisper>/);
+  });
+
+  it('refuses a token whose spoken line is no line of allowed tags', async () => {
+    const t = await talked();
+    const key = purposeKey(SECRET, 'holdem-table');
+    const st = unseal(t.token, key) as { meta: Record<string, unknown>[] };
+    st.meta[t.action]!.v = 'hi <script>alert(1)</script>';
+    const r = await t.call('speak', { token: seal(st, key), hand: t.hand, action: t.action });
+    expect(r.status).toBe(400);
+    expect(speechCalls(t.up)).toHaveLength(0);
   });
 
   it("pays with the server's local key and its project in development", async () => {
