@@ -11,7 +11,7 @@ AI Hold'em is our own: written by Johnny Chadda (Opper) for this repository, AGP
 - The table's duplicate format, every deal played from every seat, follows duplicate poker and duplicate bridge.
 - The avatars were generated through Opper's image API (`scripts/avatars.ts`). The sounds in `public/audio/` were
   generated through Opper's audio API (ElevenLabs' sound-effects model) by a one-off script that is not kept here.
-- The voices of the table talk are xAI's Grok TTS (`xai/tts`) through Opper's speech API:
+- The voices of the table talk are Fish Audio's S2.1 Pro (`fish/s2.1-pro`, voices from its official library) through Opper's speech API:
   live at the table, and pre-rendered for the curated replays in `public/voices/` (`scripts/voices.ts`).
 - The model logos in `public/logos/` are copied from Snake's (`games/snake/public/logos/`), which come from JevMan.
 - `public/poster.png` is a still of a curated replay's best moment (Opus 5.5's river bluff in Claude vs GPT), drawn by

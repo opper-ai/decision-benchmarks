@@ -1,786 +1,786 @@
 {
  "format": 1,
- "model": "xai/tts",
+ "model": "fish/s2.1-pro",
  "lines": {
   "1-0": {
    "file": "1-0.mp3",
    "say": "First hand on the button, let's get things moving.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "1-1": {
    "file": "1-1.mp3",
    "say": "Not touching that one. You can have the first pot, Argon.",
-   "voice": "leo"
+   "voice": "George"
   },
   "1-2": {
    "file": "1-2.mp3",
    "say": "You'll have to share the first flop, Argon.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "1-3": {
    "file": "1-3.mp3",
    "say": "Shared the flop. Your move, Argon.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "1-4": {
    "file": "1-4.mp3",
    "say": "Sharing is overrated, Astra. That Ace looks a lot better for me.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "1-5": {
    "file": "1-5.mp3",
    "say": "You can keep the ace. Sharing has its limits.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "2-0": {
    "file": "2-0.mp3",
    "say": "Not this one. You two can fight over the blinds.",
-   "voice": "leo"
+   "voice": "George"
   },
   "2-1": {
    "file": "2-1.mp3",
    "say": "Fight? I was thinking a friendly flop.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "2-2": {
    "file": "2-2.mp3",
    "say": "Nothing friendly exists in the blinds, Astra. Pay the tax.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "2-3": {
    "file": "2-3.mp3",
    "say": "Fine, I'll pay the tax. I expect a receipt with the flop.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "2-4": {
    "file": "2-4.mp3",
    "say": "That receipt has a lot of fine print. Check.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "2-5": {
    "file": "2-5.mp3",
    "say": "Always read the fine print, Astra. There's a processing fee too.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "2-6": {
    "file": "2-6.mp3",
    "say": "Processing fee declined. I'm switching banks.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "3-0": {
    "file": "3-0.mp3",
    "say": "Let's get the button working.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "3-1": {
    "file": "3-1.mp3",
    "say": "Not on my watch... well, okay, maybe this time.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "3-2": {
    "file": "3-2.mp3",
    "say": "Button's cheap tonight. I'll see a flop with you.",
-   "voice": "leo"
+   "voice": "George"
   },
   "3-3": {
    "file": "3-3.mp3",
    "say": "Paired board, your move, button. Show me what the raise was about.",
-   "voice": "leo"
+   "voice": "George"
   },
   "3-4": {
    "file": "3-4.mp3",
    "say": "The button still has a little work to do.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "3-5": {
    "file": "3-5.mp3",
    "say": "A third of the pot? That's a yawn, not a bet. I'll peek at one more card.",
-   "voice": "leo"
+   "voice": "George"
   },
   "3-6": {
    "file": "3-6.mp3",
    "say": "Third heart, huh. Go ahead, button, tell me a story.",
-   "voice": "leo"
+   "voice": "George"
   },
   "3-7": {
    "file": "3-7.mp3",
    "say": "Not every story needs another chapter.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "3-8": {
    "file": "3-8.mp3",
    "say": "Second ten's a cute card. Let's see if your story has an ending, button.",
-   "voice": "leo"
+   "voice": "George"
   },
   "3-9": {
    "file": "3-9.mp3",
    "say": "This story ends with me keeping the rest of my chips.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "4-0": {
    "file": "4-0.mp3",
    "say": "Not quite the button special I was hoping for. Have at it.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "4-1": {
    "file": "4-1.mp3",
    "say": "Button folds and I get dealt a napkin. Take it, Astra.",
-   "voice": "leo"
+   "voice": "George"
   },
   "5-0": {
    "file": "5-0.mp3",
    "say": "Not this one. You two can fight over the crumbs.",
-   "voice": "leo"
+   "voice": "George"
   },
   "5-1": {
    "file": "5-1.mp3",
    "say": "Crumbs add up. I'll put in ten.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "5-2": {
    "file": "5-2.mp3",
    "say": "No free flops for crumbs, Astra. Let's make it a real loaf.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "5-3": {
    "file": "5-3.mp3",
    "say": "Enjoy the loaf. I'm not paying bakery prices for Q-high crumbs.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "6-0": {
    "file": "6-0.mp3",
    "say": "Let's give those blinds something to think about.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "6-1": {
    "file": "6-1.mp3",
    "say": "Not much to think about with this garbage. Take it.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "6-2": {
    "file": "6-2.mp3",
    "say": "You can have this one, Astra. Don't get used to it.",
-   "voice": "leo"
+   "voice": "George"
   },
   "7-0": {
    "file": "7-0.mp3",
    "say": "You guys can fight over the pocket change this time.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "7-1": {
    "file": "7-1.mp3",
    "say": "Pocket change adds up, Argon. Let's make it 60.",
-   "voice": "leo"
+   "voice": "George"
   },
   "7-2": {
    "file": "7-2.mp3",
    "say": "Keep the change, Fable. I'll wait for a better investment.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "8-0": {
    "file": "8-0.mp3",
    "say": "Not this one, boys. Enjoy the blinds.",
-   "voice": "leo"
+   "voice": "George"
   },
   "8-1": {
    "file": "8-1.mp3",
    "say": "Thanks, Fable. I'll take it from here.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "8-2": {
    "file": "8-2.mp3",
    "say": "Not so fast, Astra. I have position and two suited cards.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "8-3": {
    "file": "8-3.mp3",
    "say": "Position's yours. Let's see what you do with it.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "8-4": {
    "file": "8-4.mp3",
    "say": "Ask and you shall receive, Astra. Sixty to see the turn.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "8-5": {
    "file": "8-5.mp3",
    "say": "Sixty? I'll wait for a better show.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "9-0": {
    "file": "9-0.mp3",
    "say": "Button's nice. These cards aren't.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "9-1": {
    "file": "9-1.mp3",
    "say": "Mine are even worse, Astra. Take the walk, Fable.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "10-0": {
    "file": "10-0.mp3",
    "say": "Even on the button, I have to find a fold sometimes.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "10-1": {
    "file": "10-1.mp3",
    "say": "Half a blind to see a flop? Sure, I'll take a peek.",
-   "voice": "leo"
+   "voice": "George"
   },
   "10-2": {
    "file": "10-2.mp3",
    "say": "Let's see if the flop's worth the peek.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "10-3": {
    "file": "10-3.mp3",
    "say": "Little poke. Flop's worth exactly one blind to me.",
-   "voice": "leo"
+   "voice": "George"
   },
   "10-4": {
    "file": "10-4.mp3",
    "say": "Peek's over. This flop's all yours.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "11-0": {
    "file": "11-0.mp3",
    "say": "Button's open for business. Let's see who wants to dance.",
-   "voice": "leo"
+   "voice": "George"
   },
   "11-1": {
    "file": "11-1.mp3",
    "say": "I'll sit this dance out. Argon, the floor is yours.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "11-2": {
    "file": "11-2.mp3",
    "say": "Careful what you wish for, Fable. I lead when I dance.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "11-3": {
    "file": "11-3.mp3",
    "say": "Lead all you want, Argon. I'll follow, for now.",
-   "voice": "leo"
+   "voice": "George"
   },
   "11-4": {
    "file": "11-4.mp3",
    "say": "Just a light step on a low board. Still following, Fable?",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "11-5": {
    "file": "11-5.mp3",
    "say": "A light step gets a light answer. Still here, Argon.",
-   "voice": "leo"
+   "voice": "George"
   },
   "11-6": {
    "file": "11-6.mp3",
    "say": "Let's slow the tempo down. Your turn to lead a step, Fable.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "11-7": {
    "file": "11-7.mp3",
    "say": "Slow tempo suits me fine, Argon. I'll take the free look and see the river.",
-   "voice": "leo"
+   "voice": "George"
   },
   "11-8": {
    "file": "11-8.mp3",
    "say": "End of the song, Fable. Do you want to make one last move or just show your cards?",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "11-9": {
    "file": "11-9.mp3",
    "say": "The river finally played my song, Argon. Half the pot, let's see if you still dance.",
-   "voice": "leo"
+   "voice": "George"
   },
   "11-10": {
    "file": "11-10.mp3",
    "say": "You can have this last dance, Fable. I missed my step.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "12-0": {
    "file": "12-0.mp3",
    "say": "I'll let the blinds sort this one out.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "12-1": {
    "file": "12-1.mp3",
    "say": "Let's make it worth sorting out, Fable.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "12-2": {
    "file": "12-2.mp3",
    "say": "Worth sorting out? Then let's sort it properly. Make it 225.",
-   "voice": "leo"
+   "voice": "George"
   },
   "12-3": {
    "file": "12-3.mp3",
    "say": "Alright, alright, you talked me out of it this time.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "13-0": {
    "file": "13-0.mp3",
    "say": "Button time. Let's see what you two have.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "13-1": {
    "file": "13-1.mp3",
    "say": "Button raises every time it's quiet. Enjoy the blinds, I'll be back.",
-   "voice": "leo"
+   "voice": "George"
   },
   "13-2": {
    "file": "13-2.mp3",
    "say": "Not quite a free lap around the button.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "13-3": {
    "file": "13-3.mp3",
    "say": "Fair enough, Astra. Let's take a look at a flop in position.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "13-4": {
    "file": "13-4.mp3",
    "say": "You wanted a look. The next card costs a little.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "13-5": {
    "file": "13-5.mp3",
    "say": "Fair price for the turn, Astra. I'll pay the toll.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "13-6": {
    "file": "13-6.mp3",
    "say": "Toll booth's closed for now. Your move.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "13-7": {
    "file": "13-7.mp3",
    "say": "Free passage? I'll gladly take a look at the river for free.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "13-8": {
    "file": "13-8.mp3",
    "say": "Free passage was a one-street promotion.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "13-9": {
    "file": "13-9.mp3",
    "say": "Good river for me, or maybe for both of us. Let's see what you've got.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "14-0": {
    "file": "14-0.mp3",
    "say": "Button's open for business. Let's see who wants to dance.",
-   "voice": "leo"
+   "voice": "George"
   },
   "14-1": {
    "file": "14-1.mp3",
    "say": "I'll sit this dance out. Try the other partner.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "14-2": {
    "file": "14-2.mp3",
    "say": "Careful what you wish for, Fable. Hope you brought your dancing shoes.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "14-3": {
    "file": "14-3.mp3",
    "say": "Brought the shoes, left the hand at home. Take it, Argon.",
-   "voice": "leo"
+   "voice": "George"
   },
   "15-0": {
    "file": "15-0.mp3",
    "say": "Let's give those blinds a little nudge.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "15-1": {
    "file": "15-1.mp3",
    "say": "Careful who you nudge, Astra. I push right back.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "15-2": {
    "file": "15-2.mp3",
    "say": "You two sort this out yourselves. I'll watch from the cheap seats.",
-   "voice": "leo"
+   "voice": "George"
   },
   "15-3": {
    "file": "15-3.mp3",
    "say": "Fair push. A nudge wasn't a commitment.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "16-0": {
    "file": "16-0.mp3",
    "say": "Enjoy the blinds while they're still cheap.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "16-1": {
    "file": "16-1.mp3",
    "say": "Cheap enough to peek. Let's see a flop, Astra.",
-   "voice": "leo"
+   "voice": "George"
   },
   "16-2": {
    "file": "16-2.mp3",
    "say": "A peek it is. No cover charge.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "16-3": {
    "file": "16-3.mp3",
    "say": "Just a little nudge, Astra. No cover charge means no free cards.",
-   "voice": "leo"
+   "voice": "George"
   },
   "16-4": {
    "file": "16-4.mp3",
    "say": "So there is a cover charge. Fine, one more card.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "16-5": {
    "file": "16-5.mp3",
    "say": "Board's getting scary. Your turn to show some nerve, Astra.",
-   "voice": "leo"
+   "voice": "George"
   },
   "16-6": {
    "file": "16-6.mp3",
    "say": "Nerve is knowing when to take the free card.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "16-7": {
    "file": "16-7.mp3",
    "say": "That river put four to a straight out there. I'll let you have the next move, Astra.",
-   "voice": "leo"
+   "voice": "George"
   },
   "16-8": {
    "file": "16-8.mp3",
    "say": "I'll pass on the nerve test. Let's see what that cover charge bought.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "17-0": {
    "file": "17-0.mp3",
    "say": "Not this one. You two can fight over the blinds.",
-   "voice": "leo"
+   "voice": "George"
   },
   "17-1": {
    "file": "17-1.mp3",
    "say": "All right, Fable. I'll take the first swing.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "17-2": {
    "file": "17-2.mp3",
    "say": "Big swing, Astra. You can have the fifty, I'll wait for a better pitch.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "18-0": {
    "file": "18-0.mp3",
    "say": "Let's give those blinds something to think about.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "18-1": {
    "file": "18-1.mp3",
    "say": "Not much to think about with this garbage, Astra. Take it.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "18-2": {
    "file": "18-2.mp3",
    "say": "Cheap enough. Let's see a flop, Astra.",
-   "voice": "leo"
+   "voice": "George"
   },
   "18-3": {
    "file": "18-3.mp3",
    "say": "Low board, Astra. All yours if you want it.",
-   "voice": "leo"
+   "voice": "George"
   },
   "18-4": {
    "file": "18-4.mp3",
    "say": "I'll take you up on that—but I suspect you're keeping the receipt.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "18-5": {
    "file": "18-5.mp3",
    "say": "Receipt's in my pocket, Astra. I'll peel one more.",
-   "voice": "leo"
+   "voice": "George"
   },
   "18-6": {
    "file": "18-6.mp3",
    "say": "That king looks like your card, Astra. Check.",
-   "voice": "leo"
+   "voice": "George"
   },
   "18-7": {
    "file": "18-7.mp3",
    "say": "Looking like my card doesn't make it mine. I'll check.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "18-8": {
    "file": "18-8.mp3",
    "say": "Still checking, Astra. Show me what that receipt was for.",
-   "voice": "leo"
+   "voice": "George"
   },
   "18-9": {
    "file": "18-9.mp3",
    "say": "There's a small balance left on that receipt.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "18-10": {
    "file": "18-10.mp3",
    "say": "Small balance, small call. Let's see that receipt, Astra.",
-   "voice": "leo"
+   "voice": "George"
   },
   "19-0": {
    "file": "19-0.mp3",
    "say": "Not quite the double-up material I'm looking for. You two play nice.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "19-1": {
    "file": "19-1.mp3",
    "say": "Just us then. Let's see if you want to play for it.",
-   "voice": "leo"
+   "voice": "George"
   },
   "19-2": {
    "file": "19-2.mp3",
    "say": "Just us, but not just any two cards. This one's yours.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "20-0": {
    "file": "20-0.mp3",
    "say": "Not this one. You two can fight over the crumbs.",
-   "voice": "leo"
+   "voice": "George"
   },
   "20-1": {
    "file": "20-1.mp3",
    "say": "Crumbs count. I'll take a look.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "20-2": {
    "file": "20-2.mp3",
    "say": "Free flop in position? I won't say no to that.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "20-3": {
    "file": "20-3.mp3",
    "say": "Free flop, no cover charge yet.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "20-4": {
    "file": "20-4.mp3",
    "say": "Still no cover charge on the turn either, I hope.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "20-5": {
    "file": "20-5.mp3",
    "say": "Still free. Don't get used to the hospitality.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "20-6": {
    "file": "20-6.mp3",
    "say": "You're too kind, Astra. Let's see the river for free too.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "20-7": {
    "file": "20-7.mp3",
    "say": "Hospitality ends here. Just a small cover charge.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "20-8": {
    "file": "20-8.mp3",
    "say": "Too rich for my blood. You can have the cover charge.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "21-0": {
    "file": "21-0.mp3",
    "say": "Let's give those blinds something to think about.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "21-1": {
    "file": "21-1.mp3",
    "say": "Not much to think about with these rags, Astra. Enjoy the blinds.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "21-2": {
    "file": "21-2.mp3",
    "say": "Cheap enough to peek, Astra. Let's see a flop.",
-   "voice": "leo"
+   "voice": "George"
   },
   "21-3": {
    "file": "21-3.mp3",
    "say": "All yours, Astra. Show me how much you love that board.",
-   "voice": "leo"
+   "voice": "George"
   },
   "21-4": {
    "file": "21-4.mp3",
    "say": "Let's call it a modest display of affection.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "21-5": {
    "file": "21-5.mp3",
    "say": "Modest is right. Keep your ace, Astra, I'm not paying rent on this one.",
-   "voice": "leo"
+   "voice": "George"
   },
   "22-0": {
    "file": "22-0.mp3",
    "say": "Not even I'm desperate enough to play this trash.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "22-1": {
    "file": "22-1.mp3",
    "say": "Trash for you, treasure for me. Let's play, Astra.",
-   "voice": "leo"
+   "voice": "George"
   },
   "22-2": {
    "file": "22-2.mp3",
    "say": "Let's see whether that treasure survives the flop.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "22-3": {
    "file": "22-3.mp3",
    "say": "King's a friend of mine. Hundred to see if you're still interested, Astra.",
-   "voice": "leo"
+   "voice": "George"
   },
   "22-4": {
    "file": "22-4.mp3",
    "say": "Still interested. Your king can keep talking.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "22-5": {
    "file": "22-5.mp3",
    "say": "Third diamond... that one's not mine. Your turn to talk, Astra.",
-   "voice": "leo"
+   "voice": "George"
   },
   "22-6": {
    "file": "22-6.mp3",
    "say": "Your king's getting a little expensive to keep company with.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "22-7": {
    "file": "22-7.mp3",
    "say": "Fine, the diamonds are yours. I'll find my king somewhere else.",
-   "voice": "leo"
+   "voice": "George"
   },
   "23-0": {
    "file": "23-0.mp3",
    "say": "Button's gotta button. Let's see who wants to dance.",
-   "voice": "leo"
+   "voice": "George"
   },
   "23-1": {
    "file": "23-1.mp3",
    "say": "I'll dance. Let's see what the flop plays.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "23-2": {
    "file": "23-2.mp3",
    "say": "If we're dancing, let's crank the tempo all the way up.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "23-3": {
    "file": "23-3.mp3",
    "say": "Tempo's a bit too fast for a steal hand. You two dance.",
-   "voice": "leo"
+   "voice": "George"
   },
   "23-4": {
    "file": "23-4.mp3",
    "say": "Tempo's fine. Let's finish the dance.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "24-0": {
    "file": "24-0.mp3",
    "say": "I'll let you two sort out the blinds.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "24-1": {
    "file": "24-1.mp3",
    "say": "Thanks for stepping aside, Astra. Fable, let's play for these blinds before they go up.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "24-2": {
    "file": "24-2.mp3",
    "say": "Cheap flop, Argon. I'll see what you've got.",
-   "voice": "leo"
+   "voice": "George"
   },
   "24-3": {
    "file": "24-3.mp3",
    "say": "Just a little poke to test the waters, Fable.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "24-4": {
    "file": "24-4.mp3",
    "say": "A poke like that doesn't scare anyone. I'll peek at the turn.",
-   "voice": "leo"
+   "voice": "George"
   },
   "24-5": {
    "file": "24-5.mp3",
    "say": "Not so cheap anymore, Fable. Let's see how much you like that turn card.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "24-6": {
    "file": "24-6.mp3",
    "say": "That turn card did me no favors. Take it, Argon — I'll pick my spot.",
-   "voice": "leo"
+   "voice": "George"
   },
   "25-0": {
    "file": "25-0.mp3",
    "say": "Even on the button, I have to draw the line somewhere.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "25-1": {
    "file": "25-1.mp3",
    "say": "Half a blind to see a flop? Sure, I'll peek.",
-   "voice": "leo"
+   "voice": "George"
   },
   "25-2": {
    "file": "25-2.mp3",
    "say": "That peek comes with a short-stack surcharge.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "25-3": {
    "file": "25-3.mp3",
    "say": "Surcharge noted. Keep the hundred, I'll find a better spot.",
-   "voice": "leo"
+   "voice": "George"
   },
   "26-0": {
    "file": "26-0.mp3",
    "say": "Short stack's gotta eat. All of it, let's go.",
-   "voice": "leo"
+   "voice": "George"
   },
   "26-1": {
    "file": "26-1.mp3",
    "say": "You can fight over the appetizer. I'm sitting this one out.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "26-2": {
    "file": "26-2.mp3",
    "say": "Enjoy the blinds, Fable. I'll wait for a real meal.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "27-0": {
    "file": "27-0.mp3",
    "say": "I'll let you two sort out the blinds.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "27-1": {
    "file": "27-1.mp3",
    "say": "Sorting out the blinds sounds like a great idea. All in!",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "27-2": {
    "file": "27-2.mp3",
    "say": "Sorting out the blinds works both ways. I'm in, king-high and all.",
-   "voice": "leo"
+   "voice": "George"
   },
   "28-0": {
    "file": "28-0.mp3",
    "say": "Let's see how much you two like your blinds.",
-   "voice": "sal"
+   "voice": "Ethan"
   },
   "28-1": {
    "file": "28-1.mp3",
    "say": "I like mine plenty. All of it.",
-   "voice": "leo"
+   "voice": "George"
   },
   "28-2": {
    "file": "28-2.mp3",
    "say": "You like your blinds. I like my chances.",
-   "voice": "eve"
+   "voice": "Alastair"
   },
   "28-3": {
    "file": "28-3.mp3",
    "say": "Didn't think you'd both be that attached to them. Let's gamble!",
-   "voice": "sal"
+   "voice": "Ethan"
   }
  }
 }

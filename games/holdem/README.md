@@ -175,17 +175,18 @@ nothing for this game.
   hand (`talk`, ignored by verify and the fingerprint; share links don't carry it). The same request sent again says a
   line once: the talk is applied to the token it comes with.
 - **Spoken table talk:** with the toolbar's Voice switch on (off by default, `ai-holdem.voice` in localStorage,
-  independent of Sound), each model's line is spoken in its own voice: xAI's Grok TTS (`xai/tts`) through Opper's
-  speech API (about a second and $0.001 a line; a global route, not EU). The casting is `shared/voices.ts`: each chat
-  model gets one of the five voices (eve and ara female, rex and leo male, sal neutral) after its avatar's character,
-  distinct at every preset table and in the Titans and Open models replays; Claude vs GPT seats four men and there are
-  three male voices, so Opus 5.5 and GPT-5.6 Terra share leo there.
+  independent of Sound), each model's line is spoken in its own voice: Fish Audio's S2.1 Pro (`fish/s2.1-pro`) through
+  Opper's speech API (about a second and $0.0007 a line; a global route, not EU, which Opper lists as one the provider
+  may train on: only the models' lines go to it, never what a player types). The casting is `shared/voices.ts`: each
+  chat model gets a voice of its own from Fish Audio's official library, picked by id after its avatar's character, so
+  no two models sound alike at any table.
   - **Delivery tags (live tables only):** the live prompt (`LIVE_TABLE`) lets a model add up to two tags to its `say`:
-    `[pause]`, `[long-pause]`, `[laugh]`, `[sigh]`, `[breath]`, or `<whisper>`, `<slow>`, `<soft>` round a few words.
+    `[pause]`, `[long pause]`, `[laughs]`, `[sighs]`, `[breathes]`, `[whispering]`, `[softly]`, `[slowly]`, `[excited]`,
+    `[dry]`, `[deadpan]`, `[teasing]` or `[nervous]`, just before the words they change.
     The server splits each line (`shared/delivery.ts` `splitSay`): `say`, what every screen, the chat, the bubbles, the
     other models' prompts, the review and the recording get, has no tag of any kind (anything bracket- or
-    angle-shaped is taken out, the words tidied and cut to 90 characters); the spoken form keeps only the allowed tags,
-    well formed (unknown, nested, unclosed or empty ones go, their words kept plain), and lives only in the sealed
+    angle-shaped is taken out, the words tidied and cut to 90 characters); the spoken form keeps only the allowed tags
+    (Fish Audio acts on any bracketed words, so any other tag goes, and stray marks with it), and lives only in the sealed
     token (`v`, only when it differs), so recordings and replays have none. A line cut to length is spoken plain. The
     mood adds nothing. The bench's prompt and answers are unchanged.
   - `POST api/table/speak { token, hand, action }` is never an open text-to-speech proxy: the server reads the line
@@ -197,10 +198,9 @@ nothing for this game.
     line was tagged, the time and the cost.
   - The page (`src/voice.ts`, `src/speaker.ts`) speaks from `TableUI`'s talk hook through one audio element (a blob URL
     of the mp3, revoked when the line ends; an element because it speeds a voice up with its pitch kept): one line at a
-    time in order, the next one loading while one plays, at 1.2× (Grok's delivery is unhurried), 1.3× at 4× and 1.4× at
-    8× (talk at a live table comes at the models' pace whatever the speed, and 4× is where a player who went out
-    watches, so the voices stay). Grok TTS takes no speed of its own (a `speed`, top-level or in `parameters`, left the
-    clips' length unchanged), so the rate is the page's alone. With Voice on the table waits for the speaker
+    time in order, the next one loading while one plays. The speech model itself speaks fast (`speed: 1.2`), so the page
+    plays a line as made up to 2×, at 1.1× at 4× and 1.2× at 8× (talk at a live table comes at the models' pace whatever
+    the speed, and 4× is where a player who went out watches, so the voices stay). With Voice on the table waits for the speaker
     (`speaker.settled()`): before the next model's move is shown, at a live table and in a replay, the lines said so
     far finish, for at most 3.5 s more; the player's own turn never waits, and with Voice off, or a line failed or
     dropped, nothing waits. A line not started within 4 s of being said is still dropped, so speech never trails the
@@ -246,8 +246,8 @@ The curated replays speak their talk from files, never a live call (anyone may w
 every chat model's line once to `public/voices/<replay>/<hand>-<action>.mp3` (mono, 22.05 kHz, 24 kbps) with an
 `index.json` of each line's file, words and voice; the replay view has a Voice switch when a replay has voices, and plays
 a line only while the recording still says those words. A line already rendered with the same model, voice and words is kept,
-so the script only speaks what changed. The three talking replays took 585 lines, 6.4 MB and $0.46 with the Grok
-voices (2026-10-28).
+so the script only speaks what changed. The three talking replays took 585 lines, 5.5 MB and $0.47 with the Fish
+voices (2026-11-04).
 
 ```bash
 OPPER_API_KEY=... OPPER_PROJECT=... node games/holdem/scripts/voices.ts [--only claude-vs-gpt] [--force]
