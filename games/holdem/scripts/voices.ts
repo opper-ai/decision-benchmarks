@@ -10,7 +10,7 @@
 // rendered with the same model, voice and words is kept unless --force. Replays without talk (the decision models) get no folder.
 //
 // Calls Opper's speech API (POST /v3/audio/speech) with OPPER_API_KEY; with an organization key, also set OPPER_PROJECT
-// to a project UUID. Needs ffmpeg on PATH (to make the files small). About $0.0007 a line (Fish Audio: $15 per million
+// to a project UUID. Needs ffmpeg on PATH (to make the files small). About $0.0008 a line (Fish Audio: $15 per million
 // bytes of text); the cost and the size are printed.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';

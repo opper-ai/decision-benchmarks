@@ -176,7 +176,7 @@ nothing for this game.
   line once: the talk is applied to the token it comes with.
 - **Spoken table talk:** with the toolbar's Voice switch on (off by default, `ai-holdem.voice` in localStorage,
   independent of Sound), each model's line is spoken in its own voice: Fish Audio's S2.1 Pro (`fish/s2.1-pro`) through
-  Opper's speech API (about a second and $0.0007 a line; a global route, not EU, which Opper lists as one the provider
+  Opper's speech API (one to two seconds and about $0.001 a line; a global route, not EU, which Opper lists as one the provider
   may train on: only the models' lines go to it, never what a player types). The casting is `shared/voices.ts`: each
   chat model gets a voice of its own from Fish Audio's official library, picked by id after its avatar's character, so
   no two models sound alike at any table.
@@ -200,8 +200,8 @@ nothing for this game.
     of the mp3, revoked when the line ends; an element because it speeds a voice up with its pitch kept): one line at a
     time in order, the next one loading while one plays. The speech model itself speaks fast (`speed: 1.2`), so the page
     plays a line as made up to 2×, at 1.1× at 4× and 1.2× at 8× (talk at a live table comes at the models' pace whatever
-    the speed, and 4× is where a player who went out watches, so the voices stay). With Voice on the table waits for the speaker
-    (`speaker.settled()`): before the next model's move is shown, at a live table and in a replay, the lines said so
+    the speed, and 4× is where a player who went out watches, so the voices stay). With Voice on the table waits for the
+    speaker (`speaker.settled()`): before the next model's move is shown, at a live table and in a replay, the lines said so
     far finish, for at most 3.5 s more; the player's own turn never waits, and with Voice off, or a line failed or
     dropped, nothing waits. A line not started within 4 s of being said is still dropped, so speech never trails the
     table. Silent while a resumed hand is laid out again; stopped on leaving, a new table, or the page hidden. A line

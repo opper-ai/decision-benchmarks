@@ -1,5 +1,5 @@
 // Spoken table talk: the voice each chat model speaks its lines in (decision models never talk), through Opper's
-// text-to-speech with Fish Audio's S2.1 Pro (TTS_MODEL: about a second and $0.0007 a line). Isomorphic: the server's
+// text-to-speech with Fish Audio's S2.1 Pro (TTS_MODEL: one to two seconds and about $0.001 a line). Isomorphic: the server's
 // speak route (server/table.ts) and the replay voice script (scripts/voices.ts) read it, and the tests check it.
 //
 // A voice is picked by its id in Fish Audio's library (Opper lists none for this model). These are all from Fish
