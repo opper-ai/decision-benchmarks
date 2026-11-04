@@ -5,7 +5,7 @@
 // Node-safe, erasable TypeScript only.
 import { refusedUpstream, type KeyMode } from '../../../packages/kit/server/decide.ts';
 import { withSignal } from '../../../packages/kit/shared/systemone.ts';
-import { TTS_MODEL } from '../shared/voices.ts';
+import { TTS_MODEL, TTS_SPEED, TTS_VOICES, type Voice } from '../shared/voices.ts';
 
 export const SPEECH_PATH = '/v3/audio/speech';
 /** A line is a few seconds of speech, made in about one: past this the page has moved on. */
@@ -28,7 +28,7 @@ export type SpeechResult =
   | { status: number; body: Record<string, unknown>; latencyMs: number; costUsd: null };
 
 /** Speaks `text` in `voice`. */
-export async function speak(text: string, voice: string, deps: SpeechDeps): Promise<SpeechResult> {
+export async function speak(text: string, voice: Voice, deps: SpeechDeps): Promise<SpeechResult> {
   const redact = (s: string): string => s.split(deps.apiKey).join('[redacted]');
   const started = deps.now();
   const took = () => Math.round(deps.now() - started);
@@ -42,7 +42,7 @@ export async function speak(text: string, voice: string, deps: SpeechDeps): Prom
         'X-Opper-Name': deps.callName ?? 'decision-benchmarks',
         ...(deps.project ? { 'X-Opper-Project': deps.project } : {}),
       },
-      body: JSON.stringify({ model: TTS_MODEL, input: text, voice, format: 'mp3' }),
+      body: JSON.stringify({ model: TTS_MODEL, input: text, voice: TTS_VOICES[voice], format: 'mp3', speed: TTS_SPEED }),
       signal: withSignal(timeoutMs),
     });
     if (!res.ok) {

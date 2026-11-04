@@ -30,7 +30,7 @@
 // Spoken table talk (speak): never an open text-to-speech proxy. The page names a line by its hand and action, with a
 // token from that hand; the server reads the line and its speaker from the sealed token (only a chat model's `say` is
 // there, and its spoken form when the model added delivery tags: shared/delivery.ts) and speaks it in the model's voice
-// (shared/voices.ts) through Opper's speech API (xAI Grok TTS), paid as the table's model calls are. Each visitor may
+// (shared/voices.ts) through Opper's speech API (Fish Audio S2.1 Pro), paid as the table's model calls are. Each visitor may
 // ask for a line a second after a burst of 20, and a line asked for again within ANSWER_TTL_MS (the same words, as a
 // second tab may ask) gets the same audio without a second call. A table is spoken only while the page's Voice switch
 // is on; nothing is spoken on its own.

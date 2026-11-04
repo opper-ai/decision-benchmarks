@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { purposeKey, seal, unseal } from '../../../packages/kit/server/session';
 import type { SnapshotReply, StepReply } from '../shared/table';
-import { voiceFor } from '../shared/voices';
+import { TTS_VOICES, voiceFor } from '../shared/voices';
 import { CHAT, DECISION, LOOSE, SECRET, setup, type Setup } from './table-server';
 
 const LUNA = 'azure:eu/gpt-6-luna';
@@ -37,15 +37,15 @@ describe('the table speaks a line of talk', () => {
     const model = [CHAT, LUNA][t.seat]!;
     const voice = voiceFor(model)!;
     expect(r.body).toMatchObject({ format: 'mp3', voice });
-    expect(Buffer.from(r.body.audio as string, 'base64').toString()).toBe(`mp3:${voice}:${t.say}`);
+    expect(Buffer.from(r.body.audio as string, 'base64').toString()).toBe(`mp3:${TTS_VOICES[voice]}:${t.say}`);
     const [sp] = speechCalls(t.up);
-    expect(sp!.body).toEqual({ model: 'xai/tts', input: t.say, voice, format: 'mp3' });
+    expect(sp!.body).toEqual({ model: 'fish/s2.1-pro', input: t.say, voice: TTS_VOICES[voice], format: 'mp3', speed: 1.2 });
     expect(sp!.headers.authorization).toBe('Bearer op-player');
-    expect(t.logs.some((l) => l.includes(`${model} spoken (xai/tts ${voice}, player) in`) && l.includes('$0.0009'))).toBe(true);
+    expect(t.logs.some((l) => l.includes(`${model} spoken (fish/s2.1-pro ${voice}, player) in`) && l.includes('$0.0009'))).toBe(true);
   });
 
   it('speaks a line with the delivery tags its model added, and never shows a tag: not in the answers, the review, the recording or the next prompt', async () => {
-    const said = 'Nice try. [laugh] <whisper>For now.</whisper> <script>x</script> [emotion=smug] [sigh] [pause]';
+    const said = 'Nice try. [laughs] [whispering] For now. <script>x</script> [emotion=smug] [sighs] [pause]';
     // The fake models check or call, each saying the tagged line.
     const chat = (body: Record<string, unknown>) => {
       const keys = (body.response_format as { json_schema: { schema: { properties: { action: { enum: string[] } } } } }).json_schema.schema.properties.action.enum;
@@ -65,16 +65,16 @@ describe('the table speaks a line of talk', () => {
     const r = await s.call('speak', { token, hand: 1, action: 0 });
     expect(r.status).toBe(200);
     // Two tags at most: the laugh and the whisper; the rest is gone, its words kept plain.
-    expect(speechCalls(s.up)[0]!.body.input).toBe('Nice try. [laugh] <whisper>For now.</whisper> x');
+    expect(speechCalls(s.up)[0]!.body.input).toBe('Nice try. [laughs] [whispering] For now. x');
     expect(s.logs.some((l) => l.includes('tagged'))).toBe(true);
     const review = await s.call('review', { token });
     for (const res of [...s.responses.filter((x) => x.path !== 'speak'), { path: 'review', text: JSON.stringify(review.body) }]) {
-      expect(res.text, res.path).not.toMatch(/\[laugh\]|whisper|script|emotion|\[sigh\]/);
+      expect(res.text, res.path).not.toMatch(/\[laughs\]|whispering|script|emotion|\[sighs\]/);
     }
     // The next model hears the words as shown.
     const prompts = s.up.calls.filter((c) => c.path === '/v3/compat/chat/completions').map((c) => JSON.stringify((c.body.messages as unknown[])[1]));
     expect(prompts.some((p) => p.includes('Nice try. For now. x'))).toBe(true);
-    for (const p of prompts) expect(p).not.toMatch(/\[laugh\]|<whisper>/);
+    for (const p of prompts) expect(p).not.toMatch(/\[laughs\]|\[whispering\]/);
   });
 
   it('refuses a token whose spoken line is no line of allowed tags', async () => {

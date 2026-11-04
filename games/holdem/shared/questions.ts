@@ -24,8 +24,9 @@
 import type { ChatFormat, ChatMessage } from '../../../packages/kit/shared/chat.ts';
 import type { ChoiceQuestion, SystemOneRequest } from '../../../packages/kit/shared/systemone.ts';
 import type { HistoryItem, Observation, Option, OptionKey } from './engine.ts';
-import { isSpoken, MAX_TAGS, splitSay } from './delivery.ts';
+import { isSpoken, splitSay } from './delivery.ts';
 import { MOODS, type FallbackReason, type Mood } from './recording.ts';
+import { DELIVERY_TAGS, MAX_TAGS } from './voices.ts';
 
 /** The question's name in a request. */
 export const QUESTION = 'action';
@@ -255,8 +256,8 @@ export const LIVE_TABLE =
   'For "mood", pick the face you want to show at this moment and use the whole range, annoyed, nervous and smug included: ' +
   "real players' faces change as the game goes, and a face can be true or a bluff. " +
   `Your line is spoken aloud in your own voice. To direct how it sounds you may add up to ${MAX_TAGS} delivery tags to "say", ` +
-  'where they happen: [pause], [long-pause], [laugh], [sigh] or [breath], or a few words wrapped in <whisper>...</whisper>, ' +
-  '<slow>...</slow> or <soft>...</soft>. Use them only when they fit the moment; most lines need none. Tags are never shown ' +
+  `just before the words they change: ${DELIVERY_TAGS.map((t) => `[${t}]`).join(', ')}. ` +
+  'Use them only when they fit the moment; most lines need none. Tags are never shown ' +
   `and do not count towards the ${MAX_SAY} characters; no other tags.`;
 
 /** The system message at a live table: the bench's description (moods in LIVE_MOODS order), then LIVE_TABLE. */

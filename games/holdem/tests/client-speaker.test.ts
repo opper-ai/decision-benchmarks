@@ -127,13 +127,13 @@ describe('the speaker', () => {
     expect(r.played.map((p) => p.audio)).toEqual(['B']);
   });
 
-  it('speaks at 1.2× up to 2×, 1.3× at 4× and 1.4× at 8×', async () => {
-    expect([1, 2, 4, 8].map(voiceRate)).toEqual([1.2, 1.2, 1.3, 1.4]);
+  it('speaks as made up to 2×, at 1.1× at 4× and 1.2× at 8×', async () => {
+    expect([1, 2, 4, 8].map(voiceRate)).toEqual([1, 1, 1.1, 1.2]);
     const r = rig({ speed: 8 });
     r.s.say('a');
     r.loads[0]!.resolve('A');
     await tick();
-    expect(r.played[0]!.rate).toBe(1.4);
+    expect(r.played[0]!.rate).toBe(1.2);
   });
 });
 

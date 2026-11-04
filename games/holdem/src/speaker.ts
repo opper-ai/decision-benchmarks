@@ -10,8 +10,8 @@
 // - clear() stops the line playing and forgets the rest (leaving, a new table, the page hidden, Voice switched off).
 // - The table waits for the speaker (settled): before the next model's move is shown, the lines said so far finish,
 //   for at most a cap, so a line is heard with the move it came with and a long one never stalls the table.
-// - Rates (voiceRate, the pitch kept): 1.2× at 1× and 2× (Grok's delivery is unhurried, and the table waits for it);
-//   1.3× and 1.4× at 4× and 8×. A chat table's talk comes at the models' own pace (seconds a decision) whatever the
+// - Rates (voiceRate, the pitch kept): as made at 1× and 2× (the speech model already speaks fast: TTS_SPEED, and the
+//   table waits for it); 1.1× and 1.2× at 4× and 8×. A chat table's talk comes at the models' own pace (seconds a decision) whatever the
 //   speed, and 4× is where a player who went out watches the rest, so skipping talk there would silence the table just
 //   when there is time to listen; a faster delivery, with the stale drop, keeps the voices in step instead.
 
@@ -23,7 +23,7 @@ export const SETTLE_CAP_MS = 3500;
 
 /** The playback rate at a watch speed (the player keeps the pitch). */
 export function voiceRate(speed: number): number {
-  return speed >= 8 ? 1.4 : speed >= 4 ? 1.3 : 1.2;
+  return speed >= 8 ? 1.2 : speed >= 4 ? 1.1 : 1;
 }
 
 /** A line playing: done when it ends (or is stopped). */

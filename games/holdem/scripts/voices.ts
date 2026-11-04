@@ -10,8 +10,8 @@
 // rendered with the same model, voice and words is kept unless --force. Replays without talk (the decision models) get no folder.
 //
 // Calls Opper's speech API (POST /v3/audio/speech) with OPPER_API_KEY; with an organization key, also set OPPER_PROJECT
-// to a project UUID. Needs ffmpeg on PATH (to make the files small). About $0.0008 a line (xAI Grok TTS: $15 per million
-// characters); the cost and the size are printed.
+// to a project UUID. Needs ffmpeg on PATH (to make the files small). About $0.0007 a line (Fish Audio: $15 per million
+// bytes of text); the cost and the size are printed.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,14 +21,14 @@ import { parseArgs } from 'node:util';
 import { gunzipSync } from 'node:zlib';
 import { speak } from '../server/speech.ts';
 import type { Recording } from '../shared/recording.ts';
-import { TTS_MODEL, voiceFor } from '../shared/voices.ts';
+import { TTS_MODEL, voiceFor, type Voice } from '../shared/voices.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 interface Line {
   key: string;
   say: string;
-  voice: string;
+  voice: Voice;
 }
 
 async function main() {

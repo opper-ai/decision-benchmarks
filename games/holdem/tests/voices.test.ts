@@ -1,9 +1,9 @@
-// The table talk's casting (shared/voices.ts): every chat model speaks in a real Grok TTS voice, decision models never
-// talk, and the players who meet at a preset table or in a curated replay sound different.
+// The table talk's casting (shared/voices.ts): every chat model speaks in a voice of Fish Audio's own, decision models
+// never talk, and every model has a voice no other has.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { HOLDEM_MODELS, SETS } from '../shared/models';
+import { HOLDEM_MODELS } from '../shared/models';
 import type { Recording } from '../shared/recording';
 import { TTS_MODEL, TTS_VOICES, voiceFor, VOICES } from '../shared/voices';
 
@@ -11,23 +11,19 @@ const chat = HOLDEM_MODELS.filter((m) => m.kind === 'chat');
 const replays = (JSON.parse(readFileSync(new URL('../public/demo/index.json', import.meta.url), 'utf8')) as { replays: { file: string; players: string[] }[] }).replays;
 
 describe('the voices of the table talk', () => {
-  it('casts every chat model, and only the chat models, in one of the real voices', () => {
+  it('casts every chat model, and only the chat models, in a voice with a Fish Audio id', () => {
     expect(Object.keys(VOICES).sort()).toEqual(chat.map((m) => m.id).sort());
-    for (const [id, v] of Object.entries(VOICES)) expect(TTS_VOICES, id).toContain(v);
+    for (const [id, v] of Object.entries(VOICES)) expect(TTS_VOICES[v], id).toMatch(/^[0-9a-f]{32}$/);
     for (const m of HOLDEM_MODELS.filter((x) => x.kind === 'decision')) expect(voiceFor(m.id), m.id).toBeNull();
     expect(voiceFor('toString')).toBeNull();
     expect(voiceFor('openai/gpt-4o')).toBeNull();
-    expect(voiceFor('azure:eu/gpt-6.1-sol')).toBe('rex');
+    expect(voiceFor('azure:eu/gpt-6.1-sol')).toBe('Troy');
   });
 
-  it('gives the players at each preset table, and in each curated replay, different voices (Claude vs GPT: four men, three male voices)', () => {
-    const groups = [...SETS.filter((s) => s.id !== 'decision').map((s) => ({ name: s.name, ids: s.models })), ...replays.map((r) => ({ name: r.file, ids: r.players.filter((id) => VOICES[id]) }))];
-    for (const g of groups) {
-      const voices = g.ids.map((id) => VOICES[id]!);
-      // The one exception, by design (shared/voices.ts): Opus 5.5 and GPT-5.6 Terra share leo there.
-      const shared = g.name === 'claude-vs-gpt.json.gz' ? 1 : 0;
-      expect(new Set(voices).size, `${g.name}: ${voices.join(', ')}`).toBe(voices.length - shared);
-    }
+  it('gives every model a voice of its own, and lists only voices that are cast', () => {
+    expect(new Set(Object.values(VOICES)).size).toBe(Object.keys(VOICES).length);
+    expect(Object.keys(TTS_VOICES).sort()).toEqual(Object.values(VOICES).sort());
+    expect(new Set(Object.values(TTS_VOICES)).size).toBe(Object.keys(TTS_VOICES).length);
   });
 });
 
