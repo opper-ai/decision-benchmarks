@@ -12,6 +12,7 @@ import { TableUI } from './views/table.ts';
 import { aHand, chips, levelText, ordinal, paced, personOf } from './view-model.ts';
 import { ChatBox, chatBesideTable } from './views/chat.ts';
 import type { ActionMeta } from './driver.ts';
+import { replayVoices, tableSpeaker, voiceButton } from './voice.ts';
 
 export interface ReplayOptions {
   recording: Recording;
@@ -19,6 +20,8 @@ export interface ReplayOptions {
   title: string;
   /** Back to the lobby. */
   onLeave(): void;
+  /** A curated replay's name, when its talk was rendered to public/voices/<name>/ (scripts/voices.ts). */
+  voices?: string;
 }
 
 const PLAY = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 5v14l12-7z" fill="currentColor"/></svg>';
@@ -80,12 +83,21 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     if (chatBesideTable(chat.el)) ui.clearBubbles();
   };
   let said: { seat: number; meta: ActionMeta } | undefined;
+  // The talk spoken (Voice on) from the replay's own files: never a live call, as anyone may watch a replay.
+  const voices = o.voices ? await replayVoices(o.voices) : null;
+  const speaker = tableSpeaker({ signal, speed: () => speed });
+  /** The move being shown: its line, when it has one, is spoken from its file. */
+  let move = { hand: 0, action: 0 };
+  const speakMove = (_seat: number, text: string) => {
+    const line = voices?.line(move.hand, move.action, text);
+    if (line) speaker.say(line);
+  };
   const reviewBtn = h('button.tbtn', { type: 'button', onclick: () => void openReview() }, 'Review');
   const toolbar = h(
     'div.toolbar',
     null,
     h('div.replay-title', null, h('span.replay-chip', null, 'Replay'), h('b', null, o.title), level),
-    h('div.tools', null, playBtn, stepBtn, speedGroup, handSelect, chat.button, reviewBtn, h('button.tbtn', { type: 'button', onclick: o.onLeave }, 'Leave')),
+    h('div.tools', null, playBtn, stepBtn, speedGroup, handSelect, chat.button, reviewBtn, voices ? voiceButton(signal) : null, h('button.tbtn', { type: 'button', onclick: o.onLeave }, 'Leave')),
   );
   drawPlay();
   const onKey = (e: KeyboardEvent) => {
@@ -100,7 +112,7 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
   signal.addEventListener('abort', () => window.removeEventListener('keydown', onKey), { once: true });
 
   // ---------- the table ----------
-  let ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion, talkInChat: () => chatBesideTable(chat.el) });
+  let ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion, talkInChat: () => chatBesideTable(chat.el), onTalk: speakMove });
   const tableHost = h('div.replay-table', null, ui.el);
   host.classList.add('watching');
   host.replaceChildren(toolbar, tableHost, chat.el);
@@ -149,7 +161,8 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     drawLevel(s);
   };
   const restart = async (s: TableSnapshot) => {
-    ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion, talkInChat: () => chatBesideTable(chat.el) });
+    speaker.clear();
+    ui = new TableUI({ seats, viewer: null, speed: () => speed, reduced: reducedMotion, talkInChat: () => chatBesideTable(chat.el), onTalk: speakMove });
     tableHost.replaceChildren(ui.el);
     shown = 0;
     // The chat starts again too: from the first hand empty ("Watch it again"), or after a jump with the hands before
@@ -205,7 +218,10 @@ export async function playReplay(host: HTMLElement, o: ReplayOptions, signal: Ab
     // A moment to think: the move's own latency, shortened, at the replay's speed.
     ui.thinking(seat, null);
     await wait(paced(Math.min(1400, 350 + (next?.latencyMs ?? 0) / 4), speed, reducedMotion()));
+    // Voice on: the line being spoken finishes first (capped).
+    await speaker.settled();
     ui.stopThinking(seat);
+    move = { hand: snap!.hand, action: driver.position().move };
     const r = await driver.step();
     ui.showMeta(r.seat, r.meta);
     said = { seat: r.seat, meta: r.meta };

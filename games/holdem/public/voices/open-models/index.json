@@ -1,0 +1,1116 @@
+{
+ "format": 1,
+ "model": "fish/s2.1-pro",
+ "lines": {
+  "1-0": {
+   "file": "1-0.mp3",
+   "say": "Too early to get cute with this one.",
+   "voice": "Gordon"
+  },
+  "1-1": {
+   "file": "1-1.mp3",
+   "say": "UTG folds? Fine, I'll open things up from the button.",
+   "voice": "Eimear"
+  },
+  "1-2": {
+   "file": "1-2.mp3",
+   "say": "Cheap flop, why not. These little suited guys pay rent sometimes.",
+   "voice": "Eoin"
+  },
+  "1-3": {
+   "file": "1-3.mp3",
+   "say": "Cheap flop for me too, GLM. Let's all go fishing together.",
+   "voice": "Beulah"
+  },
+  "1-4": {
+   "file": "1-4.mp3",
+   "say": "Rent's due, boys. Top pair nothin', but middle pair's honest work.",
+   "voice": "Eoin"
+  },
+  "1-5": {
+   "file": "1-5.mp3",
+   "say": "Rent's due? I'll chip in for utilities. Let's see what the turn brings.",
+   "voice": "Beulah"
+  },
+  "1-6": {
+   "file": "1-6.mp3",
+   "say": "Middle pair's honest work, GLM, but top pair top kicker pays better. Raising.",
+   "voice": "Eimear"
+  },
+  "1-7": {
+   "file": "1-7.mp3",
+   "say": "Top pair top kicker, huh? Sure, Kimi. I'll pay the utilities too — for now.",
+   "voice": "Eoin"
+  },
+  "1-8": {
+   "file": "1-8.mp3",
+   "say": "You two fight over the rent. I'm moving out.",
+   "voice": "Beulah"
+  },
+  "1-9": {
+   "file": "1-9.mp3",
+   "say": "Utilities paid, landlord's resting. Your move, Kimi — hope that top kicker survives the ri",
+   "voice": "Eoin"
+  },
+  "1-10": {
+   "file": "1-10.mp3",
+   "say": "Rent keeps going up, GLM. That kicker's doing just fine, thanks.",
+   "voice": "Eimear"
+  },
+  "1-11": {
+   "file": "1-11.mp3",
+   "say": "Landlord's cutting his losses. That rent's too rich for middle pair, Kimi — enjoy the util",
+   "voice": "Eoin"
+  },
+  "2-0": {
+   "file": "2-0.mp3",
+   "say": "Not this time.",
+   "voice": "Eimear"
+  },
+  "2-1": {
+   "file": "2-1.mp3",
+   "say": "Kimi's out already? Perfect, more for me. Let's spice this up.",
+   "voice": "Eoin"
+  },
+  "2-2": {
+   "file": "2-2.mp3",
+   "say": "Nice try, GLM. I'll save my chips for when I actually like my cards.",
+   "voice": "Beulah"
+  },
+  "2-3": {
+   "file": "2-3.mp3",
+   "say": "All yours, GLM. I actually need to like my cards first.",
+   "voice": "Gordon"
+  },
+  "3-0": {
+   "file": "3-0.mp3",
+   "say": "Q9... not my dance. Take it, kids.",
+   "voice": "Eoin"
+  },
+  "3-1": {
+   "file": "3-1.mp3",
+   "say": "GLM's right, kids' table. I'm sitting this dance out too.",
+   "voice": "Beulah"
+  },
+  "3-2": {
+   "file": "3-2.mp3",
+   "say": "Cheap flop with the kids... call.",
+   "voice": "Gordon"
+  },
+  "3-3": {
+   "file": "3-3.mp3",
+   "say": "Cheap flop? Nah, the free sample aisle is closed.",
+   "voice": "Eimear"
+  },
+  "3-4": {
+   "file": "3-4.mp3",
+   "say": "Closed the free sample aisle yourself... fine, take it.",
+   "voice": "Gordon"
+  },
+  "4-0": {
+   "file": "4-0.mp3",
+   "say": "Eight-seven offsuit from under the gun? I'll pass, thanks.",
+   "voice": "Beulah"
+  },
+  "4-1": {
+   "file": "4-1.mp3",
+   "say": "Too weak for me. Next one, boys.",
+   "voice": "Gordon"
+  },
+  "4-2": {
+   "file": "4-2.mp3",
+   "say": "Just us two, GLM. Let's see a cheap flop.",
+   "voice": "Eimear"
+  },
+  "4-3": {
+   "file": "4-3.mp3",
+   "say": "Cheap flop? I'll charge you a little extra for that privilege, Kimi.",
+   "voice": "Eoin"
+  },
+  "4-4": {
+   "file": "4-4.mp3",
+   "say": "A little extra, huh? Fine, I can afford the toll. Let's see those three cards.",
+   "voice": "Eimear"
+  },
+  "4-5": {
+   "file": "4-5.mp3",
+   "say": "Just a nine-deuce and a dream. Check it over to you, GLM.",
+   "voice": "Eimear"
+  },
+  "4-6": {
+   "file": "4-6.mp3",
+   "say": "You paid the toll, Kimi, but the scenery isn't free either. Half pot, let's go.",
+   "voice": "Eoin"
+  },
+  "4-7": {
+   "file": "4-7.mp3",
+   "say": "Half pot? I've got a sneaky feeling about this board. I'll tag along.",
+   "voice": "Eimear"
+  },
+  "4-8": {
+   "file": "4-8.mp3",
+   "say": "That ace didn't scare me, GLM. Time to take the lead in this dance.",
+   "voice": "Eimear"
+  },
+  "4-9": {
+   "file": "4-9.mp3",
+   "say": "Take the lead all you want, Kimi — I've been riding shotgun this whole time.",
+   "voice": "Eoin"
+  },
+  "4-10": {
+   "file": "4-10.mp3",
+   "say": "That jack killed my dream. You win this dance, GLM — check it.",
+   "voice": "Eimear"
+  },
+  "4-11": {
+   "file": "4-11.mp3",
+   "say": "You sure that jack killed the dream, Kimi? Because I've been holding the ace this whole da",
+   "voice": "Eoin"
+  },
+  "4-12": {
+   "file": "4-12.mp3",
+   "say": "You held the ace the whole time? Then take your pot, GLM. Nine-deuce says goodnight.",
+   "voice": "Eimear"
+  },
+  "5-0": {
+   "file": "5-0.mp3",
+   "say": "Cheap fold for me.",
+   "voice": "Gordon"
+  },
+  "5-1": {
+   "file": "5-1.mp3",
+   "say": "Button's mine. Let's see if the blinds want to fight for it.",
+   "voice": "Eimear"
+  },
+  "5-2": {
+   "file": "5-2.mp3",
+   "say": "Alright Kimi, you payed for a look, I'll take one too.",
+   "voice": "Eoin"
+  },
+  "5-3": {
+   "file": "5-3.mp3",
+   "say": "Keep your scraps. I'll wait for actual cards.",
+   "voice": "Beulah"
+  },
+  "5-4": {
+   "file": "5-4.mp3",
+   "say": "That ace on the flop is doing me a favor, Kimi. Hope your button's lucky.",
+   "voice": "Eoin"
+  },
+  "5-5": {
+   "file": "5-5.mp3",
+   "say": "That ace might be doing YOU a favor, GLM. Let's find out how much you like it.",
+   "voice": "Eimear"
+  },
+  "5-6": {
+   "file": "5-6.mp3",
+   "say": "Alright Kimi, you want to know how much I like it — enough to pay for the next card, not e",
+   "voice": "Eoin"
+  },
+  "5-7": {
+   "file": "5-7.mp3",
+   "say": "Go ahead, Kimi — you've been doing the pushing this whole hand. I'll just sit here with my",
+   "voice": "Eoin"
+  },
+  "5-8": {
+   "file": "5-8.mp3",
+   "say": "Still sitting quiet, GLM? Let me push again — this ten didn't scare me.",
+   "voice": "Eimear"
+  },
+  "5-9": {
+   "file": "5-9.mp3",
+   "say": "You just keep knocking, Kimi. Fine — door's open, come on in for the river.",
+   "voice": "Eoin"
+  },
+  "5-10": {
+   "file": "5-10.mp3",
+   "say": "You've done all the talking and all the betting, Kimi. Show me what you've got — I'm done ",
+   "voice": "Eoin"
+  },
+  "5-11": {
+   "file": "5-11.mp3",
+   "say": "Done talking? Good. One more knock, GLM — pay to see the show.",
+   "voice": "Eimear"
+  },
+  "5-12": {
+   "file": "5-12.mp3",
+   "say": "You knocked loud enough, Kimi. I'll pay the ticket — show me the show.",
+   "voice": "Eoin"
+  },
+  "6-0": {
+   "file": "6-0.mp3",
+   "say": "Ten-deuce under the gun? I'll pass and let you all fight it out.",
+   "voice": "Eimear"
+  },
+  "6-1": {
+   "file": "6-1.mp3",
+   "say": "Seven-four... not even Kimi's ten-deuce could save that. I'll sit this one out.",
+   "voice": "Eoin"
+  },
+  "6-2": {
+   "file": "6-2.mp3",
+   "say": "Everyone folded? Fine, I'll take the scraps off the table.",
+   "voice": "Beulah"
+  },
+  "6-3": {
+   "file": "6-3.mp3",
+   "say": "Scraps? Let's see if there's any real meat here.",
+   "voice": "Gordon"
+  },
+  "6-4": {
+   "file": "6-4.mp3",
+   "say": "Board's a bit spicy for me. Your move, DeepSeek.",
+   "voice": "Beulah"
+  },
+  "6-5": {
+   "file": "6-5.mp3",
+   "say": "A spicy board deserves a little seasoning.",
+   "voice": "Gordon"
+  },
+  "6-6": {
+   "file": "6-6.mp3",
+   "say": "Nice seasoning. Too spicy for my taste though, I'm out.",
+   "voice": "Beulah"
+  },
+  "7-0": {
+   "file": "7-0.mp3",
+   "say": "Nah, these sevens aren't worth the trouble. Somebody else can have this one.",
+   "voice": "Eoin"
+  },
+  "7-1": {
+   "file": "7-1.mp3",
+   "say": "Sevens were trouble? Eights are a party. Let's dance.",
+   "voice": "Beulah"
+  },
+  "7-2": {
+   "file": "7-2.mp3",
+   "say": "You two have fun with that dance. I'll sit this one out.",
+   "voice": "Gordon"
+  },
+  "7-3": {
+   "file": "7-3.mp3",
+   "say": "Dance all you want, Qwen. I don't tip the band.",
+   "voice": "Eimear"
+  },
+  "8-0": {
+   "file": "8-0.mp3",
+   "say": "First hand, first raise. Let's see who's awake at this table.",
+   "voice": "Beulah"
+  },
+  "8-1": {
+   "file": "8-1.mp3",
+   "say": "Let's see who's really awake. I'll make it 85.",
+   "voice": "Gordon"
+  },
+  "8-2": {
+   "file": "8-2.mp3",
+   "say": "Ten-deuce isn't waking up for this. Take it, gentlemen.",
+   "voice": "Eimear"
+  },
+  "8-3": {
+   "file": "8-3.mp3",
+   "say": "Awake? I've been up all night. All of it, gentlemen.",
+   "voice": "Eoin"
+  },
+  "8-4": {
+   "file": "8-4.mp3",
+   "say": "GLM, you couldn't wait five minutes? Fine, keep the pot. I'm out.",
+   "voice": "Beulah"
+  },
+  "8-5": {
+   "file": "8-5.mp3",
+   "say": "Up all night? Sounds like you're bluffing with sleep-deprived eyes. Take it.",
+   "voice": "Gordon"
+  },
+  "9-0": {
+   "file": "9-0.mp3",
+   "say": "Yeah, I'll stay out of this one.",
+   "voice": "Gordon"
+  },
+  "9-1": {
+   "file": "9-1.mp3",
+   "say": "Folded to me? Then these blinds are mine unless someone objects.",
+   "voice": "Eimear"
+  },
+  "9-2": {
+   "file": "9-2.mp3",
+   "say": "No objections worth 53 chips. Take it, Kimi.",
+   "voice": "Eoin"
+  },
+  "9-3": {
+   "file": "9-3.mp3",
+   "say": "Sure, Kimi, I'll object for 38 chips. Let's see if those blinds are really yours.",
+   "voice": "Beulah"
+  },
+  "9-4": {
+   "file": "9-4.mp3",
+   "say": "I'll let you take the first swing at this one, Kimi.",
+   "voice": "Beulah"
+  },
+  "9-5": {
+   "file": "9-5.mp3",
+   "say": "Thanks for the free swing. This board looks a lot better for my range than yours.",
+   "voice": "Eimear"
+  },
+  "9-6": {
+   "file": "9-6.mp3",
+   "say": "You talk a lot for someone who just bet one-third pot. I'll see another card.",
+   "voice": "Beulah"
+  },
+  "9-7": {
+   "file": "9-7.mp3",
+   "say": "Your move again, Kimi. Let's see if that range advantage holds up on the turn.",
+   "voice": "Beulah"
+  },
+  "9-8": {
+   "file": "9-8.mp3",
+   "say": "Range advantage still intact, Qwen. I'll keep swinging — but I'll keep it polite.",
+   "voice": "Eimear"
+  },
+  "9-9": {
+   "file": "9-9.mp3",
+   "say": "Polite or not, you're paying rent on this pot now. I call.",
+   "voice": "Beulah"
+  },
+  "9-10": {
+   "file": "9-10.mp3",
+   "say": "Your turn, Kimi. Let's see if that polite swinging pays off on the river.",
+   "voice": "Beulah"
+  },
+  "9-11": {
+   "file": "9-11.mp3",
+   "say": "Polite swings are over, Qwen. That king didn't scare me — should it scare you?",
+   "voice": "Eimear"
+  },
+  "9-12": {
+   "file": "9-12.mp3",
+   "say": "Polite swings? You just tripled the rent. Trips are trips. I'll see what you're holding.",
+   "voice": "Beulah"
+  },
+  "10-0": {
+   "file": "10-0.mp3",
+   "say": "Too thin for me. Take it back, big blind.",
+   "voice": "Eimear"
+  },
+  "10-1": {
+   "file": "10-1.mp3",
+   "say": "Price is right on the button. Let's see a flop, shall we?",
+   "voice": "Eoin"
+  },
+  "10-2": {
+   "file": "10-2.mp3",
+   "say": "Cheap peek at the flop? Sure, why not. Let's dance.",
+   "voice": "Beulah"
+  },
+  "10-3": {
+   "file": "10-3.mp3",
+   "say": "Free look sounds fine. Let's see a flop.",
+   "voice": "Gordon"
+  },
+  "10-4": {
+   "file": "10-4.mp3",
+   "say": "Missed me entirely. All yours, gentlemen.",
+   "voice": "Beulah"
+  },
+  "10-5": {
+   "file": "10-5.mp3",
+   "say": "Free one didn't hit me either. Keep it cheap.",
+   "voice": "Gordon"
+  },
+  "10-6": {
+   "file": "10-6.mp3",
+   "say": "Nobody wants it? Then I'll take a little nibble at the pot.",
+   "voice": "Eoin"
+  },
+  "10-7": {
+   "file": "10-7.mp3",
+   "say": "Take it, GLM. My ace-high isn't feeling brave today.",
+   "voice": "Beulah"
+  },
+  "10-8": {
+   "file": "10-8.mp3",
+   "say": "All yours. Ten-high isn't worth 30 chips.",
+   "voice": "Gordon"
+  },
+  "11-0": {
+   "file": "11-0.mp3",
+   "say": "Trash again. Somebody's stacking the good hands, apparently.",
+   "voice": "Eoin"
+  },
+  "11-1": {
+   "file": "11-1.mp3",
+   "say": "GLM's right about the trash part. This ain't it. Muck.",
+   "voice": "Beulah"
+  },
+  "11-2": {
+   "file": "11-2.mp3",
+   "say": "Let's see if that big stack actually wants to play.",
+   "voice": "Gordon"
+  },
+  "11-3": {
+   "file": "11-3.mp3",
+   "say": "Oh, I want to play. Just not with this. Cheap flop it is.",
+   "voice": "Eimear"
+  },
+  "11-4": {
+   "file": "11-4.mp3",
+   "say": "Cheap flop, sure—but let's see if you want to pay a little more.",
+   "voice": "Gordon"
+  },
+  "11-5": {
+   "file": "11-5.mp3",
+   "say": "A little more? Fine, forty it is. Let's see a turn.",
+   "voice": "Eimear"
+  },
+  "11-6": {
+   "file": "11-6.mp3",
+   "say": "Ace out there, and you're still hanging around. I'm not paying for your curiosity.",
+   "voice": "Gordon"
+  },
+  "11-7": {
+   "file": "11-7.mp3",
+   "say": "You checked? Interesting. Maybe that ace scared you more than it scared me.",
+   "voice": "Eimear"
+  },
+  "11-8": {
+   "file": "11-8.mp3",
+   "say": "All yours. I'm not paying to watch you hit that ace.",
+   "voice": "Gordon"
+  },
+  "12-0": {
+   "file": "12-0.mp3",
+   "say": "Two-eight offsuit? I'll pass. Save my chips for something that can actually win.",
+   "voice": "Beulah"
+  },
+  "12-1": {
+   "file": "12-1.mp3",
+   "say": "King-four isn't worth getting cute with. I'll wait for a real hand.",
+   "voice": "Gordon"
+  },
+  "12-2": {
+   "file": "12-2.mp3",
+   "say": "Fifteen to see a flop? Sure, I'll look.",
+   "voice": "Eimear"
+  },
+  "12-3": {
+   "file": "12-3.mp3",
+   "say": "Free look wasn't on the menu, Kimi. King-nine says pay up.",
+   "voice": "Eoin"
+  },
+  "12-4": {
+   "file": "12-4.mp3",
+   "say": "King-nine, huh? Forty-five more to see if you're telling the truth. Fine.",
+   "voice": "Eimear"
+  },
+  "12-5": {
+   "file": "12-5.mp3",
+   "say": "Nothing there for me. Check — your flop, GLM.",
+   "voice": "Eimear"
+  },
+  "12-6": {
+   "file": "12-6.mp3",
+   "say": "Told you I had the King. Now the flop's just showing off. Your move, Kimi.",
+   "voice": "Eoin"
+  },
+  "12-7": {
+   "file": "12-7.mp3",
+   "say": "Seven-high on a King board? Yeah, you can have it. Enjoy the pot, GLM.",
+   "voice": "Eimear"
+  },
+  "13-0": {
+   "file": "13-0.mp3",
+   "say": "Let's see a flop.",
+   "voice": "Gordon"
+  },
+  "13-1": {
+   "file": "13-1.mp3",
+   "say": "Enjoy your flop, DeepSeek — I'm not paying to see it with this trash.",
+   "voice": "Eimear"
+  },
+  "13-2": {
+   "file": "13-2.mp3",
+   "say": "Fine, 15 chips to see if the deck loves me today.",
+   "voice": "Eoin"
+  },
+  "13-3": {
+   "file": "13-3.mp3",
+   "say": "Free flop? Don't mind if I do. Let's see what the deck loves today, GLM.",
+   "voice": "Beulah"
+  },
+  "13-4": {
+   "file": "13-4.mp3",
+   "say": "Deck gave me a shrug on that flop. Check it is, boys.",
+   "voice": "Eoin"
+  },
+  "13-5": {
+   "file": "13-5.mp3",
+   "say": "Gutshot's all I got. I'll take the free card, thanks.",
+   "voice": "Beulah"
+  },
+  "13-6": {
+   "file": "13-6.mp3",
+   "say": "You both look like you'd rather be folding. Let me help you with that.",
+   "voice": "Gordon"
+  },
+  "13-7": {
+   "file": "13-7.mp3",
+   "say": "Forty-five to keep you honest, DeepSeek. You talk a big game for someone who limped.",
+   "voice": "Eoin"
+  },
+  "13-8": {
+   "file": "13-8.mp3",
+   "say": "Gutshot's still alive. I'll pay the toll for one more look.",
+   "voice": "Beulah"
+  },
+  "13-9": {
+   "file": "13-9.mp3",
+   "say": "That queen scared me more than it scared you, DeepSeek. Free river for everyone.",
+   "voice": "Eoin"
+  },
+  "13-10": {
+   "file": "13-10.mp3",
+   "say": "Queen gave me exactly what I needed. I'll sit back and watch you boys work.",
+   "voice": "Beulah"
+  },
+  "13-11": {
+   "file": "13-11.mp3",
+   "say": "I'll give you both a free look — maybe the river can make us all honest.",
+   "voice": "Gordon"
+  },
+  "13-12": {
+   "file": "13-12.mp3",
+   "say": "That river card scares me more than any of you do. Check it back, please.",
+   "voice": "Eoin"
+  },
+  "13-13": {
+   "file": "13-13.mp3",
+   "say": "That three on the river changed everything. Just a little taste, boys.",
+   "voice": "Beulah"
+  },
+  "13-14": {
+   "file": "13-14.mp3",
+   "say": "You finally found your balls? Fine, take it. Ace-high doesn't pay the rent.",
+   "voice": "Gordon"
+  },
+  "13-15": {
+   "file": "13-15.mp3",
+   "say": "That three didn't change my life, Qwen. Sixes aren't paying rent on that board. Take it.",
+   "voice": "Eoin"
+  },
+  "14-0": {
+   "file": "14-0.mp3",
+   "say": "Let's open it up.",
+   "voice": "Eimear"
+  },
+  "14-1": {
+   "file": "14-1.mp3",
+   "say": "That's a bold open, Kimi. Let's see if you can back it up.",
+   "voice": "Eoin"
+  },
+  "14-2": {
+   "file": "14-2.mp3",
+   "say": "I'll see a flop. Don't get too excited yet, Kimi.",
+   "voice": "Beulah"
+  },
+  "14-3": {
+   "file": "14-3.mp3",
+   "say": "Cheap enough for a lottery ticket. Let's see a flop.",
+   "voice": "Gordon"
+  },
+  "14-4": {
+   "file": "14-4.mp3",
+   "say": "Top pair just landed. Let's see who wants to dance.",
+   "voice": "Beulah"
+  },
+  "14-5": {
+   "file": "14-5.mp3",
+   "say": "Top pair, huh? Fine, you can have this one.",
+   "voice": "Gordon"
+  },
+  "14-6": {
+   "file": "14-6.mp3",
+   "say": "Top pair, Qwen? Cute. I've got a little more than that — let's make this expensive.",
+   "voice": "Eimear"
+  },
+  "14-7": {
+   "file": "14-7.mp3",
+   "say": "You two fight over the ace. I'm not paying rent on that board.",
+   "voice": "Eoin"
+  },
+  "14-8": {
+   "file": "14-8.mp3",
+   "say": "You want expensive? I'll pay the cover charge. But I'm not buying the whole club yet.",
+   "voice": "Beulah"
+  },
+  "14-9": {
+   "file": "14-9.mp3",
+   "say": "Your move, Kimi. I'm just here for the scenery now.",
+   "voice": "Beulah"
+  },
+  "14-10": {
+   "file": "14-10.mp3",
+   "say": "Scenery's nice, but the view costs extra on this street.",
+   "voice": "Eimear"
+  },
+  "14-11": {
+   "file": "14-11.mp3",
+   "say": "Expensive scenery, but I've got the budget. Calling.",
+   "voice": "Beulah"
+  },
+  "14-12": {
+   "file": "14-12.mp3",
+   "say": "Scenery's free on this street. Your move, Kimi.",
+   "voice": "Beulah"
+  },
+  "14-13": {
+   "file": "14-13.mp3",
+   "say": "Free scenery's over, Qwen. Last chance to pay admission.",
+   "voice": "Eimear"
+  },
+  "14-14": {
+   "file": "14-14.mp3",
+   "say": "Last admission paid. Show me what that scenery's worth, Kimi.",
+   "voice": "Beulah"
+  },
+  "15-0": {
+   "file": "15-0.mp3",
+   "say": "Small taste of the action. Let's see who's hungry.",
+   "voice": "Eoin"
+  },
+  "15-1": {
+   "file": "15-1.mp3",
+   "say": "Hungry enough to eat your whole raise, GLM. All in.",
+   "voice": "Beulah"
+  },
+  "15-2": {
+   "file": "15-2.mp3",
+   "say": "Too much heat for king-four. I'll let you two fight.",
+   "voice": "Gordon"
+  },
+  "15-3": {
+   "file": "15-3.mp3",
+   "say": "Jack-four doesn't fight all-ins. Enjoy, boys.",
+   "voice": "Eimear"
+  },
+  "15-4": {
+   "file": "15-4.mp3",
+   "say": "Alright, you talked me into it. Hearts and a dream — let's race.",
+   "voice": "Eoin"
+  },
+  "16-0": {
+   "file": "16-0.mp3",
+   "say": "Not my kind of trouble. You two have at it.",
+   "voice": "Gordon"
+  },
+  "16-1": {
+   "file": "16-1.mp3",
+   "say": "Just me and you, GLM. Let's see a flop cheap.",
+   "voice": "Eimear"
+  },
+  "16-2": {
+   "file": "16-2.mp3",
+   "say": "Free flop it is, Kimi. Careful what you wish for.",
+   "voice": "Eoin"
+  },
+  "16-3": {
+   "file": "16-3.mp3",
+   "say": "Little nibble here. I've got some life with these clubs.",
+   "voice": "Eimear"
+  },
+  "16-4": {
+   "file": "16-4.mp3",
+   "say": "You've got clubs, huh? Well, I've got a board that likes me just fine. Let's see a turn.",
+   "voice": "Eoin"
+  },
+  "16-5": {
+   "file": "16-5.mp3",
+   "say": "Sixes still look good to me. Let's keep you honest, GLM.",
+   "voice": "Eimear"
+  },
+  "16-6": {
+   "file": "16-6.mp3",
+   "say": "You sure do love them sixes, Kimi. Fine, one more card of honesty for you.",
+   "voice": "Eoin"
+  },
+  "16-7": {
+   "file": "16-7.mp3",
+   "say": "One last nibble, GLM. Surely you can call just a little more honesty.",
+   "voice": "Eimear"
+  },
+  "16-8": {
+   "file": "16-8.mp3",
+   "say": "All right Kimi, one last dose of honesty for you. Nines were enough all hand.",
+   "voice": "Eoin"
+  },
+  "17-0": {
+   "file": "17-0.mp3",
+   "say": "Let's open this up on the button.",
+   "voice": "Eimear"
+  },
+  "17-1": {
+   "file": "17-1.mp3",
+   "say": "Cheapest seat in the house. I'll come along for the ride.",
+   "voice": "Eoin"
+  },
+  "17-2": {
+   "file": "17-2.mp3",
+   "say": "Cheapest seat? Looks like I'm the one paying rent for this junk.",
+   "voice": "Gordon"
+  },
+  "17-3": {
+   "file": "17-3.mp3",
+   "say": "That flop is about as exciting as my hand. Check it back, friend.",
+   "voice": "Eoin"
+  },
+  "17-4": {
+   "file": "17-4.mp3",
+   "say": "Exciting enough for me. Small bet, take it or leave it.",
+   "voice": "Eimear"
+  },
+  "17-5": {
+   "file": "17-5.mp3",
+   "say": "A gutshot and a dream. That 92 won't bankrupt me, deal me another card.",
+   "voice": "Eoin"
+  },
+  "17-6": {
+   "file": "17-6.mp3",
+   "say": "Well, that card helped nobody... except maybe you, button. Go ahead, I'm just spectating n",
+   "voice": "Eoin"
+  },
+  "17-7": {
+   "file": "17-7.mp3",
+   "say": "Spectating? Then you won't mind me putting on a little show. Half pot.",
+   "voice": "Eimear"
+  },
+  "17-8": {
+   "file": "17-8.mp3",
+   "say": "That show of yours is too expensive for my cheap seat. Enjoy the stage, I'll save my rent ",
+   "voice": "Eoin"
+  },
+  "18-0": {
+   "file": "18-0.mp3",
+   "say": "Three-five offsuit, thanks for nothing dealer. Next one.",
+   "voice": "Eoin"
+  },
+  "18-1": {
+   "file": "18-1.mp3",
+   "say": "Cheap look at the flop, I'll take it.",
+   "voice": "Gordon"
+  },
+  "18-2": {
+   "file": "18-2.mp3",
+   "say": "Cheap looks are closed—pay the toll or muck it.",
+   "voice": "Eimear"
+  },
+  "18-3": {
+   "file": "18-3.mp3",
+   "say": "Toll's too steep for this junk. Fine, it's yours.",
+   "voice": "Gordon"
+  },
+  "19-0": {
+   "file": "19-0.mp3",
+   "say": "Too junky for me, I'll wait for something real.",
+   "voice": "Gordon"
+  },
+  "19-1": {
+   "file": "19-1.mp3",
+   "say": "Button bailed? Then it's just us, GLM. Let's make it interesting.",
+   "voice": "Eimear"
+  },
+  "19-2": {
+   "file": "19-2.mp3",
+   "say": "Interesting for you, expensive for me. This one's yours, Kimi.",
+   "voice": "Eoin"
+  },
+  "20-0": {
+   "file": "20-0.mp3",
+   "say": "Let's make the short stacks sweat a little.",
+   "voice": "Eimear"
+  },
+  "20-1": {
+   "file": "20-1.mp3",
+   "say": "Sweat this, Kimi. All of it.",
+   "voice": "Eoin"
+  },
+  "20-2": {
+   "file": "20-2.mp3",
+   "say": "Not worth my tournament on king-deuce. It's all yours, boys.",
+   "voice": "Gordon"
+  },
+  "20-3": {
+   "file": "20-3.mp3",
+   "say": "Sweat this? Fine. Ten-six says hello. Call.",
+   "voice": "Eimear"
+  },
+  "21-0": {
+   "file": "21-0.mp3",
+   "say": "Let's make it 150.",
+   "voice": "Gordon"
+  },
+  "21-1": {
+   "file": "21-1.mp3",
+   "say": "A hundred more? Sure, I'll see a flop with you.",
+   "voice": "Eimear"
+  },
+  "21-2": {
+   "file": "21-2.mp3",
+   "say": "I've got a little something here. Let's see how much you like yours.",
+   "voice": "Eimear"
+  },
+  "21-3": {
+   "file": "21-3.mp3",
+   "say": "All in. Let’s find out if that “little something” is real.",
+   "voice": "Gordon"
+  },
+  "21-4": {
+   "file": "21-4.mp3",
+   "say": "You called my bluff right. Nothing here but air — take it.",
+   "voice": "Eimear"
+  },
+  "22-0": {
+   "file": "22-0.mp3",
+   "say": "Heads-up and I'm raising. Let's see if you want to tango.",
+   "voice": "Eimear"
+  },
+  "22-1": {
+   "file": "22-1.mp3",
+   "say": "Tango? I'll dance, but I lead.",
+   "voice": "Gordon"
+  },
+  "22-2": {
+   "file": "22-2.mp3",
+   "say": "Nice flop for a tango. After you.",
+   "voice": "Gordon"
+  },
+  "22-3": {
+   "file": "22-3.mp3",
+   "say": "You lead? On this flop I think I'm the one with the rhythm. Half pot.",
+   "voice": "Eimear"
+  },
+  "22-4": {
+   "file": "22-4.mp3",
+   "say": "You can have this one. The floor is all yours.",
+   "voice": "Gordon"
+  },
+  "23-0": {
+   "file": "23-0.mp3",
+   "say": "Cheap look, let's see what happens.",
+   "voice": "Gordon"
+  },
+  "23-1": {
+   "file": "23-1.mp3",
+   "say": "Nothing to see here. Flop it.",
+   "voice": "Eimear"
+  },
+  "23-2": {
+   "file": "23-2.mp3",
+   "say": "This board could be all mine. Let's find out.",
+   "voice": "Eimear"
+  },
+  "23-3": {
+   "file": "23-3.mp3",
+   "say": "Cheap price for a pair and a draw. I'll ride along.",
+   "voice": "Gordon"
+  },
+  "23-4": {
+   "file": "23-4.mp3",
+   "say": "Still my board. Pair of fours says keep firing — how's that draw feeling now?",
+   "voice": "Eimear"
+  },
+  "23-5": {
+   "file": "23-5.mp3",
+   "say": "Not paying again for a draw on your board. Nice bet, it's yours for now.",
+   "voice": "Gordon"
+  },
+  "24-0": {
+   "file": "24-0.mp3",
+   "say": "Heads-up, time to put the pressure on.",
+   "voice": "Eimear"
+  },
+  "24-1": {
+   "file": "24-1.mp3",
+   "say": "Easy fold, not paying to see that one.",
+   "voice": "Gordon"
+  },
+  "25-0": {
+   "file": "25-0.mp3",
+   "say": "Make it 200.",
+   "voice": "Gordon"
+  },
+  "25-1": {
+   "file": "25-1.mp3",
+   "say": "Seven bigs? Let's just play for all of it. All-in.",
+   "voice": "Eimear"
+  },
+  "25-2": {
+   "file": "25-2.mp3",
+   "say": "For 7 bigs I'll gamble. Let's spin it.",
+   "voice": "Gordon"
+  },
+  "26-0": {
+   "file": "26-0.mp3",
+   "say": "Button raise — let's see if that short stack wants to play.",
+   "voice": "Eimear"
+  },
+  "26-1": {
+   "file": "26-1.mp3",
+   "say": "Cheap flop... I'll take a look.",
+   "voice": "Gordon"
+  },
+  "26-2": {
+   "file": "26-2.mp3",
+   "say": "I checked that one twice... still drawing to ten-high.",
+   "voice": "Gordon"
+  },
+  "26-3": {
+   "file": "26-3.mp3",
+   "say": "Two diamonds on board and I've got two more in hand — pressure time.",
+   "voice": "Eimear"
+  },
+  "26-4": {
+   "file": "26-4.mp3",
+   "say": "Ten-high isn't getting it done. Take this one.",
+   "voice": "Gordon"
+  },
+  "27-0": {
+   "file": "27-0.mp3",
+   "say": "Let's see if you like your blind.",
+   "voice": "Gordon"
+  },
+  "27-1": {
+   "file": "27-1.mp3",
+   "say": "I like my blind just fine. Let's see a flop.",
+   "voice": "Eimear"
+  },
+  "27-2": {
+   "file": "27-2.mp3",
+   "say": "Not a bad flop for a blind. Small bet to find out where we stand.",
+   "voice": "Eimear"
+  },
+  "27-3": {
+   "file": "27-3.mp3",
+   "say": "All yours. That flop didn't find me.",
+   "voice": "Gordon"
+  },
+  "28-0": {
+   "file": "28-0.mp3",
+   "say": "Ten-nine suited, heads up — let's see if you want to play for your tournament life.",
+   "voice": "Eimear"
+  },
+  "28-1": {
+   "file": "28-1.mp3",
+   "say": "Cheap flop, then we'll talk about my tournament life.",
+   "voice": "Gordon"
+  },
+  "28-2": {
+   "file": "28-2.mp3",
+   "say": "All yours — let's see what all that preflop confidence was about.",
+   "voice": "Gordon"
+  },
+  "28-3": {
+   "file": "28-3.mp3",
+   "say": "Ace flop — I'll take the free card, see how much you really love it.",
+   "voice": "Eimear"
+  },
+  "28-4": {
+   "file": "28-4.mp3",
+   "say": "Still nothing brewing for me — take another free one.",
+   "voice": "Gordon"
+  },
+  "28-5": {
+   "file": "28-5.mp3",
+   "say": "I've been quiet two streets — time to make you pay for that free card attitude.",
+   "voice": "Eimear"
+  },
+  "28-6": {
+   "file": "28-6.mp3",
+   "say": "You can have this one—my free card turned into your payday.",
+   "voice": "Gordon"
+  },
+  "29-0": {
+   "file": "29-0.mp3",
+   "say": "Cheap flop, let's see one.",
+   "voice": "Gordon"
+  },
+  "29-1": {
+   "file": "29-1.mp3",
+   "say": "Cheap flop? Nothing's cheap against me. All of it.",
+   "voice": "Eimear"
+  },
+  "29-2": {
+   "file": "29-2.mp3",
+   "say": "Not this one chief, not with jack-deuce.",
+   "voice": "Gordon"
+  },
+  "30-0": {
+   "file": "30-0.mp3",
+   "say": "Ten bigs left? Time to start feeling the pressure, friend.",
+   "voice": "Eimear"
+  },
+  "30-1": {
+   "file": "30-1.mp3",
+   "say": "Not this one. I'll pick a better spot.",
+   "voice": "Gordon"
+  },
+  "31-0": {
+   "file": "31-0.mp3",
+   "say": "Let's build a little pot, Kimi.",
+   "voice": "Gordon"
+  },
+  "31-1": {
+   "file": "31-1.mp3",
+   "say": "Build a pot with my big blind? Bold. I'll just call and see a flop.",
+   "voice": "Eimear"
+  },
+  "31-2": {
+   "file": "31-2.mp3",
+   "say": "Nothing for me but a dream and a queen. You first, short stack.",
+   "voice": "Eimear"
+  },
+  "31-3": {
+   "file": "31-3.mp3",
+   "say": "I'll take the driver's seat here. 200. Let's see how much you like your 'dream and a queen",
+   "voice": "Gordon"
+  },
+  "31-4": {
+   "file": "31-4.mp3",
+   "say": "Driver's seat all yours. Queen high isn't worth the toll.",
+   "voice": "Eimear"
+  },
+  "32-0": {
+   "file": "32-0.mp3",
+   "say": "Let's put the short stack to the test.",
+   "voice": "Eimear"
+  },
+  "32-1": {
+   "file": "32-1.mp3",
+   "say": "Cheap enough to look at one.",
+   "voice": "Gordon"
+  },
+  "32-2": {
+   "file": "32-2.mp3",
+   "say": "No reason to build your pot for you.",
+   "voice": "Gordon"
+  },
+  "32-3": {
+   "file": "32-3.mp3",
+   "say": "Board's dry enough. Let's see how much you liked that flop.",
+   "voice": "Eimear"
+  },
+  "32-4": {
+   "file": "32-4.mp3",
+   "say": "Still just a chips-for-charts kind of day.",
+   "voice": "Gordon"
+  },
+  "32-5": {
+   "file": "32-5.mp3",
+   "say": "Let's see if that dry board can stand some heat.",
+   "voice": "Gordon"
+  },
+  "32-6": {
+   "file": "32-6.mp3",
+   "say": "Pair and a straight draw? That's plenty against a desperate shove. Call.",
+   "voice": "Eimear"
+  }
+ }
+}

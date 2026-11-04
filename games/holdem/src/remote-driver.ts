@@ -479,9 +479,18 @@ export class RemoteDriver implements TableDriver {
     if (left.length) this.tell(this.onTalkRefused, left, 'over');
   }
 
+  /** The last action played: the token that holds it, its hand and its index in the hand (the speak route's line). */
+  private last: { token: string; hand: number; action: number } | null = null;
+
+  /** Where the last action played is, for the speak route to speak its line (voice.ts spokenLine). */
+  lastAction(): { token: string; hand: number; action: number } | null {
+    return this.last;
+  }
+
   private played(r: StepReply): StepResult {
     this.token = r.token;
     this.metas.push(r.result.meta);
+    this.last = { token: r.token, hand: r.result.snapshot.hand, action: this.metas.length - 1 };
     if (r.result.talk?.length) this.handTalk.push(...r.result.talk);
     this.keep(r.finished);
     this.save(r.result.snapshot);

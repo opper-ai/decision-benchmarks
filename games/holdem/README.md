@@ -8,7 +8,7 @@ No-limit Texas Hold'em against AI models, built (v1) from the plan in
   asks the models, chat models with the live table's prompt;
 - the page (`src/`): play a Sit & Go or watch models play live, the hand review with every AI's cards and reasoning,
   the end screen with a share image and link, the curated replays, and the leaderboard;
-- the curated replays and the poster (`scripts/`);
+- the curated replays, their spoken talk and the poster (`scripts/`);
 - the models: the decision models (the Decision set is Jev 1.14, Clef and GPT-6 Luna Decisions; any seat can pick
   the others), the Claude, GPT, Gemini, Open models (DeepSeek V4 Pro, Kimi K3, GLM-5.3) and Titans sets, and more chat
   models any seat can pick (Grok, more DeepSeek, Qwen, GLM, MiniMax).
@@ -174,6 +174,40 @@ nothing for this game.
   The lines come back as `result.talk` (and `talk` on next), in the finished hand's review and in the recording's
   hand (`talk`, ignored by verify and the fingerprint; share links don't carry it). The same request sent again says a
   line once: the talk is applied to the token it comes with.
+- **Spoken table talk:** with the toolbar's Voice switch on (off by default, `ai-holdem.voice` in localStorage,
+  independent of Sound), each model's line is spoken in its own voice: Fish Audio's S2.1 Pro (`fish/s2.1-pro`) through
+  Opper's speech API (one to two seconds and about $0.001 a line; a global route, not EU, which Opper lists as one the provider
+  may train on: only the models' lines go to it, never what a player types). The casting is `shared/voices.ts`: each
+  chat model gets a voice of its own from Fish Audio's official library, picked by id after its avatar's character, so
+  no two models sound alike at any table.
+  - **Delivery tags (live tables only):** the live prompt (`LIVE_TABLE`) lets a model add up to two tags to its `say`:
+    `[pause]`, `[long pause]`, `[laughs]`, `[sighs]`, `[breathes]`, `[whispering]`, `[softly]`, `[slowly]`, `[excited]`,
+    `[dry]`, `[deadpan]`, `[teasing]` or `[nervous]`, just before the words they change.
+    The server splits each line (`shared/delivery.ts` `splitSay`): `say`, what every screen, the chat, the bubbles, the
+    other models' prompts, the review and the recording get, has no tag of any kind (anything bracket- or
+    angle-shaped is taken out, the words tidied and cut to 90 characters); the spoken form keeps only the allowed tags
+    (Fish Audio acts on any bracketed words, and on a single word in parentheses, so any other tag goes, on the screens
+    too), and lives only in the sealed
+    token (`v`, only when it differs), so recordings and replays have none. A line cut to length is spoken plain. The
+    mood adds nothing. The bench's prompt and answers are unchanged.
+  - `POST api/table/speak { token, hand, action }` is never an open text-to-speech proxy: the server reads the line
+    (its spoken form when it has one) and the model from the sealed token (only the hand in play's talk is in it, and a
+    spoken form must split to itself), speaks it with the table's payer (the player's key, or the local key; the free
+    credits' accounting if a talking table ever ran on them), and answers `{ audio, format: 'mp3', voice }`. Per
+    visitor, a line a second after a burst of 20; a line asked for again within five minutes (the same words and voice,
+    as a second tab may ask) gets the same audio without a second call. The log has the model, the voice, whether the
+    line was tagged, the time and the cost.
+  - The page (`src/voice.ts`, `src/speaker.ts`) speaks from `TableUI`'s talk hook through one audio element (a blob URL
+    of the mp3, revoked when the line ends; an element because it speeds a voice up with its pitch kept): one line at a
+    time in order, the next one loading while one plays. The speech model itself speaks fast (`speed: 1.2`), so the page
+    plays a line as made up to 2×, at 1.1× at 4× and 1.2× at 8× (talk at a live table comes at the models' pace whatever
+    the speed, and 4× is where a player who went out watches, so the voices stay). With Voice on the table waits for the
+    speaker (`speaker.settled()`): before the next model's move is shown, at a live table and in a replay, the lines said so
+    far finish, for at most 3.5 s more; the player's own turn never waits, and with Voice off, or a line failed or
+    dropped, nothing waits. A line not started within 4 s of being said is still dropped, so speech never trails the
+    table. Silent while a resumed hand is laid out again; stopped on leaving, a new table, or the page hidden. A line
+    the browser refuses to play (no click or key yet) is dropped quietly.
+    Practice (`?practice`) has no server, so no Voice switch.
 - **Known limits (v1):** the token is stateless, so an older token can be sent again to take back a decision, or a step
   repeated to have an AI decide again. Replaying a hand this instance saw finish (fold, read the cards, play the old
   token again) is refused (409) while the instance remembers it: until the table closes, for up to 50,000 tables, more
@@ -207,6 +241,17 @@ picks the bluff over that hand's hero call:
 ```bash
 GAME=holdem npm run dev -- --port 5199
 node games/holdem/scripts/poster.ts --url http://localhost:5199/holdem/ --file claude-vs-gpt.json.gz --hand 16 --kind bluff
+```
+
+The curated replays speak their talk from files, never a live call (anyone may watch them): `scripts/voices.ts` renders
+every chat model's line once to `public/voices/<replay>/<hand>-<action>.mp3` (mono, 22.05 kHz, 24 kbps) with an
+`index.json` of each line's file, words and voice; the replay view has a Voice switch when a replay has voices, and plays
+a line only while the recording still says those words. A line already rendered with the same model, voice and words is kept,
+so the script only speaks what changed. The three talking replays took 585 lines, 5.5 MB and $0.47 with the Fish
+voices (2026-11-04).
+
+```bash
+OPPER_API_KEY=... OPPER_PROJECT=... node games/holdem/scripts/voices.ts [--only claude-vs-gpt] [--force]
 ```
 
 ## Sharing (`src/social.ts`, `src/views/share-buttons.ts`, `src/share.ts`)

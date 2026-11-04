@@ -9,6 +9,7 @@ import { applyAction, legalOptions, newHand, observe, toAct, type HandState } fr
 import { CHAT_MODELS, HOLDEM_MODELS, SETS } from '../shared/models';
 import { CHAT_FORMAT, CHAT_SYSTEM, chatFormatFor, chatSchema, LIVE_CHAT_FORMAT, LIVE_CHAT_SYSTEM, LIVE_TABLE, MAX_REASONING, MAX_SAY, parseChatAnswer, QUESTION, questionFor, readAnswer, requestFor, stateFor } from '../shared/questions';
 import { actSitAndGo, newSitAndGo } from '../shared/sitngo';
+import { DELIVERY_TAGS } from '../shared/voices';
 import { modelById } from '../src/roster';
 import { deriveSeed, keyFromSeed } from '../shared/rng';
 import { deal, act } from './support';
@@ -179,7 +180,10 @@ describe('a live table', () => {
     expect(LIVE_TABLE).toMatch(/on every action, say something out loud/i);
     for (const mood of ['annoyed', 'nervous', 'smug']) expect(LIVE_TABLE).toContain(mood);
     expect(LIVE_TABLE).not.toMatch(/fold|call|raise|bet|equity|odds|position|should|strong|weak|cards|hand\b|reveal|hide/i);
-    expect(LIVE_TABLE.length).toBeLessThan(450);
+    // The delivery tags (shared/delivery.ts) take most of the rest.
+    expect(LIVE_TABLE.length).toBeLessThan(900);
+    for (const tag of DELIVERY_TAGS) expect(LIVE_TABLE).toContain(`[${tag}]`);
+    expect(LIVE_TABLE).toMatch(/up to 2 delivery tags/);
   });
 
   it('lists the moods in a neutral (alphabetical) order, in the description and the schema', () => {

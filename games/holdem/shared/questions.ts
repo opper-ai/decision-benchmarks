@@ -24,7 +24,9 @@
 import type { ChatFormat, ChatMessage } from '../../../packages/kit/shared/chat.ts';
 import type { ChoiceQuestion, SystemOneRequest } from '../../../packages/kit/shared/systemone.ts';
 import type { HistoryItem, Observation, Option, OptionKey } from './engine.ts';
+import { isSpoken, splitSay } from './delivery.ts';
 import { MOODS, type FallbackReason, type Mood } from './recording.ts';
+import { DELIVERY_TAGS, MAX_TAGS } from './voices.ts';
 
 /** The question's name in a request. */
 export const QUESTION = 'action';
@@ -252,7 +254,11 @@ export const LIVE_TABLE =
   'This is a live table with an audience watching. On every action, say something out loud: a short line in your own voice ' +
   '(needle, bluff, banter, or answer what the others said); leave "say" empty only if you truly want silence. ' +
   'For "mood", pick the face you want to show at this moment and use the whole range, annoyed, nervous and smug included: ' +
-  "real players' faces change as the game goes, and a face can be true or a bluff.";
+  "real players' faces change as the game goes, and a face can be true or a bluff. " +
+  `Your line is spoken aloud in your own voice. To direct how it sounds you may add up to ${MAX_TAGS} delivery tags to "say", ` +
+  `just before the words they change: ${DELIVERY_TAGS.map((t) => `[${t}]`).join(', ')}. ` +
+  'Use them only when they fit the moment; most lines need none. Tags are never shown ' +
+  `and do not count towards the ${MAX_SAY} characters; no other tags.`;
 
 /** The system message at a live table: the bench's description (moods in LIVE_MOODS order), then LIVE_TABLE. */
 export const LIVE_CHAT_SYSTEM = `${chatSystemText(LIVE_MOODS)} ${LIVE_TABLE}`;
@@ -308,6 +314,19 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
  * say and reasoning as text and mood one of the moods. Talk and reasoning longer than asked are cut, not refused.
  */
 export function parseChatAnswer(content: string, keys: readonly string[]): ChatAnswer | null {
+  return readChatAnswer(content, keys, false);
+}
+
+/**
+ * A live table's chat answer: as parseChatAnswer, with its talk split (delivery.ts splitSay) into `say`, the words the
+ * screens show (no tag of any kind, cut to MAX_SAY), and `spoken`, the same words with the delivery tags the model
+ * added, when it added any.
+ */
+export function parseLiveAnswer(content: string, keys: readonly string[]): (ChatAnswer & { spoken?: string }) | null {
+  return readChatAnswer(content, keys, true);
+}
+
+function readChatAnswer(content: string, keys: readonly string[], live: boolean): (ChatAnswer & { spoken?: string }) | null {
   let v: unknown;
   try {
     v = JSON.parse(content.trim().replace(/^```(?:json)?\s*|\s*```$/g, ''));
@@ -316,7 +335,10 @@ export function parseChatAnswer(content: string, keys: readonly string[]): ChatA
   }
   if (!isObj(v) || typeof v.action !== 'string' || !keys.includes(v.action)) return null;
   if (typeof v.say !== 'string' || typeof v.reasoning !== 'string' || !MOODS.includes(v.mood as Mood)) return null;
-  return { type: 'choice', choice: v.action, say: clipSay(v.say), mood: v.mood as Mood, reasoning: v.reasoning.trim().slice(0, MAX_REASONING) };
+  const reasoning = v.reasoning.trim().slice(0, MAX_REASONING);
+  if (!live) return { type: 'choice', choice: v.action, say: clipSay(v.say), mood: v.mood as Mood, reasoning };
+  const { shown, spoken } = splitSay(v.say);
+  return { type: 'choice', choice: v.action, say: shown, ...(spoken !== shown ? { spoken } : {}), mood: v.mood as Mood, reasoning };
 }
 
 /** How the bench asks a chat model: GameDefinition.chat. Frozen with CHAT_SYSTEM. */
@@ -333,7 +355,7 @@ export const LIVE_CHAT_FORMAT: ChatFormat = {
     { role: 'user', content: chatPrompt(state, q) },
   ],
   responseFormat: (q) => chatSchema(Object.keys(q.criteria), LIVE_MOODS),
-  parse: CHAT_FORMAT.parse,
+  parse: (content, q) => parseLiveAnswer(content, Object.keys(q.criteria)) as Record<string, unknown> | null,
 };
 
 /** The chat format for a question: a live table's when there is a TableContext (the table service), else the bench's. */
@@ -346,6 +368,8 @@ export interface ReadAnswer {
   key: OptionKey;
   probabilities?: Partial<Record<OptionKey, number>>;
   say?: string;
+  /** A live table's line with its delivery tags, when it has any (delivery.ts): for text-to-speech only. */
+  spoken?: string;
   mood?: Mood;
   reasoning?: string;
 }
@@ -367,6 +391,7 @@ export function readAnswer(answer: unknown, options: readonly OptionKey[]): Read
     if (Object.keys(p).length) out.probabilities = p;
   }
   if (typeof answer.say === 'string') out.say = clipSay(answer.say);
+  if (out.say && isSpoken(answer.spoken) && splitSay(answer.spoken).shown === out.say) out.spoken = answer.spoken;
   if (MOODS.includes(answer.mood as Mood)) out.mood = answer.mood as Mood;
   if (typeof answer.reasoning === 'string') out.reasoning = answer.reasoning.slice(0, MAX_REASONING);
   return out;

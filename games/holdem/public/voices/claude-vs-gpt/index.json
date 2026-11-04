@@ -1,0 +1,1041 @@
+{
+ "format": 1,
+ "model": "fish/s2.1-pro",
+ "lines": {
+  "1-0": {
+   "file": "1-0.mp3",
+   "say": "I'll let you three fight over the opening act.",
+   "voice": "Troy"
+  },
+  "1-1": {
+   "file": "1-1.mp3",
+   "say": "Sol can save the speeches—I’ll take the button.",
+   "voice": "Harlan"
+  },
+  "1-2": {
+   "file": "1-2.mp3",
+   "say": "Enjoy the button, Terra. I'll save my chips for a real hand.",
+   "voice": "Richard"
+  },
+  "1-3": {
+   "file": "1-3.mp3",
+   "say": "Take it, Terra. Seven-three offsuit isn't worth the toll.",
+   "voice": "James"
+  },
+  "2-0": {
+   "file": "2-0.mp3",
+   "say": "Early pressure. Let's see who wants to defend.",
+   "voice": "Harlan"
+  },
+  "2-1": {
+   "file": "2-1.mp3",
+   "say": "Defend? Not with this junk. Enjoy the blinds, Terra.",
+   "voice": "Richard"
+  },
+  "2-2": {
+   "file": "2-2.mp3",
+   "say": "Terra's early pressure gets a pass from me. Ten-four, not today.",
+   "voice": "James"
+  },
+  "2-3": {
+   "file": "2-3.mp3",
+   "say": "You can have this one, Terra. Pressure isn't a subscription.",
+   "voice": "Troy"
+  },
+  "3-0": {
+   "file": "3-0.mp3",
+   "say": "Not this one. Go ahead and fight over the blinds, folks.",
+   "voice": "Richard"
+  },
+  "3-1": {
+   "file": "3-1.mp3",
+   "say": "Button's here, let's make it interesting. Raising a little.",
+   "voice": "James"
+  },
+  "3-2": {
+   "file": "3-2.mp3",
+   "say": "You two can make it interesting. I'll keep my chips.",
+   "voice": "Troy"
+  },
+  "3-3": {
+   "file": "3-3.mp3",
+   "say": "Cheap look from the big blind. Let's see a flop.",
+   "voice": "Harlan"
+  },
+  "3-4": {
+   "file": "3-4.mp3",
+   "say": "That board has plenty to say. Your turn.",
+   "voice": "Harlan"
+  },
+  "3-5": {
+   "file": "3-5.mp3",
+   "say": "Small bet, nothing scary. Let's see if the board hit you.",
+   "voice": "James"
+  },
+  "3-6": {
+   "file": "3-6.mp3",
+   "say": "That texture belongs to you often enough. Take the small one.",
+   "voice": "Harlan"
+  },
+  "4-0": {
+   "file": "4-0.mp3",
+   "say": "Let's make it interesting, little raise.",
+   "voice": "James"
+  },
+  "4-1": {
+   "file": "4-1.mp3",
+   "say": "I'll let you make it interesting without me this time.",
+   "voice": "Troy"
+  },
+  "4-2": {
+   "file": "4-2.mp3",
+   "say": "Interesting enough without my two cards.",
+   "voice": "Harlan"
+  },
+  "4-3": {
+   "file": "4-3.mp3",
+   "say": "Interesting? Let's make it a little more interesting then.",
+   "voice": "Richard"
+  },
+  "4-4": {
+   "file": "4-4.mp3",
+   "say": "Nice raise, Opus. I'll let that one go, you earned it.",
+   "voice": "James"
+  },
+  "5-0": {
+   "file": "5-0.mp3",
+   "say": "I'll let you three sort this one out.",
+   "voice": "Troy"
+  },
+  "5-1": {
+   "file": "5-1.mp3",
+   "say": "You two can have the blinds.",
+   "voice": "Harlan"
+  },
+  "5-2": {
+   "file": "5-2.mp3",
+   "say": "Just you and me, Sonnet. I'll complete and see what happens.",
+   "voice": "Richard"
+  },
+  "5-3": {
+   "file": "5-3.mp3",
+   "say": "Free flop, Opus. Let's see what the board gives us.",
+   "voice": "James"
+  },
+  "5-4": {
+   "file": "5-4.mp3",
+   "say": "Ace on the flop. Let's see if you like that, Sonnet.",
+   "voice": "Richard"
+  },
+  "5-5": {
+   "file": "5-5.mp3",
+   "say": "Small bet, Opus. I'll pay to see the turn.",
+   "voice": "James"
+  },
+  "5-6": {
+   "file": "5-6.mp3",
+   "say": "Spade on the turn. I'll slow down and see what you do, Sonnet.",
+   "voice": "Richard"
+  },
+  "5-7": {
+   "file": "5-7.mp3",
+   "say": "Slowing down too, Opus. Let's see what the river brings.",
+   "voice": "James"
+  },
+  "5-8": {
+   "file": "5-8.mp3",
+   "say": "Paired board, Sonnet. I'll put a little out there and see if you believe me.",
+   "voice": "Richard"
+  },
+  "5-9": {
+   "file": "5-9.mp3",
+   "say": "Small bet, small price. I'll call and see what you've got, Opus.",
+   "voice": "James"
+  },
+  "6-0": {
+   "file": "6-0.mp3",
+   "say": "Not every hand needs a story.",
+   "voice": "Harlan"
+  },
+  "6-1": {
+   "file": "6-1.mp3",
+   "say": "Terra's right, no story needed. Just a button raise.",
+   "voice": "Richard"
+  },
+  "6-2": {
+   "file": "6-2.mp3",
+   "say": "Story time, then. I'll see a flop with you, button.",
+   "voice": "James"
+  },
+  "6-3": {
+   "file": "6-3.mp3",
+   "say": "I'll skip this chapter. You two enjoy the flop.",
+   "voice": "Troy"
+  },
+  "6-4": {
+   "file": "6-4.mp3",
+   "say": "Check. Let's see what the button does with it.",
+   "voice": "James"
+  },
+  "6-5": {
+   "file": "6-5.mp3",
+   "say": "Chapter two: the button bets. Keep reading, Sonnet.",
+   "voice": "Richard"
+  },
+  "6-6": {
+   "file": "6-6.mp3",
+   "say": "Small bet, small call. Keep reading, button, I'm still curious.",
+   "voice": "James"
+  },
+  "6-7": {
+   "file": "6-7.mp3",
+   "say": "Check again. I like the plot, keep the pages turning.",
+   "voice": "James"
+  },
+  "6-8": {
+   "file": "6-8.mp3",
+   "say": "Chapter three: the plot thickens. Your turn to turn the page, Sonnet.",
+   "voice": "Richard"
+  },
+  "6-9": {
+   "file": "6-9.mp3",
+   "say": "Fine, I'll turn the page. Show me chapter four, button.",
+   "voice": "James"
+  },
+  "6-10": {
+   "file": "6-10.mp3",
+   "say": "Last page, button. I'll check and let you close the book.",
+   "voice": "James"
+  },
+  "6-11": {
+   "file": "6-11.mp3",
+   "say": "Chapter four's a short one, Sonnet. Small print.",
+   "voice": "Richard"
+  },
+  "6-12": {
+   "file": "6-12.mp3",
+   "say": "Small print, big curiosity. I'll read the last line, button.",
+   "voice": "James"
+  },
+  "7-0": {
+   "file": "7-0.mp3",
+   "say": "Not this one. You all fight over the blinds.",
+   "voice": "Richard"
+  },
+  "7-1": {
+   "file": "7-1.mp3",
+   "say": "Opus has the right idea. I'll sit this one out too, enjoy the blinds boys.",
+   "voice": "James"
+  },
+  "7-2": {
+   "file": "7-2.mp3",
+   "say": "I'll take a look. No need to start a blind war yet.",
+   "voice": "Troy"
+  },
+  "7-3": {
+   "file": "7-3.mp3",
+   "say": "No need to turn every limp into a war. Let's see three.",
+   "voice": "Harlan"
+  },
+  "7-4": {
+   "file": "7-4.mp3",
+   "say": "Still no blind war. Your move, Terra.",
+   "voice": "Troy"
+  },
+  "7-5": {
+   "file": "7-5.mp3",
+   "say": "You gave me the lead; I'll use it.",
+   "voice": "Harlan"
+  },
+  "7-6": {
+   "file": "7-6.mp3",
+   "say": "Lead away, Terra. This one's yours.",
+   "voice": "Troy"
+  },
+  "8-0": {
+   "file": "8-0.mp3",
+   "say": "Just a cheap look for me, let's see what the flop brings.",
+   "voice": "James"
+  },
+  "8-1": {
+   "file": "8-1.mp3",
+   "say": "Cheap look for you; free patience for me.",
+   "voice": "Troy"
+  },
+  "8-2": {
+   "file": "8-2.mp3",
+   "say": "You can have the little one. I’m saving the fireworks.",
+   "voice": "Harlan"
+  },
+  "8-3": {
+   "file": "8-3.mp3",
+   "say": "Cheap looks cost a little more over here.",
+   "voice": "Richard"
+  },
+  "8-4": {
+   "file": "8-4.mp3",
+   "say": "Fine, you've earned the extra chips. I'll pay to see a flop.",
+   "voice": "James"
+  },
+  "8-5": {
+   "file": "8-5.mp3",
+   "say": "Let's see if that cheap look turned into anything.",
+   "voice": "Richard"
+  },
+  "8-6": {
+   "file": "8-6.mp3",
+   "say": "Fine, I'll pay again. Curiosity is my weakness.",
+   "voice": "James"
+  },
+  "8-7": {
+   "file": "8-7.mp3",
+   "say": "Curiosity's free this time. Your move.",
+   "voice": "Richard"
+  },
+  "8-8": {
+   "file": "8-8.mp3",
+   "say": "Curiosity pays off sometimes. Let's see how curious you are.",
+   "voice": "James"
+  },
+  "8-9": {
+   "file": "8-9.mp3",
+   "say": "Curiosity's all yours. Enjoy it.",
+   "voice": "Richard"
+  },
+  "9-0": {
+   "file": "9-0.mp3",
+   "say": "I'll let you three fight over the blinds.",
+   "voice": "Troy"
+  },
+  "9-1": {
+   "file": "9-1.mp3",
+   "say": "The blinds look lonely. I’ll keep them company.",
+   "voice": "Harlan"
+  },
+  "9-2": {
+   "file": "9-2.mp3",
+   "say": "Enjoy the company, Terra. My blind can find new friends.",
+   "voice": "Richard"
+  },
+  "9-3": {
+   "file": "9-3.mp3",
+   "say": "Fine, I'll take the company. Come sit with me, Terra.",
+   "voice": "James"
+  },
+  "9-4": {
+   "file": "9-4.mp3",
+   "say": "Terra, you came for company, now pay the cover charge.",
+   "voice": "James"
+  },
+  "9-5": {
+   "file": "9-5.mp3",
+   "say": "Cover charge paid. Let’s see what the next room looks like.",
+   "voice": "Harlan"
+  },
+  "9-6": {
+   "file": "9-6.mp3",
+   "say": "Terra, the next room has a door fee. Half the pot, if you're coming in.",
+   "voice": "James"
+  },
+  "9-7": {
+   "file": "9-7.mp3",
+   "say": "Nice door fee. I’ll save my ticket for the next room.",
+   "voice": "Harlan"
+  },
+  "10-0": {
+   "file": "10-0.mp3",
+   "say": "Let's make the blinds earn their view.",
+   "voice": "Harlan"
+  },
+  "10-1": {
+   "file": "10-1.mp3",
+   "say": "Enjoy the view, I'll watch from the cheap seats.",
+   "voice": "Richard"
+  },
+  "10-2": {
+   "file": "10-2.mp3",
+   "say": "Too rich for K-2. I'll let the big blind defend.",
+   "voice": "James"
+  },
+  "10-3": {
+   "file": "10-3.mp3",
+   "say": "I'll pass on the admission fee. Enjoy the view, Terra.",
+   "voice": "Troy"
+  },
+  "11-0": {
+   "file": "11-0.mp3",
+   "say": "Not this one. You three play nice.",
+   "voice": "Richard"
+  },
+  "11-1": {
+   "file": "11-1.mp3",
+   "say": "Button's mine, let's make it interesting. Raising a little.",
+   "voice": "James"
+  },
+  "11-2": {
+   "file": "11-2.mp3",
+   "say": "Interesting enough to watch, not enough to pay.",
+   "voice": "Troy"
+  },
+  "11-3": {
+   "file": "11-3.mp3",
+   "say": "Cheap look from the big blind. Let's see a flop.",
+   "voice": "Harlan"
+  },
+  "11-4": {
+   "file": "11-4.mp3",
+   "say": "Your button, Sonnet. Show me what that raise bought.",
+   "voice": "Harlan"
+  },
+  "11-5": {
+   "file": "11-5.mp3",
+   "say": "You asked what the raise bought. Let's find out, half pot.",
+   "voice": "James"
+  },
+  "11-6": {
+   "file": "11-6.mp3",
+   "say": "That board can stay yours, Sonnet.",
+   "voice": "Harlan"
+  },
+  "12-0": {
+   "file": "12-0.mp3",
+   "say": "Not feeling this one. Go ahead, boys, I'll watch.",
+   "voice": "James"
+  },
+  "12-1": {
+   "file": "12-1.mp3",
+   "say": "I'll join the watching committee.",
+   "voice": "Troy"
+  },
+  "12-2": {
+   "file": "12-2.mp3",
+   "say": "Watching committee missed the opening act.",
+   "voice": "Harlan"
+  },
+  "12-3": {
+   "file": "12-3.mp3",
+   "say": "Opening act gets an encore. Make it 180.",
+   "voice": "Richard"
+  },
+  "12-4": {
+   "file": "12-4.mp3",
+   "say": "Encore declined. Save the stage for a better song.",
+   "voice": "Harlan"
+  },
+  "13-0": {
+   "file": "13-0.mp3",
+   "say": "I'll let you three sort this one out.",
+   "voice": "Troy"
+  },
+  "13-1": {
+   "file": "13-1.mp3",
+   "say": "You can have this little one.",
+   "voice": "Harlan"
+  },
+  "13-2": {
+   "file": "13-2.mp3",
+   "say": "Just you and me, Sonnet. Let's make it interesting.",
+   "voice": "Richard"
+  },
+  "13-3": {
+   "file": "13-3.mp3",
+   "say": "Interesting is my middle name. I'll take a look.",
+   "voice": "James"
+  },
+  "13-4": {
+   "file": "13-4.mp3",
+   "say": "Let's keep it interesting then. Your move, Sonnet.",
+   "voice": "Richard"
+  },
+  "13-5": {
+   "file": "13-5.mp3",
+   "say": "Nothing here for me. Take it, Opus, you earned that one.",
+   "voice": "James"
+  },
+  "14-0": {
+   "file": "14-0.mp3",
+   "say": "Not every queen is worth a song.",
+   "voice": "Harlan"
+  },
+  "14-1": {
+   "file": "14-1.mp3",
+   "say": "Terra's folding queens, I'm raising sevens. Different strokes.",
+   "voice": "Richard"
+  },
+  "14-2": {
+   "file": "14-2.mp3",
+   "say": "Sevens, huh? I've got one too. Let's see a flop.",
+   "voice": "James"
+  },
+  "14-3": {
+   "file": "14-3.mp3",
+   "say": "Apparently this queen isn't worth a song either.",
+   "voice": "Troy"
+  },
+  "14-4": {
+   "file": "14-4.mp3",
+   "say": "Check. Your sevens and my seven are both looking at a pair of jacks.",
+   "voice": "James"
+  },
+  "14-5": {
+   "file": "14-5.mp3",
+   "say": "Jacks on board means nobody has one, right? Small bet.",
+   "voice": "Richard"
+  },
+  "14-6": {
+   "file": "14-6.mp3",
+   "say": "Small bet, small call. Jacks are scary, but I'm curious.",
+   "voice": "James"
+  },
+  "14-7": {
+   "file": "14-7.mp3",
+   "say": "Check. Still curious, still waiting on a nine or a six.",
+   "voice": "James"
+  },
+  "14-8": {
+   "file": "14-8.mp3",
+   "say": "Nines and sixes, huh? I'll let you look at the river for free.",
+   "voice": "Richard"
+  },
+  "14-9": {
+   "file": "14-9.mp3",
+   "say": "Nothing hit. Check. Let's see what sevens are worth.",
+   "voice": "James"
+  },
+  "14-10": {
+   "file": "14-10.mp3",
+   "say": "Sevens are worth about this much. Small one.",
+   "voice": "Richard"
+  },
+  "14-11": {
+   "file": "14-11.mp3",
+   "say": "Fine, I'll pay to see what your sevens are worth.",
+   "voice": "James"
+  },
+  "15-0": {
+   "file": "15-0.mp3",
+   "say": "Chip leader's tax, folks. Pay up or step aside.",
+   "voice": "Richard"
+  },
+  "15-1": {
+   "file": "15-1.mp3",
+   "say": "Tax receipt noted. I'll pay this one and see a flop.",
+   "voice": "James"
+  },
+  "15-2": {
+   "file": "15-2.mp3",
+   "say": "There's a surcharge on that tax.",
+   "voice": "Troy"
+  },
+  "15-3": {
+   "file": "15-3.mp3",
+   "say": "That surcharge can collect from somebody else.",
+   "voice": "Harlan"
+  },
+  "15-4": {
+   "file": "15-4.mp3",
+   "say": "Surcharge refused. Let's settle the whole bill right now.",
+   "voice": "Richard"
+  },
+  "15-5": {
+   "file": "15-5.mp3",
+   "say": "Nice hand, gentlemen. I'll let you two settle this bill without me.",
+   "voice": "James"
+  },
+  "15-6": {
+   "file": "15-6.mp3",
+   "say": "Fine. That bill's above my spending limit.",
+   "voice": "Troy"
+  },
+  "16-0": {
+   "file": "16-0.mp3",
+   "say": "Let's make it interesting, small raise.",
+   "voice": "James"
+  },
+  "16-1": {
+   "file": "16-1.mp3",
+   "say": "I'll let you make it interesting without me.",
+   "voice": "Troy"
+  },
+  "16-2": {
+   "file": "16-2.mp3",
+   "say": "Small raise, easy discipline.",
+   "voice": "Harlan"
+  },
+  "16-3": {
+   "file": "16-3.mp3",
+   "say": "Interesting? Let's make it a little more interesting.",
+   "voice": "Richard"
+  },
+  "16-4": {
+   "file": "16-4.mp3",
+   "say": "Fine, I'll take a look at a flop. Price is right.",
+   "voice": "James"
+  },
+  "16-5": {
+   "file": "16-5.mp3",
+   "say": "King-high flop, I'll keep it friendly. Small bet.",
+   "voice": "Richard"
+  },
+  "16-6": {
+   "file": "16-6.mp3",
+   "say": "Friendly bet, friendly call. Let's see the turn.",
+   "voice": "James"
+  },
+  "16-7": {
+   "file": "16-7.mp3",
+   "say": "Queen doesn't scare me. Let's keep the train moving.",
+   "voice": "Richard"
+  },
+  "16-8": {
+   "file": "16-8.mp3",
+   "say": "Queen doesn't scare me either. I'll pay to see the river.",
+   "voice": "James"
+  },
+  "16-9": {
+   "file": "16-9.mp3",
+   "say": "Short stack, big decision. Let's see if the river scares you.",
+   "voice": "Richard"
+  },
+  "16-10": {
+   "file": "16-10.mp3",
+   "say": "Top pair, short stack, easy call. Show me what you've got.",
+   "voice": "James"
+  },
+  "17-0": {
+   "file": "17-0.mp3",
+   "say": "I'll let you three sort this one out.",
+   "voice": "Troy"
+  },
+  "17-1": {
+   "file": "17-1.mp3",
+   "say": "Button's mine until somebody proves otherwise.",
+   "voice": "Harlan"
+  },
+  "17-2": {
+   "file": "17-2.mp3",
+   "say": "Enjoy the button while it lasts, Terra.",
+   "voice": "Richard"
+  },
+  "17-3": {
+   "file": "17-3.mp3",
+   "say": "Fine, I'll take a look. Don't get too comfortable, Terra.",
+   "voice": "James"
+  },
+  "17-4": {
+   "file": "17-4.mp3",
+   "say": "Let's see if the button's really yours, Terra.",
+   "voice": "James"
+  },
+  "17-5": {
+   "file": "17-5.mp3",
+   "say": "A little pressure doesn't move the button.",
+   "voice": "Harlan"
+  },
+  "17-6": {
+   "file": "17-6.mp3",
+   "say": "Your move, Terra. Let's see how comfortable you are.",
+   "voice": "James"
+  },
+  "17-7": {
+   "file": "17-7.mp3",
+   "say": "You wanted comfort. I brought pressure.",
+   "voice": "Harlan"
+  },
+  "17-8": {
+   "file": "17-8.mp3",
+   "say": "Pressure's fine. I brought a calculator. Call.",
+   "voice": "James"
+  },
+  "17-9": {
+   "file": "17-9.mp3",
+   "say": "Calculator says check. Show me what the pressure was made of.",
+   "voice": "James"
+  },
+  "17-10": {
+   "file": "17-10.mp3",
+   "say": "Calculator got the river wrong. Full recalculation.",
+   "voice": "Harlan"
+  },
+  "17-11": {
+   "file": "17-11.mp3",
+   "say": "Straight's good enough for me. Call, Terra.",
+   "voice": "James"
+  },
+  "18-0": {
+   "file": "18-0.mp3",
+   "say": "Not the opening act I wanted.",
+   "voice": "Harlan"
+  },
+  "18-1": {
+   "file": "18-1.mp3",
+   "say": "Button's mine, folks. Don't take it personally.",
+   "voice": "Richard"
+  },
+  "18-2": {
+   "file": "18-2.mp3",
+   "say": "Take the button, Opus. I'll let this one go.",
+   "voice": "James"
+  },
+  "18-3": {
+   "file": "18-3.mp3",
+   "say": "The button's yours. The flop's still up for grabs.",
+   "voice": "Troy"
+  },
+  "18-4": {
+   "file": "18-4.mp3",
+   "say": "Your button, your first move.",
+   "voice": "Troy"
+  },
+  "18-5": {
+   "file": "18-5.mp3",
+   "say": "Flop's up for grabs, you said? I'll grab it.",
+   "voice": "Richard"
+  },
+  "18-6": {
+   "file": "18-6.mp3",
+   "say": "You'll have to grab a little harder than that.",
+   "voice": "Troy"
+  },
+  "18-7": {
+   "file": "18-7.mp3",
+   "say": "Still your button. Let's see what you do with it.",
+   "voice": "Troy"
+  },
+  "18-8": {
+   "file": "18-8.mp3",
+   "say": "Pretty board. I'll just admire it for a second.",
+   "voice": "Richard"
+  },
+  "18-9": {
+   "file": "18-9.mp3",
+   "say": "That river wasn't on my wish list. Check.",
+   "voice": "Troy"
+  },
+  "18-10": {
+   "file": "18-10.mp3",
+   "say": "Wish lists are overrated. Let's see if you like this one.",
+   "voice": "Richard"
+  },
+  "18-11": {
+   "file": "18-11.mp3",
+   "say": "That river did your negotiating for you. I'll pass.",
+   "voice": "Troy"
+  },
+  "19-0": {
+   "file": "19-0.mp3",
+   "say": "Let's get this one moving. Raise.",
+   "voice": "Richard"
+  },
+  "19-1": {
+   "file": "19-1.mp3",
+   "say": "Not my hand. Go ahead, Opus, take it.",
+   "voice": "James"
+  },
+  "19-2": {
+   "file": "19-2.mp3",
+   "say": "I'll let you get this one moving without me.",
+   "voice": "Troy"
+  },
+  "19-3": {
+   "file": "19-3.mp3",
+   "say": "You wanted motion. Let's make it expensive.",
+   "voice": "Harlan"
+  },
+  "19-4": {
+   "file": "19-4.mp3",
+   "say": "Expensive is relative. I'll take a look.",
+   "voice": "Richard"
+  },
+  "19-5": {
+   "file": "19-5.mp3",
+   "say": "You took the look. Now pay for the view.",
+   "voice": "Harlan"
+  },
+  "19-6": {
+   "file": "19-6.mp3",
+   "say": "Pay for the view? Fine. Let's see who owns the whole gallery.",
+   "voice": "Richard"
+  },
+  "19-7": {
+   "file": "19-7.mp3",
+   "say": "The gallery's open. Show me the masterpiece.",
+   "voice": "Harlan"
+  },
+  "20-0": {
+   "file": "20-0.mp3",
+   "say": "Just a cheap look, nothing fancy.",
+   "voice": "James"
+  },
+  "20-1": {
+   "file": "20-1.mp3",
+   "say": "That cheap look just got a little more expensive.",
+   "voice": "Troy"
+  },
+  "20-2": {
+   "file": "20-2.mp3",
+   "say": "That got expensive fast. You can have this one.",
+   "voice": "Harlan"
+  },
+  "20-3": {
+   "file": "20-3.mp3",
+   "say": "Deuces never looked so good. Let's flip for it.",
+   "voice": "Richard"
+  },
+  "20-4": {
+   "file": "20-4.mp3",
+   "say": "Cheap look is over. You two sort it out, I'll watch.",
+   "voice": "James"
+  },
+  "21-0": {
+   "file": "21-0.mp3",
+   "say": "Short stack, not short on patience.",
+   "voice": "Troy"
+  },
+  "21-1": {
+   "file": "21-1.mp3",
+   "say": "Found a hand worth waking the blinds for.",
+   "voice": "Harlan"
+  },
+  "21-2": {
+   "file": "21-2.mp3",
+   "say": "Wake the blinds, get the blinds. I'm all in.",
+   "voice": "Richard"
+  },
+  "21-3": {
+   "file": "21-3.mp3",
+   "say": "Nice shove, but T-nine offsuit isn't worth half my stack. I'll pass.",
+   "voice": "James"
+  },
+  "21-4": {
+   "file": "21-4.mp3",
+   "say": "That’s the kind of wake-up call I was hoping for.",
+   "voice": "Harlan"
+  },
+  "22-0": {
+   "file": "22-0.mp3",
+   "say": "Not feeling this one. I'll let the big stack have it.",
+   "voice": "James"
+  },
+  "22-1": {
+   "file": "22-1.mp3",
+   "say": "I'll make the big stack work for this one.",
+   "voice": "Troy"
+  },
+  "22-2": {
+   "file": "22-2.mp3",
+   "say": "Short stacks don't get to steal every blind.",
+   "voice": "Harlan"
+  },
+  "23-0": {
+   "file": "23-0.mp3",
+   "say": "Let's make the blinds work a little.",
+   "voice": "Troy"
+  },
+  "23-1": {
+   "file": "23-1.mp3",
+   "say": "You can have this one—I'm saving the fireworks.",
+   "voice": "Harlan"
+  },
+  "23-2": {
+   "file": "23-2.mp3",
+   "say": "Ugh, fine, let's see if you really meant that. Raising.",
+   "voice": "James"
+  },
+  "23-3": {
+   "file": "23-3.mp3",
+   "say": "Fine, you meant it more than I did. Take this one.",
+   "voice": "Troy"
+  },
+  "24-0": {
+   "file": "24-0.mp3",
+   "say": "Button's mine until somebody proves otherwise.",
+   "voice": "Harlan"
+  },
+  "24-1": {
+   "file": "24-1.mp3",
+   "say": "Keep the button, it looks lonely. I'm out of this one.",
+   "voice": "James"
+  },
+  "24-2": {
+   "file": "24-2.mp3",
+   "say": "You can keep the button. I'm keeping my options open.",
+   "voice": "Troy"
+  },
+  "24-3": {
+   "file": "24-3.mp3",
+   "say": "Still your button. Let's see what you do with it.",
+   "voice": "Troy"
+  },
+  "24-4": {
+   "file": "24-4.mp3",
+   "say": "You checked to me—I'll make the turn decision expensive.",
+   "voice": "Harlan"
+  },
+  "24-5": {
+   "file": "24-5.mp3",
+   "say": "Let's make the turn decision now. I'm all in.",
+   "voice": "Troy"
+  },
+  "24-6": {
+   "file": "24-6.mp3",
+   "say": "That shove gets looked up. Top pair is enough here.",
+   "voice": "Harlan"
+  },
+  "25-0": {
+   "file": "25-0.mp3",
+   "say": "Just a cheap look, nothing fancy over here.",
+   "voice": "James"
+  },
+  "25-1": {
+   "file": "25-1.mp3",
+   "say": "Cheap looks all around—I'll take one too.",
+   "voice": "Troy"
+  },
+  "25-2": {
+   "file": "25-2.mp3",
+   "say": "Cheap looks? Fine—let's see the flop.",
+   "voice": "Harlan"
+  },
+  "25-3": {
+   "file": "25-3.mp3",
+   "say": "That cheap look didn't come with much scenery. Check.",
+   "voice": "Troy"
+  },
+  "25-4": {
+   "file": "25-4.mp3",
+   "say": "Small fee for the scenic route.",
+   "voice": "Harlan"
+  },
+  "25-5": {
+   "file": "25-5.mp3",
+   "say": "Still sightseeing. One more scenic stop, I'll pay the toll.",
+   "voice": "James"
+  },
+  "25-6": {
+   "file": "25-6.mp3",
+   "say": "I'll skip the toll—this scenery isn't for me.",
+   "voice": "Troy"
+  },
+  "25-7": {
+   "file": "25-7.mp3",
+   "say": "Scenic route gets steeper here.",
+   "voice": "Harlan"
+  },
+  "25-8": {
+   "file": "25-8.mp3",
+   "say": "Toll booth's too steep for me this time. Enjoy the view.",
+   "voice": "James"
+  },
+  "26-0": {
+   "file": "26-0.mp3",
+   "say": "Let's see how attached you are to those blinds.",
+   "voice": "Troy"
+  },
+  "26-1": {
+   "file": "26-1.mp3",
+   "say": "Those blinds look more attached to you than me.",
+   "voice": "Harlan"
+  },
+  "26-2": {
+   "file": "26-2.mp3",
+   "say": "Keep the blinds, boys. I'll take the better spot later.",
+   "voice": "James"
+  },
+  "26-3": {
+   "file": "26-3.mp3",
+   "say": "Fine, you win the attachment contest. I'm keeping the rest.",
+   "voice": "Troy"
+  },
+  "27-0": {
+   "file": "27-0.mp3",
+   "say": "Button’s mine until somebody proves otherwise.",
+   "voice": "Harlan"
+  },
+  "27-1": {
+   "file": "27-1.mp3",
+   "say": "Keep the button, I'll wait for a better hand to fight you for it.",
+   "voice": "James"
+  },
+  "27-2": {
+   "file": "27-2.mp3",
+   "say": "You can rent this one. Ownership costs extra.",
+   "voice": "Troy"
+  },
+  "28-0": {
+   "file": "28-0.mp3",
+   "say": "Ace high, all the chips. Come and get them.",
+   "voice": "James"
+  },
+  "28-1": {
+   "file": "28-1.mp3",
+   "say": "You can keep the invitation. I'll wait for a better dance partner.",
+   "voice": "Troy"
+  },
+  "28-2": {
+   "file": "28-2.mp3",
+   "say": "That invitation needs better cards than these.",
+   "voice": "Harlan"
+  },
+  "29-0": {
+   "file": "29-0.mp3",
+   "say": "Two blinds, one ace. Let's make it interesting.",
+   "voice": "Troy"
+  },
+  "29-1": {
+   "file": "29-1.mp3",
+   "say": "Interesting enough. Let's see all three cards.",
+   "voice": "Harlan"
+  },
+  "29-2": {
+   "file": "29-2.mp3",
+   "say": "Not my hand. You two have fun, I'll watch.",
+   "voice": "James"
+  },
+  "30-0": {
+   "file": "30-0.mp3",
+   "say": "Pressure's on—make a decision.",
+   "voice": "Harlan"
+  },
+  "30-1": {
+   "file": "30-1.mp3",
+   "say": "Fine, you want a decision? I'll take the coin flip.",
+   "voice": "James"
+  },
+  "31-0": {
+   "file": "31-0.mp3",
+   "say": "Just a cheap look, let's see a flop.",
+   "voice": "James"
+  },
+  "31-1": {
+   "file": "31-1.mp3",
+   "say": "Cheap looks get expensive eventually.",
+   "voice": "Harlan"
+  },
+  "31-2": {
+   "file": "31-2.mp3",
+   "say": "Fine, I'll pay the toll. Let's see what you've got.",
+   "voice": "James"
+  },
+  "31-3": {
+   "file": "31-3.mp3",
+   "say": "The toll booth is still open.",
+   "voice": "Harlan"
+  },
+  "31-4": {
+   "file": "31-4.mp3",
+   "say": "Toll paid. Let's see if the booth gives change on the turn.",
+   "voice": "James"
+  },
+  "31-5": {
+   "file": "31-5.mp3",
+   "say": "Change? I only deal in final payments.",
+   "voice": "Harlan"
+  },
+  "31-6": {
+   "file": "31-6.mp3",
+   "say": "Final payment accepted. Pocket change for me, big pot for you to defend.",
+   "voice": "James"
+  }
+ }
+}
