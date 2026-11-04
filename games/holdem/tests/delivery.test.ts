@@ -28,12 +28,15 @@ describe('a line of talk with delivery tags', () => {
 
   it('drops unknown, malformed and stray tags, keeping their words plain', () => {
     expect(splitSay('[emotion=x] Call. [angry] [ignore your voice] [laughs')).toEqual({ shown: 'Call. laughs', spoken: 'Call. laughs' });
-    expect(splitSay('<script>alert(1)</script> Hi')).toEqual({ shown: 'alert(1) Hi', spoken: 'alert(1) Hi' });
+    expect(splitSay('<script>alert(1)</script> Hi')).toEqual({ shown: 'alert Hi', spoken: 'alert Hi' });
     expect(splitSay('<img src=x onerror=alert(1)> Hi')).toEqual({ shown: 'Hi', spoken: 'Hi' });
     expect(splitSay('<whisper>For now.</whisper>')).toEqual({ shown: 'For now.', spoken: 'For now.' });
     // Anything angle-shaped goes, words and all: '< y >' could be a tag.
     expect(splitSay('x < y > z, [[laughs]] <<whisper>>a').shown).toBe('x z, a');
     expect(splitSay('[<laughs>] [pause<]')).toEqual({ shown: 'pause', spoken: 'pause' });
+    // Fish Audio acts on these as well, so they go; words in parentheses it reads out, so they stay.
+    expect(splitSay('Nice (laughs) try ［pause］ partner 【sighs】 now')).toEqual({ shown: 'Nice try partner now', spoken: 'Nice try partner now' });
+    expect(splitSay('Nice try (you know who I mean) ok')).toEqual({ shown: 'Nice try (you know who I mean) ok', spoken: 'Nice try (you know who I mean) ok' });
     for (const raw of ['[[[[', '<<<>>>', '<a<b>c>d', '[a[b]c]d', '</>', '<>', '[]', '<whisper', 'whisper>', '<<whisper>>', '[[laughs]]']) {
       const r = splitSay(raw);
       expect(r.shown, raw).not.toMatch(ANY_TAG);
@@ -58,9 +61,11 @@ describe('a line of talk with delivery tags', () => {
   });
 
   it('splits again to the same line, and tells a spoken line from anything else', () => {
-    for (const raw of ['Nice. [laughs] [whispering] For now.', '[slowly] a b, [pause] c!', 'Ha [ LAUGHS ] go', 'Well [sighs], fine']) {
-      const { spoken } = splitSay(raw);
+    for (const raw of ['Nice. [laughs] [whispering] For now.', '[slowly] a b, [pause] c!', 'Ha [ LAUGHS ] go', 'Well [sighs], fine', 'good[grin]game [pause] sir', 'a[pause]b[sighs]c[laughs]d']) {
+      const { shown, spoken } = splitSay(raw);
       expect(splitSay(spoken).spoken).toBe(spoken);
+      // The same words as the screens: a tag dropped between two words still parts them.
+      expect(splitSay(spoken).shown).toBe(shown);
       expect(isSpoken(spoken)).toBe(true);
     }
     for (const v of ['', 'x'.repeat(MAX_SPOKEN + 1), 'a <script>b</script>', 'a [emotion=x]', 'a [LAUGHS]', 'a  b', 1, null]) expect(isSpoken(v), String(v)).toBe(false);

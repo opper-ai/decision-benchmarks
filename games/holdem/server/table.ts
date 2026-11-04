@@ -278,7 +278,7 @@ export const DEFAULT_TABLE_LIMITS: TableLimits = { starts: { ratePerSec: 1 / 15,
 
 /** Requests whose talk was charged, remembered so a retry is not charged again (see `charged`). */
 const MAX_CHARGED_TALK = 20_000;
-/** Spoken lines kept for a repeat (see `spoken`): about 40 KB of base64 each, so at most about 12 MB. */
+/** Spoken lines kept for a repeat (see `spoken`): about 70 KB of base64 each, so at most about 20 MB. */
 const SPOKEN_LINES = 300;
 /** Tables whose answer to the request that finished their last hand is kept for a retry (see `answers`). */
 const REMEMBERED_ANSWERS = 2000;

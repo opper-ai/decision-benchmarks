@@ -186,7 +186,8 @@ nothing for this game.
     The server splits each line (`shared/delivery.ts` `splitSay`): `say`, what every screen, the chat, the bubbles, the
     other models' prompts, the review and the recording get, has no tag of any kind (anything bracket- or
     angle-shaped is taken out, the words tidied and cut to 90 characters); the spoken form keeps only the allowed tags
-    (Fish Audio acts on any bracketed words, so any other tag goes, and stray marks with it), and lives only in the sealed
+    (Fish Audio acts on any bracketed words, and on a single word in parentheses, so any other tag goes, on the screens
+    too), and lives only in the sealed
     token (`v`, only when it differs), so recordings and replays have none. A line cut to length is spoken plain. The
     mood adds nothing. The bench's prompt and answers are unchanged.
   - `POST api/table/speak { token, hand, action }` is never an open text-to-speech proxy: the server reads the line
